@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/suggest-compact.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/suggest-compact.js"
           }
         ]
       },
@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/observe.js pre"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/observe.js pre"
           }
         ]
       }
@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/observe.js post"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/observe.js post"
           }
         ]
       }
@@ -64,7 +64,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/pre-compact.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-compact.js"
           }
         ]
       }
@@ -75,7 +75,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/session-start.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-start.js"
           }
         ]
       }
@@ -86,7 +86,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/check-console-log.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check-console-log.js"
           }
         ]
       }
@@ -97,7 +97,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/session-end.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-end.js"
           }
         ]
       },
@@ -106,7 +106,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/evaluate-session.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/evaluate-session.js"
           }
         ]
       },
@@ -115,7 +115,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/start-observer.js analyze",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/start-observer.js analyze",
             "timeout": 180,
             "async": true
           }
@@ -126,7 +126,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/shared/scripts/hooks/summarize-session.js",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/summarize-session.js",
             "timeout": 120,
             "async": true
           }

@@ -1,47 +1,73 @@
 # my-everything-claude-code
 
-Personal Claude Code configurations organized by frontend framework, with shared hooks system.
+Personal Claude Code plugin — shared hooks, skills, commands, and agents for all projects.
+
+## Install
+
+```bash
+# Add marketplace
+/plugin marketplace add ClayLeee/my-everything-claude-code
+
+# Install plugin
+/plugin install my-everything-claude-code@ClayLeee-my-everything-claude-code
+```
 
 ## Structure
 
 ```
-├── vue3/                      # Vue 3 + TypeScript projects
-│   └── agents/
-│       └── code-review.md
-├── shared/                    # Shared across all frameworks
-│   ├── scripts/
-│   │   ├── hooks/             # Hook scripts (observe, compact, console.log check, etc.)
-│   │   └── lib/               # Shared utilities (utils.js, session-manager.js, etc.)
-│   ├── commands/
-│   │   └── cl/                # Continuous Learning commands (status, analyze, log, sync)
-│   ├── skills/
-│   │   └── continuous-learning-v2/  # CL v2 skill (linked via Windows junction)
-│   ├── settings.local.json    # Hooks config template (no project-specific permissions)
-│   └── HOOKS.md               # Complete hooks documentation and data flow
-├── setup.sh                   # Deploy configs to a project
-└── README.md
+├── .claude-plugin/
+│   ├── marketplace.json
+│   └── plugin.json
+├── commands/
+│   ├── cl/                        # Continuous Learning (status, analyze, log, sync)
+│   └── commit-msg.md              # Generate Conventional Commits message from git diff
+├── skills/
+│   ├── continuous-learning-v2/    # Instinct-based learning system
+│   ├── conventional-commits/      # Conventional Commits specification
+│   └── vue-i18n/                  # Vue I18n guide
+├── agents/
+│   └── code-review.md             # Code review agent
+├── hooks/
+│   └── hooks.json                 # All hook definitions
+└── scripts/
+    ├── hooks/                     # Hook scripts
+    └── lib/                       # Shared utilities
 ```
 
-## Usage
+## What's Included
 
-```bash
-# Deploy Vue 3 agents + shared hooks to a project
-./setup.sh vue3 /c/Users/claylee/Documents/devops-ui-v3
+### Hooks
 
-# Deploy only shared hooks (no framework-specific agents)
-./setup.sh --hooks-only /c/Users/claylee/Documents/some-project
-```
+| Event | Hook | Description |
+|-------|------|-------------|
+| PreToolUse | git push reminder | Warn before pushing |
+| PreToolUse | block random .md | Prevent unnecessary doc files |
+| PreToolUse | suggest compact | Remind `/compact` after 50 edits |
+| PreToolUse | observe (pre) | Collect tool usage observations |
+| PostToolUse | console.log warning | Flag `console.log` in edited code |
+| PostToolUse | observe (post) | Collect tool results |
+| PreCompact | compaction log | Record compaction events |
+| SessionStart | load context | Load previous session summary |
+| Stop | global console.log check | Scan all git-changed files |
+| SessionEnd | session record | Save session metadata |
+| SessionEnd | evaluate session | Log session length |
+| SessionEnd | auto-analyze | Extract instincts from observations |
+| SessionEnd | auto-summarize | Generate session summary |
 
-## Notes
+### Skills
 
-- `settings.local.json` will NOT overwrite an existing one (merge manually if needed)
-- Hook scripts are generic and work with any project
-- Skills are linked via **Windows junction** (`mklink /J`) — editing in any project updates all projects
-- The `permissions.allow` array in the template is empty — add project-specific permissions after deploy
+- **conventional-commits** — Commit message format specification
+- **continuous-learning-v2** — Instinct-based learning from session observations
+- **vue-i18n** — Vue I18n internationalization guide
 
-## Adding a New Framework
+### Commands
 
-```bash
-mkdir -p react/agents
-# Create agents in react/agents/
-```
+- `/commit-msg` — Generate a Conventional Commits message from current git diff
+- `/cl:status` — Show learned instincts with confidence scores
+- `/cl:analyze` — Manually trigger observation analysis
+- `/cl:log` — Show recent observer log entries
+- `/cl:sync` — Update instincts.md from current instincts
+
+## Credits
+
+Hooks system adapted from [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) (MIT License).
