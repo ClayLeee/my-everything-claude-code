@@ -19,11 +19,9 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 │   ├── marketplace.json
 │   └── plugin.json
 ├── commands/
-│   ├── cl/                        # Continuous Learning (status, analyze, log, sync)
-│   └── commit-msg.md              # Generate Conventional Commits message from git diff
+│   └── cl/                        # Continuous Learning (status, analyze, log, sync)
 ├── skills/
 │   ├── continuous-learning-v2/    # Instinct-based learning system
-│   ├── conventional-commits/      # Conventional Commits specification
 │   └── vue-i18n/                  # Vue I18n guide
 ├── agents/
 │   └── code-review.md             # Code review agent
@@ -56,13 +54,11 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 
 ### Skills
 
-- **conventional-commits** — Commit message format specification
 - **continuous-learning-v2** — Instinct-based learning from session observations
 - **vue-i18n** — Vue I18n internationalization guide
 
 ### Commands
 
-- `/commit-msg` — Generate a Conventional Commits message from current git diff
 - `/cl:status` — Show learned instincts with confidence scores
 - `/cl:analyze` — Manually trigger observation analysis
 - `/cl:log` — Show recent observer log entries
