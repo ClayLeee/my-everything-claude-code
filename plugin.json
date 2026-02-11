@@ -1,0 +1,24 @@
+{
+  "name": "my-everything-claude-code",
+  "version": "1.0.0",
+  "description": "Shared Claude Code configs: hooks, skills, commands, and agents for all projects",
+  "author": {
+    "name": "ClayLeee",
+    "url": "https://github.com/ClayLeee"
+  },
+  "repository": "https://github.com/ClayLeee/my-everything-claude-code",
+  "license": "MIT",
+  "keywords": ["hooks", "conventional-commits", "continuous-learning", "vue3"],
+  "commands": [
+    "./shared/commands/",
+    "./vue3/commands/"
+  ],
+  "skills": [
+    "./shared/skills/",
+    "./vue3/skills/"
+  ],
+  "agents": [
+    "./vue3/agents/"
+  ],
+  "hooks": "./hooks.json"
+}
