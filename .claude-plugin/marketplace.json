@@ -1,0 +1,15 @@
+{
+  "name": "my-everything-claude-code",
+  "owner": {
+    "name": "ClayLeee",
+    "url": "https://github.com/ClayLeee"
+  },
+  "plugins": [
+    {
+      "name": "my-everything-claude-code",
+      "source": "./",
+      "description": "Shared Claude Code configs: hooks, skills, commands, and agents for all projects",
+      "version": "1.0.0"
+    }
+  ]
+}
