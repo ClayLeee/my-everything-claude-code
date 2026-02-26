@@ -8,7 +8,7 @@ tags: [continuous-learning, instincts, sync]
 Sync current instincts to the project CLAUDE.md-referenced file:
 
 ```bash
-node .claude/scripts/hooks/start-observer.js sync
+node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/start-observer.js sync
 ```
 
 Display the output to the user as-is. Do not summarize or reformat.
