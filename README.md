@@ -40,6 +40,71 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
     └── lib/                       # Shared utilities
 ```
 
+## Development Workflow
+
+```mermaid
+flowchart TD
+    %% ── Session Start ──
+    START([Session Start]) --> LOAD[/"load context hook<br><i>restore previous session summary</i>"/]
+    LOAD --> DEV
+
+    %% ── Development Loop ──
+    subgraph DEV ["Development Loop"]
+        direction TB
+        CODE["Write / Edit Code"] --> OBSERVE[/"observe hook<br><i>capture tool usage</i>"/]
+        CODE --> CONSOLE[/"console.log warning<br><i>flag debug statements</i>"/]
+        CODE --> COMPACT[/"suggest /compact<br><i>after 50+ edits</i>"/]
+        CODE --> BLOCK[/"block random .md<br><i>prevent unnecessary docs</i>"/]
+    end
+
+    %% ── On-Demand Agents ──
+    DEV --> |"need quality check"| REVIEW["code-review agent<br><i>duplicates · optimization · standards · i18n</i>"]
+    DEV --> |"build broken"| BUILD["build-error-resolver agent<br><i>minimal fix · no refactoring</i>"]
+    DEV --> |"security concern"| SEC["security-reviewer agent<br><i>XSS · auth · input · deps · secrets</i>"]
+    DEV --> |"cleanup time"| CLEAN["refactor-cleaner agent<br><i>dead code · unused deps · duplicates</i>"]
+    REVIEW --> DEV
+    BUILD --> DEV
+    SEC --> DEV
+    CLEAN --> DEV
+
+    %% ── Before Commit ──
+    DEV --> |"/before-commit"| BC["pnpm before-commit<br><i>type check + lint</i>"]
+    BC --> |pass| MSG["git-commit skill<br><i>generate conventional commit message</i>"]
+    BC --> |fail| DEV
+    MSG --> COMMIT["git commit + push"]
+    COMMIT --> PUSH[/"git push reminder hook<br><i>review before pushing</i>"/]
+
+    %% ── Session End ──
+    PUSH --> END([Session End])
+    END --> RECORD[/"session record + evaluate"/]
+    END --> ANALYZE[/"auto-analyze<br><i>extract instincts from observations</i>"/]
+    END --> SUMMARIZE[/"auto-summarize<br><i>generate session summary</i>"/]
+
+    %% ── Learning Cycle ──
+    ANALYZE --> INSTINCTS[("instincts/<br>personal")]
+    subgraph LEARNING ["Learning Cycle  (async)"]
+        direction LR
+        INSTINCTS --> |"/evolve"| EVOLVED["evolved<br>commands · skills · agents"]
+        INSTINCTS --> |"/instinct-export"| SHARE["share with<br>teammates"]
+        SHARE --> |"/instinct-import"| INSTINCTS
+    end
+
+    %% ── Styles ──
+    classDef hook fill:#f3e8ff,stroke:#7c3aed,color:#1e1e1e
+    classDef agent fill:#dbeafe,stroke:#2563eb,color:#1e1e1e
+    classDef command fill:#dcfce7,stroke:#16a34a,color:#1e1e1e
+    classDef phase fill:#fef3c7,stroke:#d97706,color:#1e1e1e
+    classDef store fill:#e0e7ff,stroke:#4f46e5,color:#1e1e1e
+
+    class LOAD,OBSERVE,CONSOLE,COMPACT,BLOCK,PUSH,RECORD,ANALYZE,SUMMARIZE hook
+    class REVIEW,BUILD,SEC,CLEAN agent
+    class BC,MSG command
+    class START,END phase
+    class INSTINCTS,EVOLVED,SHARE store
+```
+
+> **Legend:** <span style="color:#7c3aed">Purple</span> = auto hooks · <span style="color:#2563eb">Blue</span> = on-demand agents · <span style="color:#16a34a">Green</span> = commands · <span style="color:#d97706">Yellow</span> = session lifecycle
+
 ## What's Included
 
 ### Hooks
