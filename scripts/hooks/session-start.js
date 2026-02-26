@@ -7,7 +7,7 @@
  * !! Known issue: SessionStart hook may have bugs in some environments.
  */
 
-const ENABLED = false;
+const ENABLED = true;
 
 if (!ENABLED) {
   process.exit(0);

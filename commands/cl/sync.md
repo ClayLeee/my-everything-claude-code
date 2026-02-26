@@ -1,5 +1,5 @@
 ---
-name: "CL: Sync"
+name: "cl:sync"
 description: "Update .claude/instincts.md from current instincts without re-analyzing"
 category: Learning
 tags: [continuous-learning, instincts, sync]

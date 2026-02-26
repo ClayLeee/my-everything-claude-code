@@ -1,5 +1,5 @@
 ---
-name: "CL: Log"
+name: "cl:log"
 description: "Show recent observer analysis log entries"
 category: Learning
 tags: [continuous-learning, observer, log, debug]

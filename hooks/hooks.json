@@ -67,6 +67,17 @@
             "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-compact.js"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/start-observer.js analyze",
+            "timeout": 180,
+            "async": true
+          }
+        ]
       }
     ],
     "SessionStart": [

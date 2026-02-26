@@ -144,16 +144,19 @@ function runAnalysis() {
     const promptFile = writePromptFile();
     const shortPrompt = `Read ${promptFile} for your full instructions, then execute them.`;
 
+    const cleanEnv = { ...process.env };
+    delete cleanEnv.CLAUDECODE;
     const result = spawnSync('claude', [
       '--print',
       '--model', 'haiku',
-      '--max-turns', '5',
+      '--max-turns', '15',
       '--allowedTools', 'Read,Write,Glob,Grep'
     ], {
       input: shortPrompt,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 180000 // 3 minute timeout
+      timeout: 180000, // 3 minute timeout
+      env: cleanEnv
     });
 
     if (result.status === 0) {
@@ -261,8 +264,8 @@ function generateInstinctsMd() {
   }
 
   // Write to .claude/instincts.md in the project root
-  // Detect project root by walking up from this script
-  let projectRoot = path.resolve(__dirname, '..', '..', '..');
+  // Hooks run from project root, so cwd is reliable
+  let projectRoot = process.cwd();
   const outputFile = path.join(projectRoot, '.claude', 'instincts.md');
   ensureDir(path.dirname(outputFile));
   fs.writeFileSync(outputFile, lines.join('\n'), 'utf8');

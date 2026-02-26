@@ -1,5 +1,5 @@
 ---
-name: "CL: Status"
+name: "cl:status"
 description: "Show all learned instincts with confidence scores, grouped by domain"
 category: Learning
 tags: [continuous-learning, instincts, status]
