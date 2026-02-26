@@ -8,7 +8,7 @@ tags: [continuous-learning, instincts, status]
 Run the instinct CLI to show all learned instincts:
 
 ```bash
-python .claude/skills/continuous-learning-v2/scripts/instinct-cli.py status
+python ${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-v2/scripts/instinct-cli.py status
 ```
 
 Display the output to the user as-is. Do not summarize or reformat.

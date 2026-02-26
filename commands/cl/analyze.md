@@ -8,13 +8,13 @@ tags: [continuous-learning, observer, analyze]
 Run observer analysis in foreground:
 
 ```bash
-node .claude/scripts/hooks/start-observer.js analyze
+node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/start-observer.js analyze
 ```
 
 After completion, also run the instinct status to show results:
 
 ```bash
-python .claude/skills/continuous-learning-v2/scripts/instinct-cli.py status
+python ${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-v2/scripts/instinct-cli.py status
 ```
 
 Display all output to the user as-is.
