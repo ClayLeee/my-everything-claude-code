@@ -1,5 +1,5 @@
 ---
-name: "CL: Analyze"
+name: "cl:analyze"
 description: "Manually trigger observation analysis to extract instincts"
 category: Learning
 tags: [continuous-learning, observer, analyze]
