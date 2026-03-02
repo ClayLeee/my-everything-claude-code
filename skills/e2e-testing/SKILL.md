@@ -31,6 +31,100 @@ tests/
 └── playwright.config.ts
 ```
 
+## Test Credentials & Multi-Role Authentication
+
+Test accounts are stored in `.env.test.local` (gitignored, never committed). Different permission levels require different accounts — always use the role that matches the test scenario.
+
+**`.env.test.local` format:**
+```env
+# Sysadmin — system-level administration
+TEST_AD_USERNAME=
+TEST_AD_PASSWORD=
+
+# Organization Owner — organization management
+TEST_OO_USERNAME=
+TEST_OO_PASSWORD=
+
+# Project Manager — project-level management
+TEST_PM_USERNAME=
+TEST_PM_PASSWORD=
+
+# Engineer (RD) — development tasks
+TEST_RD_USERNAME=
+TEST_RD_PASSWORD=
+
+# QA — testing and quality assurance
+TEST_QA_USERNAME=
+TEST_QA_PASSWORD=
+```
+
+**Loading credentials in fixtures (`tests/fixtures/auth.ts`):**
+```typescript
+import dotenv from 'dotenv'
+import path from 'path'
+
+dotenv.config({ path: path.resolve(__dirname, '../../.env.test.local') })
+
+export const accounts = {
+  sysadmin: {
+    username: process.env.TEST_AD_USERNAME!,
+    password: process.env.TEST_AD_PASSWORD!,
+  },
+  orgOwner: {
+    username: process.env.TEST_OO_USERNAME!,
+    password: process.env.TEST_OO_PASSWORD!,
+  },
+  projectManager: {
+    username: process.env.TEST_PM_USERNAME!,
+    password: process.env.TEST_PM_PASSWORD!,
+  },
+  engineer: {
+    username: process.env.TEST_RD_USERNAME!,
+    password: process.env.TEST_RD_PASSWORD!,
+  },
+  qa: {
+    username: process.env.TEST_QA_USERNAME!,
+    password: process.env.TEST_QA_PASSWORD!,
+  },
+} as const
+
+export type AccountRole = keyof typeof accounts
+```
+
+**Using in tests:**
+```typescript
+import { test, expect } from '@playwright/test'
+import { accounts } from '../fixtures/auth'
+import { LoginPage } from '../pages/LoginPage'
+
+test.describe('Sysadmin features', () => {
+  test.beforeEach(async ({ page }) => {
+    const loginPage = new LoginPage(page)
+    await loginPage.loginAs(accounts.sysadmin)
+  })
+
+  test('should access system settings', async ({ page }) => {
+    await expect(page.locator('[data-testid="system-settings"]')).toBeVisible()
+  })
+})
+
+test.describe('Engineer restrictions', () => {
+  test.beforeEach(async ({ page }) => {
+    const loginPage = new LoginPage(page)
+    await loginPage.loginAs(accounts.engineer)
+  })
+
+  test('should not see admin panel', async ({ page }) => {
+    await expect(page.locator('[data-testid="admin-panel"]')).not.toBeVisible()
+  })
+})
+```
+
+**Important:**
+- `.env.test.local` must be added to `.gitignore` — never commit real credentials
+- When adding a new role, add corresponding `TEST_<ROLE>_USERNAME` / `TEST_<ROLE>_PASSWORD` entries
+- For CI, inject these values via CI environment variables or secrets
+
 ## Page Object Model (POM)
 
 ```typescript
