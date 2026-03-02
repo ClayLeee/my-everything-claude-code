@@ -89,14 +89,28 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 
 ## Key Components
 
+### Rules (`rules/`)
+
+Global rules installed to `~/.claude/rules/` for automatic enforcement:
+- **coding-style** — Immutability, file/function size limits, Vue/TS conventions
+- **performance** — Model selection strategy, context window management
+- **security** — XSS prevention, input validation, secret management for frontend
+
 ### Agents (`agents/`)
 
-All agents are designed for Vue 3 + TypeScript frontend projects. All output in 繁體中文.
+All agents output in 繁體中文.
 
 - **code-review** — Reviews code quality across four pillars: duplicate elimination, code optimization, project standard compliance, comment hygiene
 - **build-error-resolver** — Fixes build/type errors with minimal changes. No refactoring — just get the build passing
 - **security-reviewer** — Frontend security audit: XSS (`v-html`, `innerHTML`), token handling, input validation, dependency vulnerabilities, secrets detection
 - **refactor-cleaner** — Dead code cleanup using `knip`/`depcheck`/`ts-prune`. Categorizes findings by risk (SAFE/CAREFUL/RISKY), removes in safe order with verification after each batch
+- **e2e-runner** — Playwright E2E testing specialist: Page Object Model pattern, flaky test quarantine, codegen workflow, artifact management (screenshots, traces, videos)
+
+### Skills (`skills/`)
+
+- **continuous-learning-v2** — Instinct-based learning from session observations (core system, see above)
+- **e2e-testing** — Playwright E2E testing patterns: POM examples, config templates, flaky test strategies, artifact management, multi-role test credentials
+- **serena-tool-selection** — Decision framework for choosing between Serena LSP semantic tools and basic tools (Grep, Read, Glob, Edit)
 
 ### Commands
 
