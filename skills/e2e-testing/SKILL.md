@@ -193,6 +193,18 @@ test.describe('Item Search', () => {
 })
 ```
 
+## Test Scenario Guidelines
+
+Not every feature requires all scenario types. Based on the nature of the feature, consider whether these are applicable:
+
+- **Happy path** — The normal, expected successful flow. Always include this.
+- **Invalid input** — Wrong credentials, empty form submission, malformed data. Applicable when the feature accepts user input.
+- **Permission / role-based** — Different roles see different UI or get denied access. Applicable when the feature has role-based behavior.
+- **Empty state** — No data available, empty lists, first-time user experience. Applicable when the feature displays dynamic data.
+- **Error response** — API returns 500, network timeout, unexpected error. Applicable when the feature depends on backend API calls.
+
+This is not a checklist — use judgement to decide which scenarios are relevant for each feature.
+
 ## Locator Strategy (Priority Order)
 
 1. `[data-testid="..."]` — Preferred, stable across refactors
