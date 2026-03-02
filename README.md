@@ -27,12 +27,19 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 │   ├── learn-eval.md              # Extract patterns with quality evaluation
 │   └── skill-create.md            # Generate SKILL.md from git history
 ├── skills/
-│   └── continuous-learning-v2/    # Instinct-based learning system
+│   ├── continuous-learning-v2/    # Instinct-based learning system
+│   ├── e2e-testing/               # Playwright E2E testing patterns and POM examples
+│   └── serena-tool-selection/     # Serena LSP vs basic tools decision framework
 ├── agents/
 │   ├── build-error-resolver.md    # Fix build/type errors with minimal changes
 │   ├── code-review.md             # Code review agent
+│   ├── e2e-runner.md              # Playwright E2E testing specialist
 │   ├── refactor-cleaner.md        # Dead code cleanup and duplicate consolidation
 │   └── security-reviewer.md       # Frontend security vulnerability detection
+├── rules/
+│   ├── coding-style.md            # Immutability, size limits, Vue/TS conventions
+│   ├── performance.md             # Model selection, context window management
+│   └── security.md                # XSS prevention, input validation, secrets
 ├── hooks/
 │   └── hooks.json                 # All hook definitions
 └── scripts/
@@ -62,10 +69,12 @@ flowchart TD
     DEV --> |"build broken"| BUILD["build-error-resolver agent<br><i>minimal fix · no refactoring</i>"]
     DEV --> |"security concern"| SEC["security-reviewer agent<br><i>XSS · auth · input · deps · secrets</i>"]
     DEV --> |"cleanup time"| CLEAN["refactor-cleaner agent<br><i>dead code · unused deps · duplicates</i>"]
+    DEV --> |"need E2E tests"| E2E["e2e-runner agent<br><i>Playwright · POM · flaky test · artifacts</i>"]
     REVIEW --> DEV
     BUILD --> DEV
     SEC --> DEV
     CLEAN --> DEV
+    E2E --> DEV
 
     %% ── Before Commit ──
     DEV --> |"/before-commit"| BC["pnpm before-commit<br><i>type check + lint</i>"]
@@ -97,7 +106,7 @@ flowchart TD
     classDef store fill:#e0e7ff,stroke:#4f46e5,color:#1e1e1e
 
     class LOAD,OBSERVE,CONSOLE,COMPACT,BLOCK,PUSH,RECORD,ANALYZE,SUMMARIZE hook
-    class REVIEW,BUILD,SEC,CLEAN agent
+    class REVIEW,BUILD,SEC,CLEAN,E2E agent
     class BC,MSG command
     class START,END phase
     class INSTINCTS,EVOLVED,SHARE store
@@ -126,16 +135,27 @@ flowchart TD
 | SessionEnd | auto-analyze | Extract instincts from observations |
 | SessionEnd | auto-summarize | Generate session summary |
 
+### Rules
+
+Global rules installed to `~/.claude/rules/` for automatic enforcement:
+
+- **coding-style** — Immutability, file/function size limits, Vue/TS conventions
+- **performance** — Model selection strategy, context window management
+- **security** — XSS prevention, input validation, secret management for frontend
+
 ### Skills
 
 - **continuous-learning-v2** — Instinct-based learning from session observations
+- **e2e-testing** — Playwright E2E testing patterns, POM examples, config templates, flaky test strategies, multi-role test credentials
+- **serena-tool-selection** — Decision framework for choosing between Serena LSP semantic tools and basic tools (Grep, Read, Glob, Edit)
 
 ### Agents
 
-- **code-review** — Vue 3 + TypeScript code quality review (duplicates, optimization, standards, comments, i18n)
+- **code-review** — Code quality review (duplicates, optimization, standards, comments, i18n)
 - **build-error-resolver** — Fix build/type errors with minimal changes, no refactoring
 - **security-reviewer** — Frontend security audit (XSS, auth, input validation, dependencies, secrets)
 - **refactor-cleaner** — Dead code detection, unused dependency removal, duplicate consolidation
+- **e2e-runner** — Playwright E2E testing specialist: POM pattern, flaky test quarantine, codegen workflow, artifact management
 
 ### Commands
 
