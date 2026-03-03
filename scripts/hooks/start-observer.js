@@ -263,9 +263,13 @@ function generateInstinctsMd() {
     lines.push('');
   }
 
-  // Write to .claude/instincts.md in the project root
-  // Hooks run from project root, so cwd is reliable
+  // Write to .claude/instincts.md in the git root (not CWD, which may be a subdirectory)
   let projectRoot = process.cwd();
+  try {
+    projectRoot = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+  } catch {
+    log('Warning: git rev-parse failed, falling back to CWD for instincts.md output');
+  }
   const outputFile = path.join(projectRoot, '.claude', 'instincts.md');
   ensureDir(path.dirname(outputFile));
   fs.writeFileSync(outputFile, lines.join('\n'), 'utf8');
