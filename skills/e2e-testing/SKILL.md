@@ -1,209 +1,99 @@
 ---
 name: e2e-testing
-description: Playwright E2E testing patterns, Page Object Model, configuration, artifact management, and flaky test strategies.
-version: 1.0.0
+description: |
+  Playwright E2E testing patterns, Page Object Model, configuration, artifact management, and flaky test strategies.
+  This skill should be used when the user asks to "write E2E tests", "add Playwright tests", "create page tests",
+  "update E2E tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
+  or mentions Playwright testing, test maintenance, or test locators.
+version: 1.1.0
 ---
 
 # E2E Testing Patterns
 
-Comprehensive Playwright patterns for building stable, fast, and maintainable E2E test suites.
+Playwright patterns for building stable, fast, and maintainable E2E test suites. Core conventions are inline below; detailed code templates are in `references/`.
 
-## Test File Organization
+## Auth & Login Strategy
 
-```
-tests/
-├── e2e/
-│   ├── auth/
-│   │   ├── login.spec.ts
-│   │   ├── logout.spec.ts
-│   │   └── register.spec.ts
-│   ├── features/
-│   │   ├── browse.spec.ts
-│   │   ├── search.spec.ts
-│   │   └── create.spec.ts
-│   └── pages/              # Page Object Model classes
-│       ├── LoginPage.ts
-│       ├── HomePage.ts
-│       └── BasePage.ts
-├── fixtures/
-│   ├── auth.ts
-│   └── data.ts
-└── playwright.config.ts
-```
+Test accounts stored in `.env.test.local` (gitignored). Five roles: sysadmin, orgOwner, projectManager, engineer, qa.
 
-## Test Credentials & Multi-Role Authentication
+Use `storageState` to skip login — the auth setup project runs once, saves JWT to `.auth/sysadmin.json`, and all subsequent tests start authenticated. No `beforeEach` login needed.
 
-Test accounts are stored in `.env.test.local` (gitignored, never committed). Different permission levels require different accounts — always use the role that matches the test scenario.
+- `.auth/` and `.env.test.local` must be in `.gitignore`
+- For full credential format, auth.setup.ts, and multi-role config, see **`references/auth-patterns.md`**
 
-**`.env.test.local` format:**
-```env
-# Sysadmin — system-level administration
-TEST_AD_USERNAME=
-TEST_AD_PASSWORD=
+## BasePage Shared Class
 
-# Organization Owner — organization management
-TEST_OO_USERNAME=
-TEST_OO_PASSWORD=
+All POM classes extend `BasePage` (`tests/e2e/pages/BasePage.ts`) which provides:
 
-# Project Manager — project-level management
-TEST_PM_USERNAME=
-TEST_PM_PASSWORD=
+- Shared `page`, `toastSuccess`, `toastError` locators
+- `waitForApi(urlPattern)` — wait for API response
+- `waitForNavigation(urlPattern)` — wait for SPA route change
+- `getSuccessToast()` / `getErrorToast()` — read toast message text
+- Abstract `goto()` — each POM implements its own navigation
 
-# Engineer (RD) — development tasks
-TEST_RD_USERNAME=
-TEST_RD_PASSWORD=
-
-# QA — testing and quality assurance
-TEST_QA_USERNAME=
-TEST_QA_PASSWORD=
-```
-
-**Loading credentials in fixtures (`tests/fixtures/auth.ts`):**
-```typescript
-import dotenv from 'dotenv'
-import path from 'path'
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env.test.local') })
-
-export const accounts = {
-  sysadmin: {
-    username: process.env.TEST_AD_USERNAME!,
-    password: process.env.TEST_AD_PASSWORD!,
-  },
-  orgOwner: {
-    username: process.env.TEST_OO_USERNAME!,
-    password: process.env.TEST_OO_PASSWORD!,
-  },
-  projectManager: {
-    username: process.env.TEST_PM_USERNAME!,
-    password: process.env.TEST_PM_PASSWORD!,
-  },
-  engineer: {
-    username: process.env.TEST_RD_USERNAME!,
-    password: process.env.TEST_RD_PASSWORD!,
-  },
-  qa: {
-    username: process.env.TEST_QA_USERNAME!,
-    password: process.env.TEST_QA_PASSWORD!,
-  },
-} as const
-
-export type AccountRole = keyof typeof accounts
-```
-
-**Using in tests:**
-```typescript
-import { test, expect } from '@playwright/test'
-import { accounts } from '../fixtures/auth'
-import { LoginPage } from '../pages/LoginPage'
-
-test.describe('Sysadmin features', () => {
-  test.beforeEach(async ({ page }) => {
-    const loginPage = new LoginPage(page)
-    await loginPage.loginAs(accounts.sysadmin)
-  })
-
-  test('should access system settings', async ({ page }) => {
-    await expect(page.locator('[data-testid="system-settings"]')).toBeVisible()
-  })
-})
-
-test.describe('Engineer restrictions', () => {
-  test.beforeEach(async ({ page }) => {
-    const loginPage = new LoginPage(page)
-    await loginPage.loginAs(accounts.engineer)
-  })
-
-  test('should not see admin panel', async ({ page }) => {
-    await expect(page.locator('[data-testid="admin-panel"]')).not.toBeVisible()
-  })
-})
-```
-
-**Important:**
-- `.env.test.local` must be added to `.gitignore` — never commit real credentials
-- When adding a new role, add corresponding `TEST_<ROLE>_USERNAME` / `TEST_<ROLE>_PASSWORD` entries
-- For CI, inject these values via CI environment variables or secrets
+For full implementation, see **`references/code-patterns.md`** § BasePage.
 
 ## Page Object Model (POM)
 
+One page = one POM class extending `BasePage`. For pages with dialogs/tabs, use nested object structure:
+
 ```typescript
-import { type Page, type Locator } from '@playwright/test'
-
-export class ItemsPage {
-  readonly page: Page
-  readonly searchInput: Locator
-  readonly itemCards: Locator
-  readonly createButton: Locator
-
-  constructor(page: Page) {
-    this.page = page
-    this.searchInput = page.locator('[data-testid="search-input"]')
-    this.itemCards = page.locator('[data-testid="item-card"]')
-    this.createButton = page.locator('[data-testid="create-btn"]')
-  }
-
-  async goto() {
-    await this.page.goto('/items')
-    await this.page.waitForLoadState('networkidle')
-  }
-
-  async search(query: string) {
-    await this.searchInput.fill(query)
-    await this.page.waitForResponse(resp => resp.url().includes('/api/search'))
-    await this.page.waitForLoadState('networkidle')
-  }
-
-  async getItemCount() {
-    return await this.itemCards.count()
-  }
+readonly createDialog = {
+  container: this.page.locator('[data-testid="project-list-create-dialog"]'),
+  nameInput: this.page.locator('[data-testid="project-list-create-dialog-name-input"]'),
+  submitBtn: this.page.locator('[data-testid="project-list-create-dialog-submit-btn"]'),
 }
 ```
 
-## Test Structure
-
-```typescript
-import { test, expect } from '@playwright/test'
-import { ItemsPage } from '../pages/ItemsPage'
-
-test.describe('Item Search', () => {
-  let itemsPage: ItemsPage
-
-  test.beforeEach(async ({ page }) => {
-    itemsPage = new ItemsPage(page)
-    await itemsPage.goto()
-  })
-
-  test('should search by keyword', async ({ page }) => {
-    await itemsPage.search('test')
-
-    const count = await itemsPage.getItemCount()
-    expect(count).toBeGreaterThan(0)
-
-    await expect(itemsPage.itemCards.first()).toContainText(/test/i)
-    await page.screenshot({ path: 'artifacts/search-results.png' })
-  })
-
-  test('should handle no results', async ({ page }) => {
-    await itemsPage.search('xyznonexistent123')
-
-    await expect(page.locator('[data-testid="no-results"]')).toBeVisible()
-    expect(await itemsPage.getItemCount()).toBe(0)
-  })
-})
-```
+For full POM examples (basic + deep testing), see **`references/code-patterns.md`** § POM Examples.
 
 ## Test Scenario Guidelines
 
-Not every feature requires all scenario types. Based on the nature of the feature, consider whether these are applicable:
+Not every feature requires all scenario types. Use judgement:
 
-- **Happy path** — The normal, expected successful flow. Always include this.
-- **Invalid input** — Wrong credentials, empty form submission, malformed data. Applicable when the feature accepts user input.
-- **Permission / role-based** — Different roles see different UI or get denied access. Applicable when the feature has role-based behavior.
-- **Empty state** — No data available, empty lists, first-time user experience. Applicable when the feature displays dynamic data.
-- **Error response** — API returns 500, network timeout, unexpected error. Applicable when the feature depends on backend API calls.
+- **Happy path** — Always include
+- **Invalid input** — When the feature accepts user input
+- **Permission / role-based** — When the feature has role-based behavior
+- **Empty state** — When the feature displays dynamic data
+- **Error response** — When the feature depends on backend API calls
 
-This is not a checklist — use judgement to decide which scenarios are relevant for each feature.
+## Incremental Test Maintenance
+
+When UI code changes, incrementally update tests — never rebuild from scratch.
+
+### Change Detection
+
+Use `git diff --name-only` (current branch vs base) to find changed Vue files under `app/src/views/` and `app/src/components/`.
+
+### Delta Classification
+
+| Change Type | Action |
+|-------------|--------|
+| New element/component added | Add test cases + locators |
+| Element/component removed | Remove related test cases + locators |
+| Element renamed / restructured | Update locators and assertions |
+| Internal logic refactor (no UI change) | No spec changes needed |
+| Props/events changed | Update POM methods if affected |
+
+### Spec Modification Rules
+
+- **Never** delete and recreate a spec file — always edit in place
+- Preserve existing test order, `test.describe` grouping, and flaky markers
+- Add new tests at the end of the relevant `test.describe` block
+- Remove tests only when the corresponding UI is confirmed deleted
+
+### Change Analysis Template
+
+Before modifying any spec, produce this analysis:
+
+```
+## Change Analysis
+- Changed files: [list of Vue files]
+- Existing specs affected: [list of spec files]
+- New scenarios needed: [list]
+- Obsolete scenarios: [list]
+- Modified scenarios: [list with reason]
+```
 
 ## Locator Strategy (Priority Order)
 
@@ -215,172 +105,78 @@ This is not a checklist — use judgement to decide which scenarios are relevant
 
 **Never use**: XPath, auto-generated class names
 
-## Playwright Configuration
+## data-testid Convention
 
-```typescript
-import { defineConfig, devices } from '@playwright/test'
+### Naming Format
 
-export default defineConfig({
-  testDir: './tests/e2e',
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
-    ['junit', { outputFile: 'playwright-results.xml' }],
-    ['json', { outputFile: 'playwright-results.json' }]
-  ],
-  use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    actionTimeout: 10000,
-    navigationTimeout: 30000,
-  },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-  ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
-})
+`{page}-{component}-{element}[-{qualifier}]` — all kebab-case.
+
+### Examples
+
+| data-testid | Description |
+|-------------|-------------|
+| `project-list-add-btn` | Add button on project list page |
+| `project-list-edit-dialog` | Edit dialog on project list |
+| `project-list-edit-dialog-tab-members` | Members tab inside edit dialog |
+| `login-username-input` | Username input on login page |
+| `toast-success` | Global success toast notification |
+
+### Placement Rules
+
+**Add to:** interactive elements (buttons, links, toggles), all form inputs, tab triggers, table wrappers, dialog content wrappers, toast containers.
+
+**Do NOT add to:** purely decorative elements, layout wrappers, elements already uniquely identifiable by role + accessible name.
+
+### Vue Syntax
+
+```vue
+<!-- Static -->
+<Button data-testid="project-list-add-btn">新增</Button>
+<!-- Dynamic -->
+<Button :data-testid="`project-list-row-${project.id}-edit-btn`">編輯</Button>
+<!-- shadcn-vue pass-through -->
+<DialogContent data-testid="project-list-edit-dialog">
 ```
 
-## Flaky Test Patterns
+The POM class itself serves as the registry of all `data-testid` values — no separate mapping file.
 
-### Quarantine
+## Comprehensive Page Testing (Deep Testing)
 
-```typescript
-test('flaky: complex search', async ({ page }) => {
-  test.fixme(true, 'Flaky - Issue #123')
-  // test code...
-})
+### Component Tree Recursive Analysis
 
-test('conditional skip', async ({ page }) => {
-  test.skip(process.env.CI, 'Flaky in CI - Issue #123')
-  // test code...
-})
-```
+1. Read the page's `index.vue` (or main component)
+2. Identify all imported child components
+3. Recursively read children to find further children
+4. Stop at leaf nodes (shadcn-vue primitives, HTML elements)
+5. Record all interactive elements at each level
 
-### Identify Flakiness
+### Test Organization
 
-```bash
-npx playwright test tests/search.spec.ts --repeat-each=10
-npx playwright test tests/search.spec.ts --retries=3
-```
+One page = one spec file. Use nested `test.describe` mirroring the component hierarchy (Page > Dialog > Tab > Form).
 
-### Common Causes & Fixes
+### Interaction Depth Checklist
 
-**Race conditions:**
-```typescript
-// Bad: assumes element is ready
-await page.click('[data-testid="button"]')
+Consider all applicable interactions:
+- Dialog open / close
+- Form field fill (text, select, date, rich text)
+- Required field validation (submit empty form)
+- Form submit success (verify toast + list update)
+- Form submit failure (verify error toast)
+- Tab switching (verify content change)
+- Table operations (sort, filter, pagination)
+- Toggle / switch state changes
+- Delete confirmation dialog
+- Empty state display
 
-// Good: auto-wait locator
-await page.locator('[data-testid="button"]').click()
-```
+## Dual Test Reports
 
-**Network timing:**
-```typescript
-// Bad: arbitrary timeout
-await page.waitForTimeout(5000)
+Every test run produces: (1) HTML report via Playwright, (2) Markdown report at `playwright/{page-name}-test-report.md` (no date in filename, overwrites on re-run). Use 繁體中文 for markdown reports, one table per `test.describe` group.
 
-// Good: wait for specific condition
-await page.waitForResponse(resp => resp.url().includes('/api/data'))
-```
+For the full markdown template, see **`references/report-template.md`**.
 
-**Animation timing:**
-```typescript
-// Bad: click during animation
-await page.click('[data-testid="menu-item"]')
+## Additional References
 
-// Good: wait for stability
-await page.locator('[data-testid="menu-item"]').waitFor({ state: 'visible' })
-await page.waitForLoadState('networkidle')
-await page.locator('[data-testid="menu-item"]').click()
-```
-
-**SPA navigation:**
-```typescript
-// Bad: check URL immediately
-expect(page.url()).toContain('/target')
-
-// Good: wait for navigation
-await page.waitForURL('**/target')
-```
-
-## Artifact Management
-
-### Screenshots
-
-```typescript
-await page.screenshot({ path: 'artifacts/after-login.png' })
-await page.screenshot({ path: 'artifacts/full-page.png', fullPage: true })
-await page.locator('[data-testid="chart"]').screenshot({ path: 'artifacts/chart.png' })
-```
-
-### Traces
-
-```typescript
-// In playwright.config.ts
-use: {
-  trace: 'on-first-retry',  // Only capture trace on retry
-}
-```
-
-### Video
-
-```typescript
-// In playwright.config.ts
-use: {
-  video: 'retain-on-failure',
-}
-```
-
-## Codegen Workflow
-
-For quickly scaffolding tests:
-
-```bash
-npx playwright codegen http://localhost:5173
-```
-
-After recording:
-1. Replace CSS selectors with `data-testid` locators
-2. Extract page interactions into POM classes
-3. Add meaningful assertions
-4. Remove unnecessary `waitForTimeout` calls
-
-## Test Report Template
-
-```markdown
-# E2E Test Report
-
-**Date:** YYYY-MM-DD HH:MM
-**Duration:** Xm Ys
-**Status:** PASSING / FAILING
-
-## Summary
-- Total: X | Passed: Y (Z%) | Failed: A | Flaky: B | Skipped: C
-
-## Failed Tests
-
-### test-name
-**File:** `tests/e2e/feature.spec.ts:45`
-**Error:** Expected element to be visible
-**Screenshot:** artifacts/failed.png
-**Recommended Fix:** [description]
-
-## Artifacts
-- HTML Report: playwright-report/index.html
-- Screenshots: artifacts/*.png
-- Videos: artifacts/videos/*.webm
-- Traces: artifacts/*.zip
-```
+- **`references/auth-patterns.md`** — Credential format, auth.setup.ts, multi-role storageState
+- **`references/code-patterns.md`** — BasePage implementation, POM examples, test structure, flaky patterns, artifact management, codegen workflow
+- **`references/configuration.md`** — Full playwright.config.ts template, file organization, CLI commands
+- **`references/report-template.md`** — Markdown report template and rules
