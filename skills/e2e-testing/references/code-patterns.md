@@ -146,7 +146,6 @@ test.describe('Item Search', () => {
     expect(count).toBeGreaterThan(0)
 
     await expect(itemsPage.itemCards.first()).toContainText(/test/i)
-    await page.screenshot({ path: 'artifacts/search-results.png' })
   })
 
   test('should handle no results', async ({ page }) => {
@@ -223,23 +222,19 @@ await page.waitForURL('**/target')
 
 ## Artifact Management
 
-### Screenshots
+**Do NOT use manual `page.screenshot()` in specs.** Playwright's built-in config handles all artifacts automatically:
 
 ```typescript
-await page.screenshot({ path: 'artifacts/after-login.png' })
-await page.screenshot({ path: 'artifacts/full-page.png', fullPage: true })
-await page.locator('[data-testid="chart"]').screenshot({ path: 'artifacts/chart.png' })
-```
-
-### Traces & Video
-
-```typescript
-// In playwright.config.ts
+// playwright.config.ts — already configured
 use: {
-  trace: 'on-first-retry',     // Capture trace on retry only
-  video: 'retain-on-failure',  // Keep video for failed tests
+  screenshot: 'only-on-failure',  // Auto-capture on failure
+  video: 'retain-on-failure',     // Keep video for failed tests
+  trace: 'on-first-retry',        // Capture trace on retry
 }
+outputDir: 'playwright/test-results',  // All artifacts go here
 ```
+
+All failure artifacts (screenshots, videos, traces) are saved to `playwright/test-results/` automatically. No manual screenshot calls needed.
 
 ## Codegen Workflow
 

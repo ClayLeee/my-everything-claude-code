@@ -168,9 +168,28 @@ Consider all applicable interactions:
 - Delete confirmation dialog
 - Empty state display
 
+## No Manual Screenshots
+
+**Do NOT call `page.screenshot()` in spec files.** Playwright is configured with `screenshot: 'only-on-failure'`, `video: 'retain-on-failure'`, and `trace: 'on-first-retry'` — all failure artifacts are captured automatically to `playwright/test-results/`.
+
+Manual screenshots create clutter, are not gitignored properly, and duplicate built-in functionality.
+
+## Running Tests
+
+Always use `pnpm` scripts from `app/` directory (not `npx`):
+
+```bash
+cd app
+pnpm test:e2e                                    # Run all tests
+pnpm test:e2e -- tests/e2e/auth/login.spec.ts    # Run specific spec
+pnpm test:e2e -- --headed                         # See browser
+pnpm test:e2e:ui                                  # Interactive UI
+pnpm test:e2e:report                              # View HTML report
+```
+
 ## Dual Test Reports
 
-Every test run produces: (1) HTML report via Playwright, (2) Markdown report at `playwright/{page-name}-test-report.md` (no date in filename, overwrites on re-run). Use 繁體中文 for markdown reports, one table per `test.describe` group.
+Every test run produces: (1) HTML report at `playwright/reports/` via Playwright, (2) Markdown report at `playwright/{page-name}-test-report.md` (no date in filename, overwrites on re-run). Use 繁體中文 for markdown reports, one table per `test.describe` group.
 
 For the full markdown template, see **`references/report-template.md`**.
 

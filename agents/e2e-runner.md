@@ -54,7 +54,7 @@ You are an expert end-to-end testing specialist. Your mission is to ensure criti
 3. **data-testid Injection** — Add stable test locators to Vue components
 4. **Comprehensive Page Testing** — Recursively analyze and test full component trees
 5. **Flaky Test Management** — Identify and quarantine unstable tests
-6. **Dual Report Generation** — HTML + markdown reports (overwrite previous)
+6. **Dual Report Generation** — HTML (`playwright/reports/`) + markdown (`playwright/*.md`) reports (overwrite previous)
 
 ## Workflow — Mode Detection
 
@@ -142,6 +142,9 @@ When injecting `data-testid` into Vue components:
 - **Isolate tests**: Each test should be independent; no shared state between tests
 - **Fail fast**: Use `expect()` assertions at every key step
 - **Trace on retry**: Configure `trace: 'on-first-retry'` for debugging failures
+- **No manual screenshots** — NEVER add `page.screenshot()` calls in specs; Playwright's built-in `screenshot: 'only-on-failure'` handles this automatically
+- **Use `pnpm` scripts, not `npx`** — Run `pnpm test:e2e` from `app/` directory to ensure project-pinned Playwright version
+- **Artifacts go to `playwright/`** — All test outputs (reports, screenshots, videos, traces) are in `app/playwright/` (gitignored)
 
 ## Reference
 
