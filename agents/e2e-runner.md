@@ -39,6 +39,8 @@ description: |
   </commentary>
   </example>
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
+mcpServers:
+  - serena
 model: sonnet
 color: cyan
 ---
