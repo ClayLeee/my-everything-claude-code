@@ -5,7 +5,7 @@ description: |
   This skill should be used when the user asks to "write E2E tests", "add Playwright tests", "create page tests",
   "update E2E tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
   or mentions Playwright testing, test maintenance, or test locators.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # E2E Testing Patterns
@@ -20,6 +20,7 @@ Use `storageState` to skip login — the auth setup project runs once, saves JWT
 
 - `.auth/` and `.env.test.local` must be in `.gitignore`
 - For full credential format, auth.setup.ts, and multi-role config, see **`references/auth-patterns.md`**
+  > Subagent: use `Glob("**/e2e-testing/references/auth-patterns.md")` to locate this file.
 
 ## BasePage Shared Class
 
@@ -32,6 +33,7 @@ All POM classes extend `BasePage` (`tests/e2e/pages/BasePage.ts`) which provides
 - Abstract `goto()` — each POM implements its own navigation
 
 For full implementation, see **`references/code-patterns.md`** § BasePage.
+> Subagent: use `Glob("**/e2e-testing/references/code-patterns.md")` to locate this file.
 
 ## Page Object Model (POM)
 
@@ -46,6 +48,7 @@ readonly createDialog = {
 ```
 
 For full POM examples (basic + deep testing), see **`references/code-patterns.md`** § POM Examples.
+> Subagent: use `Glob("**/e2e-testing/references/code-patterns.md")` to locate this file.
 
 ## No Mock Data
 
@@ -158,9 +161,61 @@ The POM class itself serves as the registry of all `data-testid` values — no s
 4. Stop at leaf nodes (shadcn-vue primitives, HTML elements)
 5. Record all interactive elements at each level
 
+### Coverage Plan (Required for Deep Testing)
+
+After recursive analysis, produce a Coverage Plan table before writing any tests:
+
+| Component Path | Interactive Elements | Test Cases |
+|---------------|---------------------|------------|
+| `ProjectList/index.vue` | table, search, filter, refresh, add btn | 5 |
+| `ProjectList/EditProjectDialog.vue` | dialog open/close | 2 |
+| `ProjectList/EditProjectDialog.vue > GeneralTab` | name input, description, submit | 3 |
+| `ProjectList/EditProjectDialog.vue > MembersTab` | member list, add/remove member | 3 |
+
+**Validation rules:**
+- Every component found in recursive analysis MUST appear in the Coverage Plan
+- If a component is excluded, add a row with reason: `N/A — no interactive elements` or `N/A — shadcn primitive`
+- The total test case count is the minimum — additional edge cases may be added during implementation
+- Each row with test cases MUST map to a `test.describe` block in the spec
+
 ### Test Organization
 
-One page = one spec file. Use nested `test.describe` mirroring the component hierarchy (Page > Dialog > Tab > Form).
+**Simple pages**: One page = one spec file.
+
+**Deep testing complex pages**: One page = one main spec + optional component spec files.
+When a page has 3+ major interactive component groups (dialogs with tabs, complex forms),
+split into separate spec files for parallel development:
+
+- `{page}.spec.ts` — main page UI, toolbar, table, search, filter
+- `{page}-{dialog}.spec.ts` — each major dialog/panel gets its own spec
+
+All spec files share the same POM class. Each spec file is independently runnable.
+
+Use nested `test.describe` mirroring the component hierarchy (Page > Dialog > Tab > Form).
+
+#### Nested Structure Example
+
+```typescript
+test.describe('Project List', () => {
+  test.describe('Basic UI & Toolbar', () => { /* ... */ });
+  test.describe('Search & Filter', () => { /* ... */ });
+
+  test.describe('Edit Project Dialog', () => {
+    test('should open edit dialog', async () => { /* ... */ });
+
+    test.describe('General Tab', () => {
+      test('should display form fields', async () => { /* ... */ });
+      test('should validate required fields', async () => { /* ... */ });
+      test('should save changes', async () => { /* ... */ });
+    });
+
+    test.describe('Members Tab', () => {
+      test('should switch to members tab', async () => { /* ... */ });
+      test('should list current members', async () => { /* ... */ });
+    });
+  });
+});
+```
 
 ### Interaction Depth Checklist
 
@@ -188,22 +243,36 @@ Always use `pnpm` scripts from `app/` directory (not `npx`):
 
 ```bash
 cd app
-pnpm test:e2e                                    # Run all tests
-pnpm test:e2e -- tests/e2e/auth/login.spec.ts    # Run specific spec
-pnpm test:e2e -- --headed                         # See browser
-pnpm test:e2e:ui                                  # Interactive UI
-pnpm test:e2e:report                              # View HTML report
+E2E_REPORT_NAME=login-test-report pnpm test:e2e -- tests/e2e/auth/login.spec.ts    # Run specific spec
+E2E_REPORT_NAME=project-list-test-report pnpm test:e2e                              # Run all tests
+pnpm test:e2e -- --headed                                                            # See browser
+pnpm test:e2e:ui                                                                     # Interactive UI
+pnpm test:e2e:report                                                                 # View HTML report
 ```
+
+Set `E2E_REPORT_NAME` to control report file naming (defaults to `latest` if not set).
 
 ## Dual Test Reports
 
-Every test run produces: (1) HTML report at `playwright/reports/` via Playwright, (2) Markdown report at `playwright/{page-name}-test-report.md` (no date in filename, overwrites on re-run). Use 繁體中文 for markdown reports, one table per `test.describe` group.
+Every test run produces:
+1. HTML report at `playwright/reports/{report-name}/index.html`
+2. Markdown report at `playwright/{report-name}.md`
+
+Both use the same `{page-name}-test-report` identifier.
+The report name is set via `E2E_REPORT_NAME` env var (defaults to `latest` if not set).
+
+Use 繁體中文 for markdown reports, one table per `test.describe` group. Filename has no date (overwrites on re-run, date is in content).
 
 For the full markdown template, see **`references/report-template.md`**.
+> Subagent: use `Glob("**/e2e-testing/references/report-template.md")` to locate this file.
 
 ## Additional References
 
 - **`references/auth-patterns.md`** — Credential format, auth.setup.ts, multi-role storageState
+  > Subagent: use `Glob("**/e2e-testing/references/auth-patterns.md")` to locate this file.
 - **`references/code-patterns.md`** — BasePage implementation, POM examples, test structure, flaky patterns, artifact management, codegen workflow
+  > Subagent: use `Glob("**/e2e-testing/references/code-patterns.md")` to locate this file.
 - **`references/configuration.md`** — Full playwright.config.ts template, file organization, CLI commands
+  > Subagent: use `Glob("**/e2e-testing/references/configuration.md")` to locate this file.
 - **`references/report-template.md`** — Markdown report template and rules
+  > Subagent: use `Glob("**/e2e-testing/references/report-template.md")` to locate this file.
