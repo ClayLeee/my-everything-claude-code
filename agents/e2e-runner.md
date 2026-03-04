@@ -109,29 +109,24 @@ When injecting `data-testid` into Vue components:
 4. Edit the Vue file — **only add `data-testid` attributes**, do not modify class, events, props, script, or any other code
 5. Re-read the file to confirm only `data-testid` was added
 
-## CRITICAL — No Fabricated Data
+## CRITICAL — No Mock Data
 
-**NEVER fabricate, guess, or invent API response structures.** All mock data must be derived from actual source code.
-
-### Before writing any `page.route()` mock
-
-1. **Read API type definitions** — Find interfaces in `app/src/api/` and `app/src/types/` for the real request/response shape
-2. **Read the Vue component** — Understand how it consumes the API response (which fields it reads, how it handles errors, validation logic)
-3. **Match real types exactly** — Every field in your mock must exist in the actual TypeScript interface
-4. **Add source comment** — Above each `page.route()`, comment the type/interface file it's based on
+**NEVER use mock data to replace real API responses.** All E2E tests must hit the real running dev server. This rule is absolute — there are no exceptions.
 
 ### Forbidden
 
-- Inventing API fields or response structures not found in source code
-- Guessing validation behavior (error messages, field-level errors) without reading component logic
-- Assuming endpoint paths or error formats without reading API module code
-- Writing `page.route()` mocks before reading the relevant API types
+- `route.fulfill()` with fabricated response bodies — this is mock data
+- `route.abort()` to simulate network failures — use real error conditions instead
+- Fake data constants (e.g. `MOCK_AUTH_METHODS_RESPONSE`) in test files
+- Delaying API responses via `page.route()` + `waitForTimeout()` to simulate loading states
+- Any test scenario that requires fabricated API responses to function
 
-### Prefer real API over mocking
+### What to Do Instead
 
-- **Default: test against the real running dev server** — Most tests should hit actual API
-- **Mock only when necessary**: error states (401, 500), edge cases impossible to reproduce naturally
-- When mocking, the response body must conform to the project's actual TypeScript interfaces
+- **Test against real API** — Hit the actual dev server, assert on real results
+- **Trigger real errors** — Use wrong credentials, invalid input, missing fields to produce real API errors
+- **Skip untestable states** — If a state (loading spinner, transient button disabled) can only be observed via mocking, it does not belong in E2E tests
+- **Use `page.waitForResponse()`** — Waiting for real API responses is fine; intercepting and replacing them is not
 
 ## Key Principles
 

@@ -47,6 +47,14 @@ readonly createDialog = {
 
 For full POM examples (basic + deep testing), see **`references/code-patterns.md`** § POM Examples.
 
+## No Mock Data
+
+**All E2E tests must hit the real running dev server.** Never use fabricated API responses.
+
+- **Forbidden**: `route.fulfill()` with fake data, `route.abort()`, fake data constants, `waitForTimeout()` delays to simulate loading
+- **Allowed**: `page.waitForResponse()` to wait for real API responses
+- **Skip untestable states**: If a state (loading spinner, transient button disabled) can only be observed via mocking, do not test it in E2E — those belong in unit tests
+
 ## Test Scenario Guidelines
 
 Not every feature requires all scenario types. Use judgement:
