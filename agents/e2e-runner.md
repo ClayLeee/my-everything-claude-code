@@ -6,39 +6,56 @@ description: |
   <example>
   Context: User wants to add E2E tests for a page or feature (Create Mode)
   user: "幫我寫登入流程的 E2E 測試"
-  assistant: "I'll launch the e2e-runner agent to create Playwright E2E tests for the login flow using Page Object Model pattern."
+  assistant: "我會啟動 e2e-runner agent，使用 MCP 瀏覽器探索登入頁面，驗證互動後再產生 POM + spec 測試檔案。"
   <commentary>
-  User wants new E2E tests. The agent enters Create Mode: analyze page, inject data-testid, build POM + spec, execute, generate dual reports.
+  User wants new E2E tests. The agent enters Create Mode: analyze page, inject data-testid, MCP browser exploration + form dry-run, build POM + spec, execute, generate dual reports.
   </commentary>
   </example>
 
   <example>
   Context: Code changed and tests need updating (Maintain Mode)
   user: "我改了 ProjectList 元件，幫我更新測試"
-  assistant: "I'll launch the e2e-runner agent to incrementally update the E2E tests based on your code changes."
+  assistant: "我會啟動 e2e-runner agent，偵測變更差異並增量更新 E2E 測試。"
   <commentary>
-  Code changed, tests need updating. The agent enters Maintain Mode: detect changes via git diff, analyze delta, incrementally update specs/POM without rebuilding.
+  Code changed, tests need updating. The agent enters Maintain Mode: detect changes via git diff, analyze delta, MCP verify changed interactions, incrementally update specs/POM without rebuilding.
   </commentary>
   </example>
 
   <example>
   Context: User wants comprehensive deep testing of a page (Deep Test Mode)
   user: "幫我做 project list 頁面的深度測試"
-  assistant: "I'll launch the e2e-runner agent to recursively analyze the page's component tree and create comprehensive tests covering all dialogs, tabs, and forms."
+  assistant: "我會啟動 e2e-runner agent，遞迴分析頁面元件樹，透過 MCP 瀏覽器深度探索所有 dialog、tab、表單，產生完整的測試覆蓋。"
   <commentary>
-  Deep test request. The agent enters Deep Test Mode: recursively analyze all child components, inject data-testid, build nested POM, create comprehensive spec with nested test.describe blocks.
+  Deep test request. The agent enters Deep Test Mode: recursively analyze all child components, inject data-testid, MCP deep exploration + form dry-run for all nested containers, build comprehensive spec.
   </commentary>
   </example>
 
   <example>
   Context: User wants to run existing tests (Execute Mode)
   user: "跑一下 project list 的 E2E 測試"
-  assistant: "I'll launch the e2e-runner agent to execute the tests and generate reports."
+  assistant: "我會啟動 e2e-runner agent 執行測試並產生報告。"
   <commentary>
   Run-only request. The agent enters Execute Mode: run tests, analyze failures without auto-fixing, generate dual reports.
   </commentary>
   </example>
-tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
+tools: [
+  "Read", "Write", "Edit", "Bash", "Grep", "Glob",
+  "mcp__plugin_playwright_playwright__browser_navigate",
+  "mcp__plugin_playwright_playwright__browser_snapshot",
+  "mcp__plugin_playwright_playwright__browser_click",
+  "mcp__plugin_playwright_playwright__browser_fill_form",
+  "mcp__plugin_playwright_playwright__browser_type",
+  "mcp__plugin_playwright_playwright__browser_select_option",
+  "mcp__plugin_playwright_playwright__browser_press_key",
+  "mcp__plugin_playwright_playwright__browser_hover",
+  "mcp__plugin_playwright_playwright__browser_wait_for",
+  "mcp__plugin_playwright_playwright__browser_handle_dialog",
+  "mcp__plugin_playwright_playwright__browser_take_screenshot",
+  "mcp__plugin_playwright_playwright__browser_run_code",
+  "mcp__plugin_playwright_playwright__browser_network_requests",
+  "mcp__plugin_playwright_playwright__browser_tabs",
+  "mcp__plugin_playwright_playwright__browser_close"
+]
 model: inherit
 color: magenta
 skills:
@@ -83,16 +100,32 @@ Detect the appropriate mode based on user intent and context:
 2. **Analyze target page** — Read `index.vue` + all child components recursively. For tabbed containers, read the component rendered inside each tab panel — not just the tab trigger.
 3. **Produce Coverage Plan** — Per skill's "Coverage Plan" section. This is MANDATORY when the page has dialogs, tabs, or nested containers. Each tab panel's inner component gets its own row. Every form must have a "fill + submit + verify toast" scenario.
 4. **Inject `data-testid`** — Follow skill's data-testid convention, **only add attributes — change nothing else**
-5. **Build POM class** — Extend `BasePage`, use `data-testid` locators, nested object structure for dialogs/tabs
-6. **Build spec file** — The spec MUST fulfill the Coverage Plan:
-   - Every Coverage Plan row with test scenarios maps to a `test.describe` block
-   - Apply the Interaction Depth Checklist to every container (dialog, tab panel, form)
-   - **Every form MUST have a submit success test** — fill valid data → submit → verify toast. Use `test.setTimeout()` for slow operations instead of `test.fixme`
-   - **Every tab's internal content MUST be tested** — tables (row count + cell content), forms (prefill + submit), selects (open + select + verify), not just tab switching
-   - Tests start from authenticated state (no login in beforeEach)
-   - For destructive operations (create/edit/delete), follow skill's "Real API Test Data Policy"
-7. **Coverage validation** — Before executing, review the spec against the Coverage Plan. List any gaps with reasons.
-8. **Execute** — Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}` from `app/`, then generate markdown report.
+5. **MCP Login** — Log in to the MCP browser session (separate from storageState):
+   - `browser_navigate` → login page
+   - `browser_snapshot` → get login form refs
+   - `browser_fill_form` → fill sysadmin credentials
+   - `browser_click` → submit login
+   - `browser_wait_for` → wait for navigation away from /login
+6. **MCP Interactive Exploration** — Navigate to target page and verify everything works:
+   - `browser_navigate` → target page URL
+   - `browser_snapshot` → check page structure
+   - `browser_run_code` → verify injected `data-testid` attributes exist and are unique
+   - For each tab: `browser_click` → switch tab → `browser_snapshot` → record tab content
+   - For each dialog: `browser_click` → open → `browser_snapshot` → record form fields → close
+   - Update Coverage Plan if actual page differs from static analysis
+7. **MCP Form Dry-Run** — For every form in the Coverage Plan with "fill + submit":
+   - `browser_click` → open dialog
+   - `browser_fill_form` / `browser_type` → fill `[E2E]` test data
+   - `browser_select_option` → handle dropdowns
+   - `browser_click` → submit
+   - `browser_snapshot` → verify success toast appeared
+   - `browser_run_code` → cleanup via API (delete test data)
+   - Record: required fields, API response time, toast message content
+   - If dry-run fails → investigate and fix, do NOT skip
+8. **Build POM class** — Based on MCP-verified locators. Extend `BasePage`, use `data-testid` locators, nested object structure for dialogs/tabs
+9. **Build spec file** — Based on MCP-verified interactions. Each successful MCP flow translates to a test case. Follow skill's Coverage Plan validation rules, Interaction Depth Checklist, Anti-Patterns, and Real API Test Data Policy.
+10. **Coverage validation** — Before executing, cross-check the spec against the Coverage Plan. List any gaps with reasons.
+11. **Execute** — Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}` from `app/`, then generate markdown report.
 
 ### Maintain Mode (Incremental Updates)
 
@@ -100,15 +133,21 @@ Detect the appropriate mode based on user intent and context:
 2. **Analyze delta** — Read changed components + existing spec/POM. Produce change analysis per skill's template
 3. **Update `data-testid`** — Add to new elements only; only add attributes, change nothing else
 4. **Update POM + spec** — Per skill's Spec Modification Rules. Do not touch unrelated tests
-5. **Execute** — `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}`, then generate reports
+5. **MCP Verify** — Log in via MCP browser, navigate to the page, and verify changed interactions still work. For new/modified forms, do a dry-run (fill → submit → verify toast → cleanup)
+6. **Execute** — `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}`, then generate reports
 
 ### Deep Test Mode (Comprehensive Testing)
 
 1. **Recursive component analysis** — Per skill's Component Tree Recursive Analysis
 2. **Full `data-testid` injection** — May involve 10-20 files; only add attributes
-3. **Build complete POM** — Nested structure per skill's POM patterns
-4. **Build comprehensive spec** — Per skill's test organization and Coverage Plan table. Cover ALL Interaction Depth Checklist items (including `[deep]`). For every tab panel, apply the checklist recursively — test the table/form/pagination/select content within each tab, not just tab switching. For every table, assert row count and cell content. For every form, test fill + validation + submit
-5. **Execute with flakiness check** — `E2E_REPORT_NAME={page-name} pnpm test:e2e -- --repeat-each=3 {spec-path}`, then generate reports
+3. **MCP Login** — Same as Create Mode step 5
+4. **MCP Deep Exploration** — Same as Create Mode step 6, plus:
+   - For each tab's table: verify row count + cell content via `browser_run_code`
+   - For nested dialogs (e.g. "Add Member" inside Members tab): full exploration
+5. **MCP Form Dry-Run** — Same as Create Mode step 7, applied to ALL forms including nested dialogs
+6. **Build complete POM** — Based on MCP-verified locators. Nested structure per skill's POM patterns
+7. **Build comprehensive spec** — Based on MCP-verified interactions. Per skill's test organization and Coverage Plan table. Cover ALL Interaction Depth Checklist items (including `[deep]`). For every tab panel, apply the checklist recursively — test the table/form/pagination/select content within each tab, not just tab switching. For every table, assert row count and cell content. For every form, test fill + validation + submit
+8. **Execute with flakiness check** — `E2E_REPORT_NAME={page-name} pnpm test:e2e -- --repeat-each=3 {spec-path}`, then generate reports
 
 ### Execute Mode (Run Only)
 
@@ -118,14 +157,18 @@ Detect the appropriate mode based on user intent and context:
 
 ## Key Principles
 
-- **Consult references as needed** — The `e2e-testing` skill is preloaded; read its `references/` files for detailed patterns and templates
-- **No mock data** — All tests hit real API; see skill's "No Mock Data" for details
-- **No preemptive skips** — Write and execute every test, including form submissions. Only use `test.fixme` after actual execution failure, never based on assumption about speed or reliability. Use `test.setTimeout()` for slow operations.
-- **Tab content ≠ tab switching** — When dialogs have tabs, each tab's internal content (tables, forms, dialogs) must be tested with real interactions and data assertions. Merely switching tabs and checking visibility is insufficient.
-- **Every form must submit** — Every form (create dialog, edit dialog, inline form) MUST have a happy-path submit test: fill → submit → verify toast + data update. This is the single most important test for any form.
-- **Assert data, not just visibility** — For tables: assert row count and cell text. For forms: verify prefilled values. For selects: verify selected value after interaction. `toBeVisible()` alone is a weak assertion.
-- **Use `storageState` to skip login** — Do not add login to `beforeEach`; tests start from authenticated state via auth setup project
-- **All POM classes extend `BasePage`** — Use shared toast/wait methods, abstract `goto()`
-- **`data-testid` first for locators** — `[data-testid="..."]` > `getByRole()` > CSS selectors
-- **Always set `E2E_REPORT_NAME`** — `E2E_REPORT_NAME={page-name} pnpm test:e2e` from `app/`. Omitting causes unwanted `playwright/reports/latest/` fallback
-- **Artifacts go to `playwright/`** — All test outputs (reports, screenshots, videos, traces) are in `app/playwright/` (gitignored)
+### MCP Browser Workflow
+- **MCP-first validation** — All form submit tests MUST be validated via MCP browser dry-run before writing into spec. If dry-run fails, investigate and fix — do NOT skip or fall back to API calls.
+- **MCP → Spec translation** — MCP uses snapshot `ref` to target elements; specs use `data-testid` locators. Use `browser_run_code` to map between them. See skill's "MCP-Driven Test Discovery" for details.
+- **MCP is for validation, not a replacement for specs** — MCP is a "try first" tool. The final deliverable is always a replayable `.spec.ts` file.
+
+### Testing Rules (see skill for full details)
+- **Consult skill references** — The `e2e-testing` skill is preloaded; read its `references/` files for patterns and templates. Do not work from memory.
+- **UI-first testing** — See skill's "Anti-Patterns § API-as-substitute" and "Real API Test Data Policy"
+- **Tab content ≠ tab switching** — See skill's "Anti-Patterns § Shallow tab/dialog testing". Applies to Create Mode too.
+- **Coverage Plan drives the spec** — See skill's "Coverage Plan § Validation rules"
+- **No mock data, no preemptive skips** — See skill's "No Mock Data" and "Anti-Patterns § Preemptive skip/fixme"
+
+### Conventions
+- **Always set `E2E_REPORT_NAME`** — `E2E_REPORT_NAME={page-name} pnpm test:e2e` from `app/`
+- **Artifacts go to `playwright/`** — All test outputs in `app/playwright/` (gitignored)

@@ -258,6 +258,159 @@ After recording:
 3. Add meaningful assertions
 4. Remove unnecessary `waitForTimeout` calls
 
+## Coverage Plan Rules
+
+### Create Mode vs Deep Test Mode
+
+- **Create Mode**: Every Coverage Plan row MUST have corresponding tests. Each tab panel's primary content (tables, forms) must be tested. Items marked `[deep]` in the Interaction Depth Checklist may be omitted.
+- **Deep Test Mode**: Same as Create Mode, plus all `[deep]` items. Use `--repeat-each=3` for flakiness detection.
+
+### Decomposition Rules
+
+- **Tabbed containers** — Each tab panel gets its own row(s). Tab switching alone is NOT a valid Coverage Plan entry. Analyze the component rendered inside each tab and list its interactive elements separately.
+- **Dialogs with forms** — List every form's fields. Every form MUST have a "fill + submit + verify toast" scenario.
+- **Nested dialogs** — If a tab/dialog opens another dialog (e.g. "Add Member" dialog inside Members tab), that inner dialog gets its own row.
+
+### Validation Rules
+
+- Every component found in recursive analysis MUST appear in the Coverage Plan
+- If a component is excluded, add a row with reason: `N/A — no interactive elements` or `N/A — shadcn primitive`
+- **Every form MUST have a submit success row** — "fill + submit + verify toast" is never optional
+- **Every tab panel MUST have its own row(s)** with the tab's internal components — not just "tab switching"
+- Each row with test cases MUST map to a `test.describe` block in the spec
+- If coverage is intentionally skipped, use `test.skip(true, 'reason')` in the spec — never silently omit
+
+## Interaction Depth Checklist
+
+Apply to every container (dialog, tab panel, form). All applicable items are **required** in Create Mode. Items marked `[deep]` are additionally required in Deep Test Mode.
+
+### Container Patterns
+
+- **Dialog** — open → verify content visible → close (click cancel or X). For AlertDialog, verify confirm action works
+- **Tabs** — switch to each tab → **then treat each tab panel as a sub-page**: recursively apply this entire checklist to the content within each tab. In Coverage Plan, list each tab's inner components explicitly
+- **Popover / Filter panel** — open trigger → interact with inner controls → verify effect on parent page (e.g., table filters, row count changes) → close
+- **Accordion / Collapsible** — expand → verify content visible → collapse `[deep]`
+
+### Data Display Patterns
+
+- **Table** — assert row count > 0 and at least one cell has non-empty text. If sortable: click header, verify order changes. If expandable: expand a row, verify children appear
+- **Pagination** — verify page info text (e.g., total count or "第 1 頁"), click next page, assert content or page indicator changes. If table above: verify rows update
+- **Empty state** — when no data exists, verify empty state message or illustration is visible `[deep]`
+- **Skeleton / Loading** — do NOT assert on loading states (transient); instead wait for skeleton to disappear before asserting content `[deep]`
+
+### Form Patterns
+
+- **Form fields** — verify all expected fields are present (visible). Fill all required fields with valid data
+- **Required field validation** — submit empty form or clear a required field, expect error message or disabled submit button
+- **⚠️ Form submit success** — **MANDATORY for every form.** Fill valid data → submit → verify success toast + list/page updates to reflect change. Never skip this preemptively. For slow operations, extend timeout with `test.setTimeout()` instead of using `test.fixme`.
+- **Form submit failure** — use invalid input that triggers real API error → verify error toast or inline error
+- **Select / Dropdown** — click trigger → wait for dropdown content visible → select an option → verify trigger displays selected value
+- **Rich text editor (Tiptap)** — click editor area → type text → verify content appears. Do NOT test toolbar formatting unless explicitly requested `[deep]`
+
+### Action Patterns
+
+- **Toggle / Switch** — click → verify state change (visual or API call)
+- **Delete confirmation** — open AlertDialog → fill confirmation input if required → submit → verify item removed from list
+- **Drag and drop** — use Playwright `dragTo()` → verify order or position changes `[deep]`
+- **Multi-role behavior** `[deep]`
+
+**For Create Mode**: cover every item that applies to the target page. If an item cannot be tested without mocking, document it with `test.skip` and state the reason. If a test is slow but functional, extend the timeout — do not skip.
+
+## MCP-Driven Test Discovery
+
+After injecting `data-testid` and before writing POM/spec, use Playwright MCP browser to actually interact with the page. This is the "try before write" approach.
+
+### MCP Session Authentication
+
+MCP browser and `@playwright/test` storageState are separate — MCP needs its own login:
+1. `browser_navigate` → login page
+2. `browser_fill_form` → fill test account credentials
+3. `browser_click` → submit login
+4. `browser_wait_for` → wait for navigation to complete
+
+### Interactive Exploration
+
+After navigating to the target page:
+- `browser_snapshot` → get ARIA tree to understand page structure
+- `browser_run_code` → verify `data-testid` attributes exist and are unique
+- Open each tab/dialog via `browser_click` → `browser_snapshot` → record content
+- Update Coverage Plan if actual page differs from static Vue file analysis
+
+### Form Dry-Run (mandatory for every form)
+
+For each form in the Coverage Plan:
+1. Open dialog via MCP → fill test data → submit
+2. Verify success toast via `browser_snapshot`
+3. Cleanup test data via `browser_run_code` (API delete)
+4. If dry-run fails → investigate and fix. Never skip.
+
+### MCP → Spec Translation
+
+MCP snapshot uses ARIA `ref` to identify elements (no `data-testid`/`id`/`class` in snapshot).
+Translation rules:
+- MCP action succeeds → identify the corresponding `data-testid` locator → write into spec
+- Use `browser_run_code` to query element's `data-testid`:
+  ```javascript
+  await page.locator('[aria-label="..."]').getAttribute('data-testid')
+  ```
+- Specs MUST use `page.locator('[data-testid="..."]')` — never MCP `ref` values
+
+## MCP Pre-Validation Workflow
+
+### Step 1: MCP Dry-Run (in agent's MCP session)
+
+Agent uses MCP tools to validate the full interaction flow:
+
+```
+browser_navigate → /overview/project-list
+browser_click → [Add Project button]
+browser_fill_form → [{name: "Project Name", ref: "N1", value: "[E2E] Test"}]
+browser_click → [Submit button]
+browser_snapshot → verify toast visible in ARIA tree
+browser_run_code → cleanup: await fetch('/prod-api/v3/projects/...', {method: 'DELETE'})
+```
+
+### Step 2: Map MCP refs to data-testid
+
+Use `browser_run_code` to find the `data-testid` for elements interacted via MCP:
+
+```javascript
+// In browser_run_code
+const testIds = await page.locator('[data-testid]').evaluateAll(
+  els => els.map(el => ({
+    testid: el.getAttribute('data-testid'),
+    tag: el.tagName,
+    text: el.textContent?.trim().slice(0, 30)
+  }))
+);
+return testIds;
+```
+
+### Step 3: Translate to Spec Code
+
+Based on the successful MCP dry-run, write the corresponding spec:
+
+```typescript
+test('should create project via UI form', async ({ page }) => {
+  const listPage = new ProjectListPage(page)
+  await listPage.goto()
+  await listPage.clickAddProject()
+
+  // Fill form — each line validated via MCP dry-run
+  await listPage.createDialog.nameInput.fill('[E2E] Test')
+  // ... other fields validated in MCP
+
+  const apiPromise = listPage.waitForApi('/v3/projects')
+  await listPage.createDialog.submitBtn.click()
+  await apiPromise
+
+  const toast = await listPage.getSuccessToast()
+  expect(toast).toContain('成功')
+})
+```
+
+Every `fill`/`click` in the spec corresponds to a MCP action that was verified to work.
+
 ## Real API Test Data Examples
 
 ### Create with Cleanup
