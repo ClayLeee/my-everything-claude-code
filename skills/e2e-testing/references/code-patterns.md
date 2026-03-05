@@ -89,7 +89,7 @@ export class ItemsPage extends BasePage {
 
 ### Deep Testing POM (Nested Dialog/Tab Structure)
 
-One page = one POM file. Use nested object structure for dialog/tab locators:
+One page = one POM file. Use nested object structure for dialog/tab locators. For tabs, include locators for the **content within** each tab panel (tables, forms, selects), not just the tab triggers:
 
 ```typescript
 export class ProjectListPage extends BasePage {
@@ -106,10 +106,20 @@ export class ProjectListPage extends BasePage {
 
   readonly editDialog = {
     container: this.page.locator('[data-testid="project-list-edit-dialog"]'),
+    // Tab triggers
+    tabInfo: this.page.locator('[data-testid="project-list-edit-dialog-tab-info"]'),
     tabMembers: this.page.locator('[data-testid="project-list-edit-dialog-tab-members"]'),
     tabSettings: this.page.locator('[data-testid="project-list-edit-dialog-tab-settings"]'),
+    // Info tab content
     nameInput: this.page.locator('[data-testid="project-list-edit-dialog-name-input"]'),
+    descInput: this.page.locator('[data-testid="project-list-edit-dialog-desc-input"]'),
     submitBtn: this.page.locator('[data-testid="project-list-edit-dialog-submit-btn"]'),
+    // Members tab content
+    membersTable: this.page.locator('[data-testid="project-list-edit-dialog-members-table"]'),
+    membersRows: this.page.locator('[data-testid="project-list-edit-dialog-members-table"] tbody tr'),
+    addMemberBtn: this.page.locator('[data-testid="project-list-edit-dialog-add-member-btn"]'),
+    // Settings tab content
+    visibilitySelect: this.page.locator('[data-testid="project-list-edit-dialog-visibility-select"]'),
   }
 
   constructor(page: Page) {
@@ -247,3 +257,203 @@ After recording:
 2. Extract page interactions into POM classes
 3. Add meaningful assertions
 4. Remove unnecessary `waitForTimeout` calls
+
+## Real API Test Data Examples
+
+### Create with Cleanup
+
+```typescript
+test.describe('Create Project', () => {
+  const TEST_NAME = '[E2E] Create Test'
+
+  test.afterEach(async ({ request }) => {
+    // Best-effort cleanup
+    const resp = await request.get('/prod-api/v3/projects?keyword=[E2E]')
+    if (resp.ok()) {
+      const data = await resp.json()
+      for (const p of data.data ?? []) {
+        await request.delete(`/prod-api/v3/projects/${p.id}`).catch(() => {})
+      }
+    }
+  })
+
+  test('should create project and show success toast', async ({ page }) => {
+    const listPage = new ProjectListPage(page)
+    await listPage.goto()
+    await listPage.clickAddProject()
+    await listPage.createDialog.nameInput.fill(TEST_NAME)
+    // fill other required fields...
+    const apiPromise = listPage.waitForApi('/v3/projects')
+    await listPage.createDialog.submitBtn.click()
+    await apiPromise
+    const toast = await listPage.getSuccessToast()
+    expect(toast).toContain('成功')
+  })
+})
+```
+
+## UI Pattern Testing Examples
+
+### Table Assertion
+
+Always verify row count **and** cell content — not just that the table exists:
+
+```typescript
+// Assert table has data
+const rows = page.locator('[data-testid="members-table"] tbody tr')
+expect(await rows.count()).toBeGreaterThan(0)
+
+// Assert cell content is non-empty
+const firstCell = rows.first().locator('td').first()
+await expect(firstCell).not.toHaveText('')
+```
+
+### Select / Dropdown Interaction
+
+shadcn-vue Select uses Radix portal — the dropdown content renders **outside** the parent container:
+
+```typescript
+// Click the select trigger
+await page.locator('[data-testid="role-select-trigger"]').click()
+
+// Wait for dropdown content (rendered in portal, not inside trigger's parent)
+const dropdownContent = page.locator('[data-testid="role-select-content"]')
+await expect(dropdownContent).toBeVisible()
+
+// Select an option
+await dropdownContent.getByText('Engineer').click()
+
+// Verify selected value is displayed in trigger
+await expect(page.locator('[data-testid="role-select-trigger"]')).toContainText('Engineer')
+```
+
+### Form Fill + Validation
+
+Test both invalid and valid submission:
+
+```typescript
+test.describe('Create Project Form', () => {
+  test('should show validation error on empty submit', async ({ page }) => {
+    const listPage = new ProjectListPage(page)
+    await listPage.goto()
+    await listPage.addButton.click()
+
+    // Submit without filling required fields
+    await listPage.createDialog.submitBtn.click()
+
+    // Expect error (inline or toast)
+    await expect(page.locator('.field-error, [data-testid="field-error"]').first()).toBeVisible()
+  })
+
+  test('should create project with valid data', async ({ page }) => {
+    const listPage = new ProjectListPage(page)
+    await listPage.goto()
+    await listPage.addButton.click()
+
+    await listPage.createDialog.nameInput.fill('[E2E] Test Project')
+    // Fill other required fields...
+
+    const apiPromise = listPage.waitForApi('/v3/projects')
+    await listPage.createDialog.submitBtn.click()
+    await apiPromise
+
+    const toast = await listPage.getSuccessToast()
+    expect(toast).toContain('成功')
+  })
+})
+```
+
+### Pagination
+
+Verify page info and navigation:
+
+```typescript
+// Verify page info text exists
+const pageInfo = page.locator('[data-testid="pagination-info"]')
+await expect(pageInfo).toBeVisible()
+
+// Record current content for comparison
+const firstRowBefore = await page.locator('tbody tr').first().textContent()
+
+// Click next page
+await page.locator('[data-testid="pagination-next"]').click()
+await page.waitForLoadState('networkidle')
+
+// Verify content changed (rows or page indicator)
+const firstRowAfter = await page.locator('tbody tr').first().textContent()
+expect(firstRowAfter).not.toBe(firstRowBefore)
+```
+
+### Nested Spec Structure for Tabbed Dialogs
+
+Mirror the component hierarchy with nested `test.describe` blocks:
+
+```typescript
+test.describe('Project List', () => {
+  test.describe('Edit Dialog', () => {
+    test.beforeEach(async ({ page }) => {
+      const listPage = new ProjectListPage(page)
+      await listPage.goto()
+      // Open edit dialog for first project
+      await listPage.firstRowEditBtn.click()
+      await expect(listPage.editDialog.container).toBeVisible()
+    })
+
+    test.describe('Info Tab', () => {
+      test('should display project info fields', async ({ page }) => {
+        const listPage = new ProjectListPage(page)
+        await expect(listPage.editDialog.nameInput).toBeVisible()
+        await expect(listPage.editDialog.descInput).toBeVisible()
+      })
+
+      test('should update project info', async ({ page }) => {
+        const listPage = new ProjectListPage(page)
+        await listPage.editDialog.nameInput.fill('[E2E] Updated Name')
+        const apiPromise = listPage.waitForApi('/v3/projects/')
+        await listPage.editDialog.submitBtn.click()
+        await apiPromise
+        const toast = await listPage.getSuccessToast()
+        expect(toast).toContain('成功')
+      })
+    })
+
+    test.describe('Members Tab', () => {
+      test.beforeEach(async ({ page }) => {
+        const listPage = new ProjectListPage(page)
+        await listPage.editDialog.tabMembers.click()
+      })
+
+      test('should display members table with data', async ({ page }) => {
+        const listPage = new ProjectListPage(page)
+        const rows = listPage.editDialog.membersRows
+        expect(await rows.count()).toBeGreaterThan(0)
+        // Verify cell content
+        const firstCell = rows.first().locator('td').first()
+        await expect(firstCell).not.toHaveText('')
+      })
+
+      test('should have add member button', async ({ page }) => {
+        const listPage = new ProjectListPage(page)
+        await expect(listPage.editDialog.addMemberBtn).toBeVisible()
+      })
+    })
+
+    test.describe('Settings Tab', () => {
+      test.beforeEach(async ({ page }) => {
+        const listPage = new ProjectListPage(page)
+        await listPage.editDialog.tabSettings.click()
+      })
+
+      test('should interact with visibility select', async ({ page }) => {
+        const listPage = new ProjectListPage(page)
+        await listPage.editDialog.visibilitySelect.click()
+        // Wait for dropdown content
+        const content = page.locator('[data-testid="visibility-select-content"]')
+        await expect(content).toBeVisible()
+        // Select option
+        await content.getByText('Private').click()
+        await expect(listPage.editDialog.visibilitySelect).toContainText('Private')
+      })
+    })
+  })
+})
