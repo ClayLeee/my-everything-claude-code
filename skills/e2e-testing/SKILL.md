@@ -52,11 +52,22 @@ For full POM examples (basic + deep testing), see **`references/code-patterns.md
 
 ## No Mock Data
 
-**All E2E tests must hit the real running dev server.** Never use fabricated API responses.
+**All E2E tests must hit the real running dev server.** Never use fabricated API responses. This rule is absolute — there are no exceptions.
 
-- **Forbidden**: `route.fulfill()` with fake data, `route.abort()`, fake data constants, `waitForTimeout()` delays to simulate loading
-- **Allowed**: `page.waitForResponse()` to wait for real API responses
-- **Skip untestable states**: If a state (loading spinner, transient button disabled) can only be observed via mocking, do not test it in E2E — those belong in unit tests
+### Forbidden
+
+- `route.fulfill()` with fabricated response bodies — this is mock data
+- `route.abort()` to simulate network failures — use real error conditions instead
+- Fake data constants (e.g. `MOCK_AUTH_METHODS_RESPONSE`) in test files
+- `page.route()` + `waitForTimeout()` to simulate loading states
+- Any test scenario that requires fabricated API responses to function
+
+### What to Do Instead
+
+- **Test against real API** — Hit the actual dev server, assert on real results
+- **Trigger real errors** — Use wrong credentials, invalid input, missing fields to produce real API errors
+- **Skip untestable states** — If a state (loading spinner, transient button disabled) can only be observed via mocking, it does not belong in E2E tests
+- **Use `page.waitForResponse()`** — Waiting for real API responses is fine; intercepting and replacing them is not
 
 ## Test Scenario Guidelines
 
@@ -67,6 +78,12 @@ Not every feature requires all scenario types. Use judgement:
 - **Permission / role-based** — When the feature has role-based behavior
 - **Empty state** — When the feature displays dynamic data
 - **Error response** — When the feature depends on backend API calls
+
+## Test Hygiene
+
+- **Isolate tests** — Each test should be independent; no shared mutable state between tests
+- **Fail fast** — Use `expect()` assertions at every key step; don't let tests drift after a critical failure
+- **Wait for conditions, not time** — `waitForResponse()` > `waitForTimeout()`; never rely on arbitrary delays
 
 ## Incremental Test Maintenance
 
