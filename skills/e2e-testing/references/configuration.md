@@ -12,10 +12,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [
-    ['html', {
-      outputFolder: `playwright/reports/${process.env.E2E_REPORT_NAME || 'latest'}`,
-      open: 'never',
-    }],
+    ['html', { outputFolder: 'playwright/reports' }],
   ],
   outputDir: 'playwright/test-results',
   use: {
@@ -102,7 +99,7 @@ All artifacts are consolidated under `app/playwright/` (gitignored):
 
 | Artifact | Path | Source |
 |----------|------|--------|
-| HTML report | `playwright/reports/{report-name}/` | `reporter` config (via `E2E_REPORT_NAME` env var) |
+| HTML report | `playwright/reports/` | `reporter` config |
 | Failure screenshots | `playwright/test-results/` | Built-in `screenshot: 'only-on-failure'` |
 | Failure videos | `playwright/test-results/` | Built-in `video: 'retain-on-failure'` |
 | Retry traces | `playwright/test-results/` | Built-in `trace: 'on-first-retry'` |

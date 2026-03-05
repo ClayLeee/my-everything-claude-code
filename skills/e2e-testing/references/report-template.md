@@ -1,17 +1,17 @@
 # Dual Test Reports
 
-Every test run produces two reports. The report name is controlled via `E2E_REPORT_NAME` env var (defaults to `latest` if not set).
+Every test run produces two reports.
 
 ## Report 1: HTML (Playwright built-in)
 
-Automatically generated at `playwright/reports/{report-name}/`. View with:
+Automatically generated at `playwright/reports/`. View with:
 ```bash
 cd app && pnpm test:e2e:report
 ```
 
 ## Report 2: Markdown
 
-Stored at `playwright/{report-name}.md` — **filename has no date** (overwrites on re-run, date is in content).
+Stored at `playwright/{page-name}-test-report.md` — **filename has no date** (overwrites on re-run, date is in content).
 
 ### Template
 
@@ -61,7 +61,7 @@ Stored at `playwright/{report-name}.md` — **filename has no date** (overwrites
 ---
 
 ## Artifacts
-- HTML Report: `playwright/reports/{report-name}/index.html`
+- HTML Report: `playwright/reports/{page-name}/index.html`
 - Failure Screenshots: `playwright/test-results/` (auto-captured)
 - Videos: `playwright/test-results/` (auto-captured)
 - Traces: `playwright/test-results/` (auto-captured)
@@ -76,6 +76,6 @@ _測試工具: Playwright_
 
 - Use 繁體中文 for report content
 - One table per `test.describe` group
-- Filename format: `playwright/{report-name}.md` (no date in filename, uses `E2E_REPORT_NAME` env var)
+- Filename format: `playwright/{page-name}-test-report.md` (no date in filename)
 - Always overwrite previous report (no accumulation)
 - Reference the style from existing reports in `playwright/` directory
