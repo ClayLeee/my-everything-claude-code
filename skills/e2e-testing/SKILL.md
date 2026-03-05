@@ -5,7 +5,7 @@ description: |
   This skill should be used when the user asks to "write E2E tests", "add Playwright tests", "create page tests",
   "update E2E tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
   or mentions Playwright testing, test maintenance, or test locators.
-version: 1.1.0
+version: 1.0.1-beta.1
 ---
 
 # E2E Testing Patterns
@@ -110,6 +110,13 @@ Not every feature requires all scenario types. Use judgement:
 - **Fail fast** — Use `expect()` assertions at every key step; don't let tests drift after a critical failure
 - **Wait for conditions, not time** — `waitForResponse()` > `waitForTimeout()`; never rely on arbitrary delays
 
+## Anti-Patterns — Never Do These
+
+- **Preemptive skip/fixme** — Do NOT mark tests as `test.fixme` or `test.skip` based on *assumptions* about speed or reliability. Always write and execute the full flow first. Only mark as `test.fixme` after the test actually fails on execution. For known slow operations (e.g. backend provisioning), extend the timeout with `test.setTimeout(120000)` instead of skipping.
+- **Shallow tab/dialog testing** — Switching tabs and verifying they render is NOT sufficient coverage. Each tab panel is a sub-page — apply the full Interaction Depth Checklist to its content (tables, forms, dialogs inside the tab).
+- **Missing form submit test** — Every form (create dialog, edit dialog, inline form) MUST have a happy-path submit test: fill required fields → submit → verify success toast + data update. This is the single most important test for any form. Never omit it.
+- **Visibility-only assertions for data** — Do not stop at "element is visible". For tables, assert row count and cell content. For forms, verify field values are prefilled correctly. For selects, verify the selected value after interaction.
+
 ## Incremental Test Maintenance
 
 When UI code changes, incrementally update tests — never rebuild from scratch.
@@ -204,6 +211,31 @@ The POM class itself serves as the registry of all `data-testid` values — no s
 5. Record all interactive elements at each level
 6. For containers with tabs, list every tab panel and its inner components separately in the Coverage Plan — each tab is a sub-page requiring its own analysis
 
+### Coverage Plan (Required for Create Mode AND Deep Test Mode)
+
+After recursive analysis, produce a Coverage Plan table before writing any tests. This is mandatory whenever the page contains dialogs, tabs, or nested interactive containers.
+
+| Container | Component | Interactive Elements | Test Scenarios |
+|-----------|-----------|---------------------|----------------|
+| Page | `{Page}/index.vue` | table, toolbar buttons, search | table display, search, toolbar actions |
+| {Dialog A} | `{DialogA}.vue > {FormComponent}` | form fields, submit btn | open/close, validation, **fill + submit + verify toast** |
+| {Dialog B} > Tab 1 | `{Tab1Component}.vue` | table, add/remove, search | table content, CRUD operations, search |
+| {Dialog B} > Tab 2 | `{Tab2Component}.vue` | form fields, selects, toggle | field interactions, form submit |
+| ... | ... | ... | ... |
+
+**Decomposition rules:**
+- **Tabbed containers** — Each tab panel gets its own row(s). Tab switching alone is NOT a valid Coverage Plan entry. Analyze the component rendered inside each tab and list its interactive elements separately.
+- **Dialogs with forms** — List every form's fields. Every form MUST have a "fill + submit + verify toast" scenario.
+- **Nested dialogs** — If a tab/dialog opens another dialog (e.g. "Add Member" dialog inside Members tab), that inner dialog gets its own row.
+
+**Validation rules:**
+- Every component found in recursive analysis MUST appear in the Coverage Plan
+- If a component is excluded, add a row with reason: `N/A — no interactive elements` or `N/A — shadcn primitive`
+- **Every form MUST have a submit success row** — "fill + submit + verify toast" is never optional
+- **Every tab panel MUST have its own row(s)** with the tab's internal components — not just "tab switching"
+- Each row with test cases MUST map to a `test.describe` block in the spec
+- If coverage is intentionally skipped, use `test.skip(true, 'reason')` in the spec — never silently omit
+
 ### Test Organization
 
 One page = one spec file. Use nested `test.describe` mirroring the component hierarchy (Page > Dialog > Tab > Form).
@@ -230,7 +262,7 @@ All applicable items are **required** in Create Mode. Items marked `[deep]` are 
 
 - **Form fields** — verify all expected fields are present (visible). Fill all required fields with valid data
 - **Required field validation** — submit empty form or clear a required field, expect error message or disabled submit button
-- **Form submit success** — fill valid data → submit → verify success toast + list/page updates to reflect change
+- **⚠️ Form submit success** — **MANDATORY for every form.** Fill valid data → submit → verify success toast + list/page updates to reflect change. Never skip this preemptively. For slow operations, extend timeout with `test.setTimeout()` instead of using `test.fixme`.
 - **Form submit failure** — use invalid input that triggers real API error → verify error toast or inline error
 - **Select / Dropdown** — click trigger → wait for dropdown content visible → select an option → verify trigger displays selected value
 - **Rich text editor (Tiptap)** — click editor area → type text → verify content appears. Do NOT test toolbar formatting unless explicitly requested `[deep]`
@@ -242,7 +274,7 @@ All applicable items are **required** in Create Mode. Items marked `[deep]` are 
 - **Drag and drop** — use Playwright `dragTo()` → verify order or position changes `[deep]`
 - **Multi-role behavior** `[deep]`
 
-**For Create Mode**: cover every item that applies to the target page. If an item cannot be tested without mocking, document it with `test.skip` and state the reason.
+**For Create Mode**: cover every item that applies to the target page. If an item cannot be tested without mocking, document it with `test.skip` and state the reason. If a test is slow but functional, extend the timeout — do not skip.
 
 ## No Manual Screenshots
 

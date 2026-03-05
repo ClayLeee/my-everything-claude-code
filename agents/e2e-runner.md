@@ -80,15 +80,19 @@ Detect the appropriate mode based on user intent and context:
 ### Create Mode (New Tests)
 
 1. **Check auth setup** — Verify `auth.setup.ts` and `.auth/` config exist; if not, create them first (see skill `references/auth-patterns.md`)
-2. **Analyze target page** — Read `index.vue` + all child components, build component tree
-3. **Inject `data-testid`** — Follow skill's data-testid convention, **only add attributes — change nothing else**
-4. **Build POM class** — Extend `BasePage`, use `data-testid` locators, nested object structure for dialogs/tabs
-5. **Build spec file** — Follow skill's test scenario guidelines AND the Interaction Depth Checklist:
-   - For each UI pattern (table, form, tabs, select, pagination), apply the corresponding checklist assertions
-   - When the page has tabbed containers, produce a Coverage Plan table listing each tab's inner components first, then write tests per tab
+2. **Analyze target page** — Read `index.vue` + all child components recursively. For tabbed containers, read the component rendered inside each tab panel — not just the tab trigger.
+3. **Produce Coverage Plan** — Per skill's "Coverage Plan" section. This is MANDATORY when the page has dialogs, tabs, or nested containers. Each tab panel's inner component gets its own row. Every form must have a "fill + submit + verify toast" scenario.
+4. **Inject `data-testid`** — Follow skill's data-testid convention, **only add attributes — change nothing else**
+5. **Build POM class** — Extend `BasePage`, use `data-testid` locators, nested object structure for dialogs/tabs
+6. **Build spec file** — The spec MUST fulfill the Coverage Plan:
+   - Every Coverage Plan row with test scenarios maps to a `test.describe` block
+   - Apply the Interaction Depth Checklist to every container (dialog, tab panel, form)
+   - **Every form MUST have a submit success test** — fill valid data → submit → verify toast. Use `test.setTimeout()` for slow operations instead of `test.fixme`
+   - **Every tab's internal content MUST be tested** — tables (row count + cell content), forms (prefill + submit), selects (open + select + verify), not just tab switching
    - Tests start from authenticated state (no login in beforeEach)
    - For destructive operations (create/edit/delete), follow skill's "Real API Test Data Policy"
-6. **Execute** — Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}` from `app/`, then generate markdown report.
+7. **Coverage validation** — Before executing, review the spec against the Coverage Plan. List any gaps with reasons.
+8. **Execute** — Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}` from `app/`, then generate markdown report.
 
 ### Maintain Mode (Incremental Updates)
 
@@ -116,6 +120,10 @@ Detect the appropriate mode based on user intent and context:
 
 - **Consult references as needed** — The `e2e-testing` skill is preloaded; read its `references/` files for detailed patterns and templates
 - **No mock data** — All tests hit real API; see skill's "No Mock Data" for details
+- **No preemptive skips** — Write and execute every test, including form submissions. Only use `test.fixme` after actual execution failure, never based on assumption about speed or reliability. Use `test.setTimeout()` for slow operations.
+- **Tab content ≠ tab switching** — When dialogs have tabs, each tab's internal content (tables, forms, dialogs) must be tested with real interactions and data assertions. Merely switching tabs and checking visibility is insufficient.
+- **Every form must submit** — Every form (create dialog, edit dialog, inline form) MUST have a happy-path submit test: fill → submit → verify toast + data update. This is the single most important test for any form.
+- **Assert data, not just visibility** — For tables: assert row count and cell text. For forms: verify prefilled values. For selects: verify selected value after interaction. `toBeVisible()` alone is a weak assertion.
 - **Use `storageState` to skip login** — Do not add login to `beforeEach`; tests start from authenticated state via auth setup project
 - **All POM classes extend `BasePage`** — Use shared toast/wait methods, abstract `goto()`
 - **`data-testid` first for locators** — `[data-testid="..."]` > `getByRole()` > CSS selectors
