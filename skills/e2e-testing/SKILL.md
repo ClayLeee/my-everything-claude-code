@@ -4,7 +4,7 @@ description: |
   Playwright E2E testing patterns, Page Object Model, configuration, artifact management, MCP browser validation, and flaky test strategies.
   This skill should be used when the user asks to "write E2E tests", "add Playwright tests", "create page tests",
   "update E2E tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
-  "MCP browser dry-run", "validate form via browser",
+  "MCP browser dry-run", "validate form via browser", "semantic analysis", "produce SET",
   or mentions Playwright testing, test maintenance, or test locators.
 version: 1.0.1-beta.1
 ---
@@ -108,6 +108,59 @@ Not every feature requires all scenario types. Use judgement:
 - **Empty state** — When the feature displays dynamic data
 - **Error response** — When the feature depends on backend API calls
 
+## Semantic Analysis
+
+Before producing a Coverage Plan, perform structured semantic extraction from each Vue component to understand what every interactive element actually does. This replaces guesswork with evidence-based test strategy.
+
+### Extraction Process
+
+1. **Read template** — List interactive elements: `@click`, icons, `v-if`, `:disabled`, form inputs
+2. **Serena `get_symbols_overview`** — Scan script skeleton: functions, refs, computed, emits
+3. **Serena `find_symbol(handlerName, include_body=true)`** — Get handler implementation
+4. **Serena `find_referencing_symbols`** — Trace handler to API module endpoint
+5. **Serena `search_for_pattern`** — Find validation schema (Zod rules, required fields)
+6. **Merge template + script analysis** — Produce the Semantic Element Table (SET)
+
+For small files (<100 lines), `Read` may be faster than Serena for steps 2-5.
+
+### Semantic Element Table (SET)
+
+Each interactive element gets one row:
+
+| # | Element | Type | Semantic | Handler/Event | API Call | Behavior | Test Strategy |
+|---|---------|------|----------|---------------|----------|----------|---------------|
+| 1 | Add Member button | button | add-member | `handleAddMember` | `POST /members` | form-submit | open → fill ALL fields → submit → waitForResponse → toast → table update → cleanup |
+| 2 | Delete icon (Trash2) | icon-button | delete | `handleDelete` | `DELETE /members/:id` | delete-confirm | click → AlertDialog → confirm input → submit → waitForResponse → removal |
+
+For the complete extraction clues table (handler names, icon names, i18n keys, emit events, API calls, UI patterns → behavior mapping), see **`references/code-patterns.md`** § Semantic Extraction Rules.
+
+### Behavior Taxonomy
+
+Each behavior (form-submit, delete-confirm, toggle, inline-edit, navigation, sort, filter, pagination, drag-reorder, static-display) maps to minimum required test steps, plus required error/boundary scenarios (empty fields, invalid input, cancel/close state cleanup, disabled states).
+
+**Boundary principle**: Only test errors a user can trigger in normal operation. Do NOT mock network/server errors — violates No Mock Data principle. Derive specific error scenarios from Vue component's validation rules, disabled computed, and error handling code.
+
+For the complete behavior → test steps mapping, error scenarios per behavior, and code examples, see **`references/code-patterns.md`** § Behavior Taxonomy.
+
+### Table Column Assertion Rules
+
+Replace generic "one cell non-empty" with type-specific assertions per column type (pure text, badge/status, progress, date, link/button, action column). Detect column type from Vue template (`<Badge>`, `<Progress>`, `formatDate()`, etc.) and apply matching assertion patterns.
+
+For the complete column type → assertion mapping and code examples, see **`references/code-patterns.md`** § Table Column Assertion Rules.
+
+### SET → Coverage Plan Derivation
+
+The Coverage Plan is mechanically derived from the SET — not manually judged:
+
+1. Group SET rows by container (page, dialog, tab panel)
+2. Each group = one Coverage Plan row
+3. Test Scenarios = union of all Test Strategy entries in that group
+4. Every `form-submit` row MUST produce a "fill + submit + toast + data update" scenario
+5. Every `delete-confirm` row MUST produce a "trigger + confirm + removal" scenario
+6. Every table MUST have per-column-type assertions
+
+For a complete worked example (component tree → SET → Coverage Plan → test.describe blocks), see **`references/code-patterns.md`** § Worked Example.
+
 ## Test Hygiene
 
 - **Isolate tests** — Each test should be independent; no shared mutable state between tests
@@ -117,7 +170,7 @@ Not every feature requires all scenario types. Use judgement:
 ## Anti-Patterns — Never Do These
 
 - **Preemptive skip/fixme** — Do NOT mark tests as `test.fixme` or `test.skip` based on *assumptions* about speed or reliability. Always write and execute the full flow first. Only mark as `test.fixme` after the test actually fails on execution. For known slow operations (e.g. backend provisioning), extend the timeout with `test.setTimeout(120000)` instead of skipping.
-- **Shallow tab/dialog testing** — Switching tabs and verifying they render is NOT sufficient coverage. Each tab panel is a sub-page — apply the full Interaction Depth Checklist to its content (tables, forms, dialogs inside the tab). This applies to **Create Mode too**, not just Deep Test Mode.
+- **Shallow tab/dialog testing** — Switching tabs and verifying they render is NOT sufficient coverage. Each tab panel is a sub-page — apply the full Interaction Depth Checklist to its content (tables, forms, dialogs inside the tab).
 - **Missing form submit test** — Every form (create dialog, edit dialog, inline form) MUST have a happy-path submit test: fill required fields → submit → verify success toast + data update. This is the single most important test for any form. Never omit it.
 - **Visibility-only assertions for data** — Do not stop at "element is visible". For tables, assert row count and cell content. For forms, verify field values are prefilled correctly. For selects, verify the selected value after interaction.
 - **API-as-substitute for UI interaction** — NEVER use `request.post()` / `request.get()` in the test body as a substitute for filling a form through the UI. The purpose of E2E tests is to exercise the actual user interface. The `request` fixture is ONLY for: (1) **cleanup** in `afterEach`/`afterAll` — deleting test data, (2) **setup** in `beforeEach` — creating prerequisite data for edit/delete tests. If a form has complex fields (selects, date pickers, comboboxes), the test MUST interact with those UI elements through Playwright locators, not bypass them with API calls.
@@ -217,7 +270,7 @@ The POM class itself serves as the registry of all `data-testid` values — no s
 5. Record all interactive elements at each level
 6. For containers with tabs, list every tab panel and its inner components separately in the Coverage Plan — each tab is a sub-page requiring its own analysis
 
-### Coverage Plan (Required for Create Mode AND Deep Test Mode)
+### Coverage Plan (Required)
 
 After recursive analysis, produce a Coverage Plan table before writing any tests. Mandatory whenever the page contains dialogs, tabs, or nested interactive containers.
 
@@ -238,7 +291,7 @@ One page = one spec file. Use nested `test.describe` mirroring the component hie
 
 ### Interaction Depth Checklist
 
-Apply to every container (dialog, tab panel, form) found in the Coverage Plan. All applicable items are required in Create Mode; items marked `[deep]` are additionally required in Deep Test Mode.
+Apply to every container (dialog, tab panel, form) found in the Coverage Plan. All applicable items are required.
 
 For the full checklist (containers, data display, forms, actions), see **`references/code-patterns.md`** § Interaction Depth Checklist.
 
@@ -271,6 +324,6 @@ For the full markdown template, see **`references/report-template.md`**.
 ## Additional References
 
 - **`references/auth-patterns.md`** — Credential format, auth.setup.ts, multi-role storageState
-- **`references/code-patterns.md`** — BasePage implementation, POM examples (including tab-internal locators), test structure, UI pattern testing examples (table, select, form, pagination, nested specs), Coverage Plan rules, Interaction Depth Checklist, MCP-Driven Test Discovery (session auth, exploration, form dry-run, MCP→Spec translation), flaky patterns, artifact management
+- **`references/code-patterns.md`** — BasePage implementation, POM examples (including tab-internal locators), test structure, UI pattern testing examples (table, select, form, pagination, nested specs), Coverage Plan rules, Interaction Depth Checklist, MCP-Driven Test Discovery (session auth, exploration, form dry-run, MCP→Spec translation), flaky patterns, artifact management, Semantic Analysis Reference (extraction rules, behavior taxonomy code examples, column assertion rules, worked example)
 - **`references/configuration.md`** — Full playwright.config.ts template, file organization, CLI commands
 - **`references/report-template.md`** — Markdown report template and rules
