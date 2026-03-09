@@ -105,4 +105,4 @@ All artifacts are consolidated under `app/playwright/` (gitignored):
 | Retry traces | `playwright/test-results/` | Built-in `trace: 'on-first-retry'` |
 | Markdown reports | `playwright/*-test-report.md` | Agent-generated |
 
-**Do NOT use manual `page.screenshot()`** — rely on Playwright's built-in failure artifact capture.
+> **No manual `page.screenshot()` in specs** — see SKILL.md § No Manual Screenshots.
