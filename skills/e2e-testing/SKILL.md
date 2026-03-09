@@ -6,7 +6,7 @@ description: |
   "update E2E tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
   "handle test errors", "retry failed form submission", "classify test failures",
   or mentions Playwright testing, test maintenance, or test locators.
-version: 1.0.1-beta.5
+version: 1.0.1-beta.6
 ---
 
 # E2E Testing Patterns
