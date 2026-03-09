@@ -62,7 +62,7 @@ All output must be in **繁體中文**.
 
 ## First Step — Always
 
-1. The `e2e-testing` skill is preloaded via `skills:` field. Read its `references/` files as needed — especially `references/code-patterns.md` § UI Pattern Testing Examples for concrete interaction code (table assertions, select/dropdown, form validation, pagination, nested spec structure).
+1. The `e2e-testing` skill is preloaded via `skills:` field. Read its `references/` files as needed — especially `references/ui-patterns.md` for concrete interaction code (table assertions, select/dropdown, form validation, pagination, nested spec structure).
 2. Do not work from memory — the skill and references are the canonical source.
 
 ## Workflow — Mode Detection
@@ -86,7 +86,7 @@ Detect the appropriate mode based on user intent and context:
    - For each UI pattern (table, form, tabs, select, pagination), apply the corresponding checklist assertions
    - When the page has tabbed containers, produce a Coverage Plan table listing each tab's inner components first, then write tests per tab
    - Tests start from authenticated state (no login in beforeEach)
-   - For destructive operations (create/edit/delete), follow skill's "Real API Test Data Policy"
+   - For destructive operations (create/edit/delete), follow skill's "UI-Only Test Data Policy"
 6. **Execute** — Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}` from `app/`, then generate markdown report. On form submission errors, apply Error Discrimination Framework to determine if recoverable (retry) or non-recoverable (report FAIL).
 
 ### Maintain Mode (Incremental Updates)

@@ -6,7 +6,7 @@ description: |
   "update E2E tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
   "handle test errors", "retry failed form submission", "classify test failures",
   or mentions Playwright testing, test maintenance, or test locators.
-version: 1.1.0
+version: 1.0.1-beta.5
 ---
 
 # E2E Testing Patterns
@@ -67,9 +67,9 @@ For full POM examples (basic + deep testing), see **`references/code-patterns.md
 - **Skip untestable states** — If a state (loading spinner, transient button disabled) can only be observed via mocking, it does not belong in E2E tests
 - **Use `page.waitForResponse()`** — Waiting for real API responses is fine; intercepting and replacing them is not
 
-## Real API Test Data Policy
+## UI-Only Test Data Policy
 
-Since tests hit the real API, destructive tests (create/edit/delete) must follow this policy to remain idempotent:
+All test data manipulation MUST go through the UI — no `request` fixture, no API calls in `beforeEach`/`afterEach`. Tests behave exactly like a real user.
 
 ### Naming Convention
 
@@ -80,20 +80,26 @@ Use `[E2E]` prefix for test-created data so it's identifiable and cleanable:
 ### Lifecycle
 
 For **create** tests:
-1. Create entity with `[E2E]` name in test body
-2. Assert success (toast + list update)
-3. Clean up in `test.afterEach` or `test.afterAll` via `request` fixture
+1. Open dialog/form through UI (click add button)
+2. Fill all required fields through UI interactions
+3. Submit → wait for API response → assert success toast + list update
+4. Clean up through UI — search `[E2E]` data → delete via UI delete button
 
-For **edit/delete** tests:
-- Create dedicated test data in `test.beforeEach` via API (`request` fixture)
-- Perform UI action
-- Clean up if needed
+For **edit** tests:
+- Use existing data on the page (first row) — do NOT create via API
+- Record original values → edit through UI → assert success → restore original values through UI
 
-For full lifecycle examples (create with cleanup, edit/delete with setup), see **`references/code-patterns.md`** § Real API Test Data Examples.
+For **delete** tests:
+- Create the delete target through UI first (open create dialog → fill → submit)
+- Search for the created data → delete through UI → confirm → assert removal
 
-### When to Skip
+Use `test.describe.serial` to chain create → verify → delete within one group.
 
-If cleanup API doesn't exist for an entity type, use `test.skip(true, 'reason')` — don't silently omit the test.
+For full lifecycle examples and code patterns, see **`references/test-data-policy.md`**.
+
+### When UI Cleanup Is Not Possible
+
+If no delete UI exists, accept data persistence — use unique identifiers per run (timestamp suffix) to avoid collisions. Do NOT fall back to API cleanup.
 
 ## Test Scenario Guidelines
 
@@ -118,8 +124,6 @@ When UI code changes, incrementally update tests — never rebuild from scratch.
 - **Never** delete and recreate a spec file — always edit in place
 - Preserve existing test order, `test.describe` grouping, and flaky markers
 - Before modifying any spec, produce a Change Analysis (changed files, affected specs, new/obsolete/modified scenarios)
-
-For full delta classification table, change detection workflow, and change analysis template, see **`references/code-patterns.md`** § Incremental Test Maintenance.
 
 ## Locator Strategy (Priority Order)
 
@@ -177,45 +181,19 @@ The POM class itself serves as the registry of all `data-testid` values — no s
 5. Record all interactive elements at each level
 6. For containers with tabs, list every tab panel and its inner components separately in the Coverage Plan — each tab is a sub-page requiring its own analysis
 
+For the full semantic extraction procedure (recursive analysis, SET table, behavior taxonomy), see **`references/semantic-analysis.md`**. For Coverage Plan decomposition rules and validation, see **`references/coverage-checklist.md`**. For MCP browser-driven test discovery (session auth, exploration, form dry-run), see **`references/mcp-discovery.md`**.
+
 ### Test Organization
 
 One page = one spec file. Use nested `test.describe` mirroring the component hierarchy (Page > Dialog > Tab > Form).
 
 ### Interaction Depth Checklist
 
-All applicable items are **required** in Create Mode. Items marked `[deep]` are additionally required in Deep Test Mode.
+Apply to every container (dialog, tab panel, form) found in the Coverage Plan. Covers four categories: **Container Patterns** (dialog, tabs, popover, accordion), **Data Display** (table, pagination, empty state), **Form Patterns** (fields, validation, submit, select, rich text), and **Action Patterns** (toggle, delete confirm, drag-and-drop, multi-role).
 
-#### Container Patterns
+Key mandatory items: every form MUST have a "fill + submit + verify toast" test; every table MUST have row count + per-column-type assertions; every tab panel MUST be treated as a sub-page with its own recursive checklist application.
 
-- **Dialog** — open → verify content visible → close (click cancel or X). For AlertDialog, verify confirm action works
-- **Tabs** — switch to each tab → **then treat each tab panel as a sub-page**: recursively apply this entire checklist to the content within each tab. In Coverage Plan, list each tab's inner components explicitly
-- **Popover / Filter panel** — open trigger → interact with inner controls → verify effect on parent page (e.g., table filters, row count changes) → close
-- **Accordion / Collapsible** — expand → verify content visible → collapse `[deep]`
-
-#### Data Display Patterns
-
-- **Table** — assert row count > 0 and at least one cell has non-empty text. If sortable: click header, verify order changes. If expandable: expand a row, verify children appear
-- **Pagination** — verify page info text (e.g., total count or "第 1 頁"), click next page, assert content or page indicator changes. If table above: verify rows update
-- **Empty state** — when no data exists, verify empty state message or illustration is visible `[deep]`
-- **Skeleton / Loading** — do NOT assert on loading states (transient); instead wait for skeleton to disappear before asserting content `[deep]`
-
-#### Form Patterns
-
-- **Form fields** — verify all expected fields are present (visible). Fill all required fields with valid data
-- **Required field validation** — submit empty form or clear a required field, expect error message or disabled submit button
-- **Form submit success** — fill valid data → submit → verify success toast + list/page updates to reflect change
-- **Form submit failure** — use invalid input that triggers real API error → verify error toast or inline error
-- **Select / Dropdown** — click trigger → wait for dropdown content visible → select an option → verify trigger displays selected value
-- **Rich text editor (Tiptap)** — click editor area → type text → verify content appears. Do NOT test toolbar formatting unless explicitly requested `[deep]`
-
-#### Action Patterns
-
-- **Toggle / Switch** — click → verify state change (visual or API call)
-- **Delete confirmation** — open AlertDialog → fill confirmation input if required → submit → verify item removed from list
-- **Drag and drop** — use Playwright `dragTo()` → verify order or position changes `[deep]`
-- **Multi-role behavior** `[deep]`
-
-**For Create Mode**: cover every item that applies to the target page. If an item cannot be tested without mocking, document it with `test.skip` and state the reason.
+For the complete checklist with all items and rules, see **`references/coverage-checklist.md`** § Interaction Depth Checklist. For runnable code examples of each pattern, see **`references/ui-patterns.md`**.
 
 ## No Manual Screenshots
 
@@ -246,7 +224,12 @@ For the full markdown template, see **`references/report-template.md`**.
 ## Additional References
 
 - **`references/auth-patterns.md`** — Credential format, auth.setup.ts, multi-role storageState
-- **`references/code-patterns.md`** — BasePage implementation, POM examples (including tab-internal locators), test structure, incremental test maintenance (delta classification, change analysis template), UI pattern testing examples (table, select, form, pagination, nested specs), flaky patterns, artifact config, codegen workflow
+- **`references/code-patterns.md`** — BasePage implementation, POM examples (including tab-internal locators), test structure, flaky patterns, artifact config, codegen workflow
 - **`references/configuration.md`** — Full playwright.config.ts template, file organization, CLI commands
-- **`references/report-template.md`** — Markdown report template and rules
+- **`references/coverage-checklist.md`** — Coverage Plan decomposition rules, validation rules, Interaction Depth Checklist details
 - **`references/error-discrimination.md`** — Error Discrimination Framework: error classification decision flow, recoverable vs non-recoverable determination, retry strategy, detection code examples
+- **`references/mcp-discovery.md`** — MCP-Driven Test Discovery: session auth, page exploration, form dry-run, MCP→Spec translation
+- **`references/report-template.md`** — Markdown report template and rules
+- **`references/semantic-analysis.md`** — Semantic Analysis: recursive extraction procedure, Semantic Element Table (SET), behavior taxonomy, column assertion rules, worked example
+- **`references/test-data-policy.md`** — UI-Only Test Data Policy: forbidden API patterns, lifecycle examples (create with cleanup, edit/delete with setup)
+- **`references/ui-patterns.md`** — UI pattern testing code examples: table, select, form, pagination, nested specs
