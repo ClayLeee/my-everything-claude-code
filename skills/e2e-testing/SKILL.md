@@ -5,8 +5,9 @@ description: |
   This skill should be used when the user asks to "write E2E tests", "add Playwright tests", "create page tests",
   "update E2E tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
   "handle test errors", "retry failed form submission", "classify test failures",
+  "test a remote URL", "remote test", "test this URL", "遠端測試", "測試網址",
   or mentions Playwright testing, test maintenance, or test locators.
-version: 1.0.1-beta.6
+version: 1.0.1-beta.7
 ---
 
 # E2E Testing Patterns
@@ -135,6 +136,8 @@ When UI code changes, incrementally update tests — never rebuild from scratch.
 
 **Never use**: XPath, auto-generated class names
 
+> **Remote Test Mode exception**: When testing remote URLs without source code access, the priority order is reversed: `getByRole()` > `getByText()` > `getByPlaceholder()` > `getByLabel()` > CSS > `[data-testid]` (only if already present on the remote site). See **`references/remote-testing.md`** § Remote Locator Strategy for the full MCP ARIA → Playwright locator mapping table.
+
 ## data-testid Convention
 
 ### Naming Format
@@ -182,6 +185,8 @@ The POM class itself serves as the registry of all `data-testid` values — no s
 6. For containers with tabs, list every tab panel and its inner components separately in the Coverage Plan — each tab is a sub-page requiring its own analysis
 
 For the full semantic extraction procedure (recursive analysis, SET table, behavior taxonomy), see **`references/semantic-analysis.md`**. For Coverage Plan decomposition rules and validation, see **`references/coverage-checklist.md`**. For MCP browser-driven test discovery (session auth, exploration, form dry-run), see **`references/mcp-discovery.md`**.
+
+> **Remote Test Mode**: When testing remote URLs without local source code, skip file-based component tree analysis entirely. Instead, use MCP browser exploration (`browser_navigate` → `browser_snapshot`) to discover page structure, interactive elements, and form fields. See **`references/remote-testing.md`** § MCP Exploration Workflow for the complete discovery procedure.
 
 ### Test Organization
 
@@ -232,4 +237,5 @@ For the full markdown template, see **`references/report-template.md`**.
 - **`references/report-template.md`** — Markdown report template and rules
 - **`references/semantic-analysis.md`** — Semantic Analysis: recursive extraction procedure, Semantic Element Table (SET), behavior taxonomy, column assertion rules, worked example
 - **`references/test-data-policy.md`** — UI-Only Test Data Policy: forbidden API patterns, lifecycle examples (create with cleanup, edit/delete with setup)
+- **`references/remote-testing.md`** — Remote Test Mode: scaffold minimal Playwright project, MCP auth bridging, remote locator strategy, MCP exploration workflow, RemoteBasePage pattern
 - **`references/ui-patterns.md`** — UI pattern testing code examples: table, select, form, pagination, nested specs
