@@ -108,7 +108,7 @@ Not every feature requires all scenario types. Use judgement:
 - **Happy path** — Always include
 - **Invalid input** — When the feature accepts user input
 - **Permission / role-based** — When the feature has role-based behavior
-- **Empty state** — When the feature displays dynamic data
+- **Empty state** — When the feature displays dynamic data. **Never skip CRUD tests because the list is empty** — create data through UI first, then test edit/delete on it. Only skip if the page genuinely has no create/edit/delete UI (read-only page). See `references/test-data-policy.md` § Empty Page Handling.
 - **Error response** — When the feature depends on backend API calls. For detailed error classification (recoverable vs non-recoverable) and retry strategy, see **`references/error-discrimination.md`**
 
 ## Test Hygiene
@@ -221,11 +221,13 @@ pnpm test:e2e:report                                      # View HTML report
 
 ## Dual Test Reports
 
-Every test run produces: (1) HTML report at `playwright/reports/{page-name}/` — requires `E2E_REPORT_NAME={page-name}` env var (otherwise falls back to `playwright/reports/latest/`), (2) Markdown report at `playwright/{page-name}/test-report.md` (no date in filename, overwrites on re-run). Use 繁體中文 for markdown reports, one table per `test.describe` group.
+Every test run produces: (1) HTML report at `playwright/reports/{page-name}/` — requires `E2E_REPORT_NAME={page-name}` env var (otherwise falls back to `playwright/reports/latest/`), (2) Markdown report at `playwright/reports/{page-name}/test-report.md` (no date in filename, overwrites on re-run). All paths are relative to the `package.json` directory. Use 繁體中文 for markdown reports, one table per `test.describe` group.
 
 For the full markdown template, see **`references/report-template.md`**.
 
 ## Additional References
+
+> **Path resolution:** These reference files are in this skill's `references/` directory, adjacent to this SKILL.md file. When a command or agent instructs you to read `references/foo.md`, resolve the path relative to this SKILL.md's location. If the path cannot be resolved directly, use `Glob("**/e2e-testing/references/foo.md")` to locate it.
 
 - **`references/auth-patterns.md`** — Credential format, auth.setup.ts, multi-role storageState
 - **`references/code-patterns.md`** — BasePage implementation, POM examples (including tab-internal locators), test structure, flaky patterns, artifact config, codegen workflow

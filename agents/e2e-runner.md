@@ -88,14 +88,15 @@ Detect the appropriate mode and execute the full pipeline automatically:
 
    IF any test fails:
    ├── Classify each failure:
-   │   ├── FORM SUBMISSION + recoverable keyword (重複/duplicate/invalid format)?
-   │   │   └── YES → Fix per strategy table → Retry (max 2)
-   │   │   └── NO → Report FAIL with classification
+   │   ├── FORM SUBMISSION error?
+   │   │   ├── Environment keyword (disabled/archived/locked/suspended)? → ENVIRONMENT: **do NOT modify test code**, fix environment state through UI (MCP), then retry
+   │   │   ├── Recoverable keyword (重複/duplicate/invalid format)? → Fix per strategy table → Retry (max 2)
+   │   │   └── Other → Report FAIL with classification
    │   ├── PAGE LOADING error → Report FAIL
    │   └── ELEMENT INTERACTION error → Report FAIL
    └── Generate report with per-failure classification
 
-7. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/{page-name}/test-report.md`)
+7. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/reports/{page-name}/test-report.md`)
 
 ## Maintain Mode
 
@@ -110,14 +111,15 @@ Detect the appropriate mode and execute the full pipeline automatically:
 
    IF any test fails:
    ├── Classify each failure:
-   │   ├── FORM SUBMISSION + recoverable keyword (重複/duplicate/invalid format)?
-   │   │   └── YES → Fix per strategy table → Retry (max 2)
-   │   │   └── NO → Report FAIL with classification
+   │   ├── FORM SUBMISSION error?
+   │   │   ├── Environment keyword (disabled/archived/locked/suspended)? → ENVIRONMENT: **do NOT modify test code**, fix environment state through UI (MCP), then retry
+   │   │   ├── Recoverable keyword (重複/duplicate/invalid format)? → Fix per strategy table → Retry (max 2)
+   │   │   └── Other → Report FAIL with classification
    │   ├── PAGE LOADING error → Report FAIL
    │   └── ELEMENT INTERACTION error → Report FAIL
    └── Generate report with per-failure classification
 
-6. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/{page-name}/test-report.md`)
+6. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/reports/{page-name}/test-report.md`)
 
 ## Run Mode
 
@@ -126,14 +128,15 @@ Detect the appropriate mode and execute the full pipeline automatically:
 
    IF any test fails:
    ├── Classify each failure:
-   │   ├── FORM SUBMISSION + recoverable keyword (重複/duplicate/invalid format)?
-   │   │   └── YES → Log as RECOVERABLE (do NOT auto-fix in Run mode)
-   │   │   └── NO → Log as NON-RECOVERABLE
+   │   ├── FORM SUBMISSION error?
+   │   │   ├── Environment keyword (disabled/archived/locked/suspended)? → ENVIRONMENT: report data state issue, suggest UI fix
+   │   │   ├── Recoverable keyword (重複/duplicate/invalid format)? → Log as RECOVERABLE
+   │   │   └── Other → Log as NON-RECOVERABLE
    │   ├── PAGE LOADING error → NON-RECOVERABLE
    │   └── ELEMENT INTERACTION error → NON-RECOVERABLE
    └── Do NOT auto-fix — only classify and report
 
-3. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/{page-name}/test-report.md`) with error classifications
+3. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/reports/{page-name}/test-report.md`) with error classifications
 
 ## Remote Mode
 
@@ -148,22 +151,22 @@ Detect the appropriate mode and execute the full pipeline automatically:
    ├── Classify each failure (same decision tree as Create mode)
    └── Generate report with per-failure classification
 
-7. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/{page-name}/test-report.md`)
+7. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/reports/{page-name}/test-report.md`)
 
 ## Directory Structure
 
 All paths are relative to the project root (where `package.json` lives):
 
 ```
-{project-root}/
+{project-root}/                       ← where package.json lives
 ├── playwright/
-│   ├── {page-name}/              ← artifacts per page
-│   │   ├── analysis.md
-│   │   ├── coverage-plan.md
-│   │   └── test-report.md
-│   ├── reports/                  ← HTML reports (Playwright built-in)
+│   ├── reports/                      ← all reports per page
 │   │   └── {page-name}/
-│   └── test-results/             ← screenshots, videos, traces (Playwright built-in)
+│   │       ├── index.html            ← HTML report (Playwright built-in)
+│   │       ├── analysis.md           ← page analysis artifact
+│   │       ├── coverage-plan.md      ← coverage plan artifact
+│   │       └── test-report.md        ← markdown report (agent-generated)
+│   └── test-results/                 ← screenshots, videos, traces (Playwright built-in)
 ├── tests/
 │   ├── e2e/
 │   │   ├── auth/
@@ -189,7 +192,7 @@ All paths are relative to the project root (where `package.json` lives):
 - **Use `storageState` to skip login** — Tests start from authenticated state via auth setup project
 - **All POM classes extend `BasePage`** — Exception: Remote mode uses `RemoteBasePage`
 - **`data-testid` first for locators** — Exception: Remote mode reverses priority (`getByRole` > `getByText` > CSS)
-- **Artifacts go to `playwright/`** — Analysis, plans, and MD reports go to `playwright/{page-name}/`. HTML reports, screenshots, videos, traces are in `playwright/reports/` and `playwright/test-results/` (Playwright built-in, gitignored)
+- **Artifacts go to `playwright/reports/{page-name}/`** — All per-page artifacts (analysis, coverage plan, MD report, HTML report) are consolidated under `playwright/reports/{page-name}/`. Screenshots, videos, and traces are in `playwright/test-results/` (Playwright built-in, gitignored). All paths are relative to the `package.json` directory.
 - **Specs go to `tests/e2e/{domain}/`** — POM classes go to `tests/e2e/pages/`
 
 ## Edge Cases

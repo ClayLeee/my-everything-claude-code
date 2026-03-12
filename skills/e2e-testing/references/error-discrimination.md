@@ -17,7 +17,11 @@ ERROR DETECTED
     ├── 401 / 403 ──▶ FAIL (permission issue)
     └── 500+ ──▶ FAIL (server error)
 
-[3] Does the error message contain actionable field information?
+[3] Does the error message indicate an ENVIRONMENT/DATA STATE issue?
+    ├── YES (disabled, archived, locked, suspended, etc.) ──▶ ENVIRONMENT (see below)
+    └── NO ──▶ [3b]
+
+[3b] Does the error message contain actionable field information?
     ├── YES (name duplicate, invalid format, etc.) ──▶ RECOVERABLE, fix and retry
     └── NO (operation failed, insufficient permissions, etc.) ──▶ FAIL
 
@@ -28,16 +32,34 @@ ERROR DETECTED
 
 ## Error Classification Table
 
-| Signal | HTTP Status | Recoverable? | Action |
+| Signal | HTTP Status | Classification | Action |
 |---|---|---|---|
-| Toast: field error (name duplicate, invalid format) | 400/409/422 | YES | Parse field, fix value, retry |
-| Inline validation (`.text-destructive`) | N/A | YES | Fix field value, resubmit |
-| Toast: generic error (operation failed) | 400+ | NO | Report failure |
-| Toast: insufficient permissions | 403 | NO | Report failure |
-| Server error | 500/502/503 | NO | Report failure |
-| Playwright timeout | N/A | NO | Report failure |
-| Empty table (initial load) | 200 | NO | Report failure (data issue) |
-| Dialog did not open | N/A | NO | Report failure |
+| Toast: field error (name duplicate, invalid format) | 400/409/422 | RECOVERABLE | Parse field, fix value, retry |
+| Inline validation (`.text-destructive`) | N/A | RECOVERABLE | Fix field value, resubmit |
+| Toast: entity state error (disabled, archived, locked) | 400/403/409 | ENVIRONMENT | **Do NOT modify test code.** Fix entity state through UI (MCP), then retry. |
+| Toast: generic error (operation failed) | 400+ | FAIL | Report failure |
+| Toast: insufficient permissions | 403 | FAIL | Report failure |
+| Server error | 500/502/503 | FAIL | Report failure |
+| Playwright timeout | N/A | FAIL | Report failure |
+| Empty table (initial load) | 200 | FAIL | Report failure (data issue) |
+| Dialog did not open | N/A | FAIL | Report failure |
+
+## ENVIRONMENT Errors — Fix Environment, NOT Test Code
+
+**ENVIRONMENT errors mean the test data or environment state is wrong, NOT the test code.** When the API error message describes a state/condition of the entity (disabled, archived, suspended, locked, etc.), the test logic is correct but the environment doesn't support the operation.
+
+**Mandatory behavior:**
+1. **Do NOT modify test code** — the test is correct
+2. **Identify the root cause** — parse the error message to determine which entity is in what state (e.g., "project X is disabled")
+3. **Fix the environment through UI** — use Playwright MCP tools (`browser_navigate`, `browser_click`, `browser_fill_form`, etc.) to navigate to the entity's settings and restore it to the required state (e.g., re-enable the project)
+4. **Retry the test** — after fixing the environment, re-run the failing test (max 1 environment-fix retry)
+5. **If UI fix is not possible** — report clearly to the user: what entity, what state, what needs to change. Do NOT rewrite the test.
+
+**Example:** Test tries to create an issue in a project → API returns "project is disabled" →
+1. Use MCP: `browser_navigate` to the project settings page
+2. Find and click the "enable" / "activate" button
+3. Confirm the project is re-enabled
+4. Re-run the test
 
 ## Recoverable Error Keywords
 
@@ -50,6 +72,22 @@ These keywords in error toasts, combined with HTTP 400/409/422, indicate a recov
 必填 / 不得為空 / required
 長度不足 / 超過長度 / too short / too long
 不可早於 / 不可晚於 / must not be before / must not be after
+```
+
+## Environment Error Keywords
+
+These keywords indicate the error is caused by entity/data state, NOT test code. Do NOT modify test code when these appear:
+
+```
+已停用 / 被停用 / disabled / deactivated
+已封存 / 已歸檔 / archived
+已鎖定 / locked
+已暫停 / suspended
+已關閉 / closed
+已凍結 / frozen
+唯讀 / read-only / readonly
+不允許 / not allowed (when referring to entity state)
+無法操作 / cannot operate
 ```
 
 ## Non-Recoverable Error Keywords

@@ -30,6 +30,8 @@ Use `[E2E]` prefix for test-created data: `[E2E] Create Test`, `[E2E] Delete Tar
 3. Edit through UI → assert success
 4. **Restore original values through UI** to leave data unchanged
 
+**If the page has no existing data:** Create a `[E2E]` item through UI first (same as Create Tests), then edit it, then clean up. Use `test.describe.serial` to chain: create → edit → cleanup.
+
 ### Delete Tests
 
 1. **Create the delete target through UI first** — open create dialog → fill `[E2E] Delete Target` → submit
@@ -128,6 +130,18 @@ test.describe('Delete Project', () => {
   })
 })
 ```
+
+## Empty Page Handling
+
+**Never skip tests because a page has no data.** Only skip if the page genuinely has no create/edit/delete UI (read-only page). If a list page is empty:
+
+1. The **Create** test runs first — it creates data through UI, so subsequent tests have something to work with
+2. The **Edit** test uses the item created in step 1 (chain with `test.describe.serial`)
+3. The **Delete** test removes the created item as cleanup
+
+Test ordering: `test.describe.serial('CRUD', () => { create → edit → delete })`. This guarantees data exists for each step and cleans up after itself.
+
+If the page requires a parent entity (e.g., issues require a project), set up that context in a `test.beforeAll` through UI navigation, or document the prerequisite clearly in the spec file.
 
 ## When UI Cleanup Is Not Possible
 
