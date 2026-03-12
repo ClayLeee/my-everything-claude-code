@@ -20,6 +20,7 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 │   └── plugin.json
 ├── commands/
 │   ├── cl/                        # Continuous Learning (status, analyze, log, sync)
+│   ├── e2e/                       # E2E Testing workflow (analyze, plan, create, run, maintain, remote)
 │   ├── evolve.md                  # Cluster instincts into skills/commands/agents
 │   ├── instinct-export.md         # Export instincts for sharing
 │   ├── instinct-import.md         # Import instincts from others
@@ -155,11 +156,17 @@ Global rules installed to `~/.claude/rules/` for automatic enforcement:
 - **build-error-resolver** — Fix build/type errors with minimal changes, no refactoring
 - **security-reviewer** — Frontend security audit (XSS, auth, input validation, dependencies, secrets)
 - **refactor-cleaner** — Dead code detection, unused dependency removal, duplicate consolidation
-- **e2e-runner** — Playwright E2E testing specialist: POM pattern, flaky test quarantine, codegen workflow, artifact management
+- **e2e-runner** — Playwright E2E testing auto-dispatcher: detects mode (Create/Maintain/Run/Remote), runs full pipeline, generates dual reports
 
 ### Commands
 
 - `/before-commit` — Run project checks (`pnpm before-commit`), then generate conventional commit message
+- `/e2e:analyze` — Analyze page structure and build Semantic Element Table
+- `/e2e:plan` — Generate coverage plan from analysis artifact
+- `/e2e:create` — Create POM + spec, run tests, generate dual reports (HTML + MD)
+- `/e2e:maintain` — Incrementally update tests from code changes, run tests, generate reports
+- `/e2e:run` — Run existing tests with error classification and dual reports
+- `/e2e:remote` — Scaffold Playwright project, explore remote URL via MCP, create and run tests
 - `/cl:status` — Show learned instincts with confidence scores
 - `/cl:analyze` — Manually trigger observation analysis
 - `/cl:log` — Show recent observer log entries

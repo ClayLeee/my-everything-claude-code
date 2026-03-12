@@ -69,7 +69,7 @@ All under `scripts/hooks/`, written in Node.js (pure stdlib, no npm dependencies
 - Hook scripts read JSON from stdin and write JSON to stdout; diagnostic output goes to stderr
 
 ### Allowed Documentation Files
-The hook system blocks creation of `.md` files except: `README.md`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SKILL.md`, `MEMORY.md`, `HOOKS.md`.
+The hook system blocks creation of `.md` files except: `README.md`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SKILL.md`, `MEMORY.md`, `HOOKS.md`, and any `.md` files under `playwright/` directories (E2E analysis/plan/report artifacts).
 
 ### Commit Convention
 Conventional Commits format. All AI-assisted commits include:
@@ -119,6 +119,14 @@ Continuous Learning (`commands/cl/`):
 - `/cl:analyze` — manually trigger observation analysis
 - `/cl:log` — show recent observer log
 - `/cl:sync` — update instincts.md without re-analyzing
+
+E2E Testing (`commands/e2e/`):
+- `/e2e:analyze` — analyze page structure and build Semantic Element Table
+- `/e2e:plan` — generate coverage plan from analysis artifact
+- `/e2e:create` — create POM + spec, run tests, generate dual reports (HTML + MD)
+- `/e2e:maintain` — incrementally update tests from code changes, run tests, generate reports
+- `/e2e:run` — run existing tests with error classification and dual reports
+- `/e2e:remote` — scaffold Playwright project, explore remote URL via MCP, create and run tests
 
 Workflow (`commands/`):
 - `/before-commit` — run `pnpm before-commit` (type check + lint), then invoke `git-commit` skill to generate commit message

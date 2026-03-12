@@ -7,7 +7,7 @@ description: |
   "handle test errors", "retry failed form submission", "classify test failures",
   "test a remote URL", "remote test", "test this URL", "遠端測試", "測試網址",
   or mentions Playwright testing, test maintenance, or test locators.
-version: 1.0.1-beta.7
+version: 1.0.1-beta.8
 ---
 
 # E2E Testing Patterns
