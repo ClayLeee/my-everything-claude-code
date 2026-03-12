@@ -16,12 +16,12 @@ All output must be in **繁體中文**.
 
 ## Step 1: Locate Coverage Plan
 
-Look for `playwright/reports/{page-name}/coverage-plan.md` (relative to `package.json` directory):
+Look for `playwright/{page-name}/coverage-plan.md` (relative to `package.json` directory):
 - If exactly one exists, use it
 - If multiple exist, ask the user which page to create tests for
 - If none exist, tell the user to run `/e2e:analyze` then `/e2e:plan` first
 
-> **Note:** Legacy paths (`playwright/{page-name}/coverage-plan.md`, `playwright/{page-name}-coverage-plan.md`) are also accepted for backward compatibility.
+> **Note:** Legacy flat-file paths (`playwright/{page-name}-coverage-plan.md`) are also accepted for backward compatibility.
 
 ## Step 2: Load References (MANDATORY — do not skip)
 
