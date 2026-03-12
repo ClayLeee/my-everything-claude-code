@@ -49,7 +49,7 @@ description: |
   </example>
 tools: ["Read", "Write", "Edit", "Bash", "Grep", "Glob"]
 model: inherit
-color: magenta
+color: cyan
 skills:
   - e2e-testing
 ---
@@ -67,42 +67,26 @@ Detect the appropriate mode and execute the full pipeline automatically:
 | Trigger (中文 / English) | Mode | Auto-dispatch Steps |
 |--------------------------|------|---------------------|
 | "寫測試" / "write tests" / "深度測試" / "deep test" / new page without spec | **Create** | analyze → plan → create (含跑測試+雙報告) |
-| "更新測試" / "update tests" / code has changes | **Maintain** | maintain (含跑測試+雙報告) |
+| "更新測試" / "update tests" / code has changes / "補測試" / "加測試給XX功能" / verbal description of test gaps | **Maintain** | maintain (含跑測試+雙報告) |
 | "跑測試" / "run tests" / "execute tests" | **Run** | run (含雙報告) |
 | "遠端測試" / "測試網址" / "test URL" / user provides URL | **Remote** | remote (含跑測試+雙報告) |
 
 > **Note:** "深度測試" (deep test) is NOT a separate mode — Create mode always includes comprehensive depth checklist coverage. Deep test requests follow the Create pipeline.
 
-## Pre-Execution Setup (MANDATORY)
-
-Before ANY mode, read these references from the `e2e-testing` skill:
-
-**Always read:**
-- `references/error-discrimination.md` — error classification framework
-
-**Per-mode additional reads:**
-| Mode | Additional References |
-|------|----------------------|
-| Create | `references/semantic-analysis.md`, `references/coverage-checklist.md`, `references/ui-patterns.md`, `references/code-patterns.md`, `references/test-data-policy.md`, `references/auth-patterns.md` |
-| Maintain | `references/code-patterns.md` |
-| Run | `references/report-template.md` |
-| Remote | `references/remote-testing.md`, `references/mcp-discovery.md`, `references/auth-patterns.md` |
-
 ## Create Mode (includes Deep Test)
 
-1. **Check auth setup** — Verify `auth.setup.ts` and `.auth/` config exist; if not, create them first (see `references/auth-patterns.md`)
-2. **Analyze target page** — Read `index.vue` + all child components, build component tree and Semantic Element Table per `references/semantic-analysis.md`
+1. **Check auth setup** — Read `references/auth-patterns.md` NOW. Verify `auth.setup.ts` and `.auth/` config exist; if not, create them first.
+2. **Analyze target page** — Read `references/semantic-analysis.md` NOW. Read `index.vue` + all child components, build component tree and Semantic Element Table.
 3. **Inject `data-testid`** — Follow skill's data-testid convention, **only add attributes — change nothing else**
-4. **Build POM class** — Extend `BasePage`, use `data-testid` locators, nested object structure for dialogs/tabs
-5. **Build spec file** — Follow coverage checklist AND interaction depth checklist:
-   - For each UI pattern (table, form, tabs, select, pagination), apply the corresponding checklist assertions from `references/coverage-checklist.md`
+4. **Build POM class** — Read `references/code-patterns.md` + `references/test-data-policy.md` NOW. Create `tests/e2e/pages/{PageName}Page.ts`, extend `BasePage`, use `data-testid` locators, nested object structure for dialogs/tabs.
+5. **Build spec file** — Read `references/coverage-checklist.md` + `references/ui-patterns.md` NOW. Create `tests/e2e/{domain}/{page-name}.spec.ts`:
+   - For each UI pattern (table, form, tabs, select, pagination), apply the corresponding checklist assertions
    - When the page has tabbed containers, produce a Coverage Plan table listing each tab's inner components first, then write tests per tab
    - Tests start from authenticated state (no login in beforeEach)
-   - For destructive operations (create/edit/delete), follow `references/test-data-policy.md` UI-Only Test Data Policy
-6. **Execute** — Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}` from `app/`. After execution:
+   - For destructive operations (create/edit/delete), follow UI-Only Test Data Policy
+6. **Execute** — Read `references/error-discrimination.md` NOW. Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}` from `app/`. After execution:
 
    IF any test fails:
-   ├── Re-read `references/error-discrimination.md` NOW
    ├── Classify each failure:
    │   ├── FORM SUBMISSION + recoverable keyword (重複/duplicate/invalid format)?
    │   │   └── YES → Fix per strategy table → Retry (max 2)
@@ -111,18 +95,20 @@ Before ANY mode, read these references from the `e2e-testing` skill:
    │   └── ELEMENT INTERACTION error → Report FAIL
    └── Generate report with per-failure classification
 
-7. **Generate dual reports** — HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/{page-name}-test-report.md`)
+7. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/{page-name}/test-report.md`)
 
 ## Maintain Mode
 
-1. **Detect changes** — `git diff --name-only` current vs base, filter `app/src/views/` and `app/src/components/`
-2. **Analyze delta** — Read changed components + existing spec/POM. Produce change analysis
+1. **Determine change scope** — Read `references/coverage-checklist.md` NOW. Use one or both input sources:
+   - **Natural language**: If user describes what changed or what needs testing, parse description → identify target pages/features → cross-reference coverage checklist for gaps
+   - **Git diff**: `git diff --name-only` current vs base, filter `app/src/views/` and `app/src/components/`
+   - Both available → merge results. Neither yields changes → inform user and exit.
+2. **Analyze delta** — Read `references/code-patterns.md` NOW. Read changed components + existing spec/POM. Produce change analysis.
 3. **Update `data-testid`** — Add to new elements only; only add attributes, change nothing else
 4. **Update POM + spec** — Do not touch unrelated tests
-5. **Execute** — Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}` from `app/`. After execution:
+5. **Execute** — Read `references/error-discrimination.md` NOW. Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}` from `app/`. After execution:
 
    IF any test fails:
-   ├── Re-read `references/error-discrimination.md` NOW
    ├── Classify each failure:
    │   ├── FORM SUBMISSION + recoverable keyword (重複/duplicate/invalid format)?
    │   │   └── YES → Fix per strategy table → Retry (max 2)
@@ -131,15 +117,14 @@ Before ANY mode, read these references from the `e2e-testing` skill:
    │   └── ELEMENT INTERACTION error → Report FAIL
    └── Generate report with per-failure classification
 
-6. **Generate dual reports** — HTML + Markdown
+6. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/{page-name}/test-report.md`)
 
 ## Run Mode
 
 1. **Execute** — Run `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path-or-filters}` from `app/`
-2. **Error Discrimination** — After execution:
+2. **Error Discrimination** — Read `references/error-discrimination.md` NOW. After execution:
 
    IF any test fails:
-   ├── Re-read `references/error-discrimination.md` NOW
    ├── Classify each failure:
    │   ├── FORM SUBMISSION + recoverable keyword (重複/duplicate/invalid format)?
    │   │   └── YES → Log as RECOVERABLE (do NOT auto-fix in Run mode)
@@ -148,23 +133,54 @@ Before ANY mode, read these references from the `e2e-testing` skill:
    │   └── ELEMENT INTERACTION error → NON-RECOVERABLE
    └── Do NOT auto-fix — only classify and report
 
-3. **Generate dual reports** — HTML + Markdown with error classifications
+3. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/{page-name}/test-report.md`) with error classifications
 
 ## Remote Mode
 
 1. **Confirm scope** — Ask: target URL, whether login is needed, test depth
-2. **Scaffold minimal Playwright project** — Per `references/remote-testing.md` § Scaffold
-3. **MCP authentication (if needed)** — Per `references/remote-testing.md` § MCP Authentication
-4. **MCP exploration** — Per `references/remote-testing.md` § MCP Exploration Workflow
-5. **Generate test files** — POM extending `RemoteBasePage` + spec
-6. **Execute** — `E2E_REPORT_NAME={page-name} pnpm exec playwright test {spec-path}`. After execution:
+2. **Scaffold Playwright in current directory** — Read `references/remote-testing.md` NOW. Check if `playwright.config.ts` exists; if not, scaffold in place per § Scaffold. Do NOT scaffold to `~/e2e-remote/`.
+3. **MCP authentication (if needed)** — Read `references/auth-patterns.md` NOW. Per `references/remote-testing.md` § MCP Authentication.
+4. **MCP exploration** — Read `references/mcp-discovery.md` NOW. Per `references/remote-testing.md` § MCP Exploration Workflow.
+5. **Generate test files** — `tests/e2e/pages/{PageName}Page.ts` (POM extending `RemoteBasePage`) + `tests/e2e/{domain}/{page-name}.spec.ts` (domain inferred from URL path)
+6. **Execute** — Read `references/error-discrimination.md` NOW. `E2E_REPORT_NAME={page-name} pnpm exec playwright test {spec-path}`. After execution:
 
    IF any test fails:
-   ├── Re-read `references/error-discrimination.md` NOW
    ├── Classify each failure (same decision tree as Create mode)
    └── Generate report with per-failure classification
 
-7. **Generate dual reports** — HTML + Markdown
+7. **Generate dual reports** — Read `references/report-template.md` NOW. HTML (`playwright/reports/{page-name}/`) + Markdown (`playwright/{page-name}/test-report.md`)
+
+## Directory Structure
+
+All paths are relative to the project root (where `package.json` lives):
+
+```
+{project-root}/
+├── playwright/
+│   ├── {page-name}/              ← artifacts per page
+│   │   ├── analysis.md
+│   │   ├── coverage-plan.md
+│   │   └── test-report.md
+│   ├── reports/                  ← HTML reports (Playwright built-in)
+│   │   └── {page-name}/
+│   └── test-results/             ← screenshots, videos, traces (Playwright built-in)
+├── tests/
+│   ├── e2e/
+│   │   ├── auth/
+│   │   │   └── auth.setup.ts
+│   │   ├── pages/
+│   │   │   ├── BasePage.ts
+│   │   │   ├── RemoteBasePage.ts
+│   │   │   └── {PageName}Page.ts
+│   │   └── {domain}/             ← specs grouped by feature domain
+│   │       └── {page-name}.spec.ts
+│   └── fixtures/
+│       ├── auth.ts
+│       └── data.ts
+└── playwright.config.ts
+```
+
+**`{domain}` naming:** Inferred from `src/views/` subdirectory (e.g. `src/views/projects/` → `tests/e2e/projects/`). For Remote mode, inferred from URL path (e.g. `/projects/` → `tests/e2e/projects/`).
 
 ## Key Principles
 
@@ -173,7 +189,8 @@ Before ANY mode, read these references from the `e2e-testing` skill:
 - **Use `storageState` to skip login** — Tests start from authenticated state via auth setup project
 - **All POM classes extend `BasePage`** — Exception: Remote mode uses `RemoteBasePage`
 - **`data-testid` first for locators** — Exception: Remote mode reverses priority (`getByRole` > `getByText` > CSS)
-- **Artifacts go to `playwright/`** — All test outputs (reports, screenshots, videos, traces) are in `app/playwright/` (gitignored)
+- **Artifacts go to `playwright/`** — Analysis, plans, and MD reports go to `playwright/{page-name}/`. HTML reports, screenshots, videos, traces are in `playwright/reports/` and `playwright/test-results/` (Playwright built-in, gitignored)
+- **Specs go to `tests/e2e/{domain}/`** — POM classes go to `tests/e2e/pages/`
 
 ## Edge Cases
 

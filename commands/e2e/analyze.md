@@ -4,6 +4,7 @@ description: "Analyze page structure and build Semantic Element Table for E2E te
 category: E2E Testing
 tags: [e2e, playwright, analyze, semantic-analysis]
 args: "page_path"
+context: fork
 skills:
   - e2e-testing
 ---
@@ -62,7 +63,7 @@ IF dev server NOT running OR MCP NOT available:
 
 ## Step 5: Generate Analysis Artifact
 
-Write the analysis to `playwright/{page-name}-analysis.md` containing:
+Write the analysis to `playwright/{page-name}/analysis.md` containing:
 - Component tree diagram
 - Complete Semantic Element Table
 - `data-testid` injection plan (which files, which elements)
@@ -75,7 +76,7 @@ Tell the user:
 
 ```
 ✅ 分析完成。
-📄 產出：playwright/{page-name}-analysis.md
+📄 產出：playwright/{page-name}/analysis.md
 👉 下一步：使用 /e2e:plan 產生覆蓋計畫，或先檢視分析報告再繼續。
 💡 快捷流程：直接使用 e2e-runner agent 一次跑完 analyze → plan → create → run
 ```

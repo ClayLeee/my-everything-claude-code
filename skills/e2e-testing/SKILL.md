@@ -7,7 +7,6 @@ description: |
   "handle test errors", "retry failed form submission", "classify test failures",
   "test a remote URL", "remote test", "test this URL", "遠端測試", "測試網址",
   or mentions Playwright testing, test maintenance, or test locators.
-version: 1.0.1-beta.8
 ---
 
 # E2E Testing Patterns
@@ -222,7 +221,7 @@ pnpm test:e2e:report                                      # View HTML report
 
 ## Dual Test Reports
 
-Every test run produces: (1) HTML report at `playwright/reports/{page-name}/` — requires `E2E_REPORT_NAME={page-name}` env var (otherwise falls back to `playwright/reports/latest/`), (2) Markdown report at `playwright/{page-name}-test-report.md` (no date in filename, overwrites on re-run). Use 繁體中文 for markdown reports, one table per `test.describe` group.
+Every test run produces: (1) HTML report at `playwright/reports/{page-name}/` — requires `E2E_REPORT_NAME={page-name}` env var (otherwise falls back to `playwright/reports/latest/`), (2) Markdown report at `playwright/{page-name}/test-report.md` (no date in filename, overwrites on re-run). Use 繁體中文 for markdown reports, one table per `test.describe` group.
 
 For the full markdown template, see **`references/report-template.md`**.
 
@@ -230,7 +229,6 @@ For the full markdown template, see **`references/report-template.md`**.
 
 - **`references/auth-patterns.md`** — Credential format, auth.setup.ts, multi-role storageState
 - **`references/code-patterns.md`** — BasePage implementation, POM examples (including tab-internal locators), test structure, flaky patterns, artifact config, codegen workflow
-- **`references/configuration.md`** — Full playwright.config.ts template, file organization, CLI commands
 - **`references/coverage-checklist.md`** — Coverage Plan decomposition rules, validation rules, Interaction Depth Checklist details
 - **`references/error-discrimination.md`** — Error Discrimination Framework: error classification decision flow, recoverable vs non-recoverable determination, retry strategy, detection code examples
 - **`references/mcp-discovery.md`** — MCP-Driven Test Discovery: session auth, page exploration, form dry-run, MCP→Spec translation

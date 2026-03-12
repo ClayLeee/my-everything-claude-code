@@ -11,21 +11,26 @@ Patterns for E2E testing remote URLs without a local project.
 
 ## Scaffold Minimal Playwright Project
 
-Create a self-contained Playwright project in the user-specified directory (default: `~/e2e-remote/{domain}/`).
+Scaffold Playwright in the **current working directory**. If `playwright.config.ts` already exists, reuse it (update `baseURL` if needed). Do NOT scaffold to `~/e2e-remote/`.
 
 ### Directory Structure
 
 ```
-{target-dir}/
-├── package.json              # Only @playwright/test
+{project-root}/
+├── package.json              # Only @playwright/test (skip if exists)
 ├── playwright.config.ts      # baseURL = remote URL, no webServer
 ├── .auth/                    # storageState (if auth needed)
 │   └── remote.json
+├── playwright/
+│   └── {page-name}/
+│       └── test-report.md    # Markdown report
 └── tests/
-    ├── pages/
-    │   ├── RemoteBasePage.ts # Abstract base class
-    │   └── {PageName}Page.ts # POM based on exploration results
-    └── {page-name}.spec.ts   # Test scenarios
+    └── e2e/
+        ├── pages/
+        │   ├── RemoteBasePage.ts # Abstract base class
+        │   └── {PageName}Page.ts # POM based on exploration results
+        └── {domain}/
+            └── {page-name}.spec.ts   # Test scenarios (domain from URL path)
 ```
 
 ### package.json Template
@@ -53,7 +58,7 @@ import { defineConfig } from '@playwright/test';
 const reportName = process.env.E2E_REPORT_NAME || 'latest';
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './tests/e2e',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 1,

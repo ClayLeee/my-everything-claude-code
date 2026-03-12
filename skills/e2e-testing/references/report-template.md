@@ -11,7 +11,7 @@ cd app && pnpm test:e2e:report
 
 ## Report 2: Markdown
 
-Stored at `playwright/{page-name}-test-report.md` — **filename has no date** (overwrites on re-run, date is in content).
+Stored at `playwright/{page-name}/test-report.md` — **filename has no date** (overwrites on re-run, date is in content).
 
 ### Template
 
@@ -76,6 +76,6 @@ _測試工具: Playwright_
 
 - Use 繁體中文 for report content
 - One table per `test.describe` group
-- Filename format: `playwright/{page-name}-test-report.md` (no date in filename)
+- Filename format: `playwright/{page-name}/test-report.md` (no date in filename)
 - Always overwrite previous report (no accumulation)
 - Reference the style from existing reports in `playwright/` directory

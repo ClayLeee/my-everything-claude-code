@@ -3,6 +3,7 @@ name: "e2e:plan"
 description: "Generate coverage plan from page analysis for E2E testing"
 category: E2E Testing
 tags: [e2e, playwright, plan, coverage]
+context: fork
 skills:
   - e2e-testing
 ---
@@ -15,10 +16,12 @@ All output must be in **繁體中文**.
 
 ## Step 1: Locate Analysis Artifact
 
-Look for `playwright/{page-name}-analysis.md` files:
+Look for `playwright/{page-name}/analysis.md` files:
 - If exactly one exists, use it
 - If multiple exist, ask the user which page to plan for
 - If none exist, tell the user to run `/e2e:analyze` first
+
+> **Note:** Legacy flat-file paths (`playwright/{page-name}-analysis.md`) are also accepted for backward compatibility.
 
 ## Step 2: Load References (MANDATORY — do not skip)
 
@@ -60,7 +63,7 @@ Produce a Coverage Plan containing:
 
 ## Step 5: Write Coverage Plan Artifact
 
-Write to `playwright/{page-name}-coverage-plan.md`.
+Write to `playwright/{page-name}/coverage-plan.md`.
 
 ## Step 6: Next Step Prompt
 
@@ -68,7 +71,7 @@ Tell the user:
 
 ```
 ✅ 覆蓋計畫已產生。
-📄 產出：playwright/{page-name}-coverage-plan.md
+📄 產出：playwright/{page-name}/coverage-plan.md
 👉 下一步：使用 /e2e:create 建立測試並執行。
 💡 快捷流程：直接使用 e2e-runner agent 一次跑完 analyze → plan → create → run
 ```

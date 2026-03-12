@@ -1,8 +1,9 @@
 ---
 name: "e2e:maintain"
-description: "Incrementally update E2E tests based on code changes, run tests, and generate reports"
+description: "Incrementally update E2E tests based on code changes or verbal descriptions, run tests, and generate reports"
 category: E2E Testing
 tags: [e2e, playwright, maintain, update, incremental]
+context: fork
 skills:
   - e2e-testing
 ---
@@ -18,16 +19,31 @@ All output must be in **繁體中文**.
 Read these files before proceeding:
 - `references/error-discrimination.md` — error classification framework
 - `references/code-patterns.md` — POM and spec patterns for updates
+- `references/coverage-checklist.md` — interaction depth checklist and coverage requirements
+- `references/report-template.md` — markdown report template and rules
 
-Do NOT proceed to Step 2 without reading both files.
+Do NOT proceed to Step 2 without reading all files listed above.
 
-## Step 2: Detect Changes
+## Step 2: Determine Change Scope
 
-Run `git diff --name-only` (current vs base branch) and filter for:
-- `app/src/views/` — page components
-- `app/src/components/` — shared components
+Determine the change scope using one or both input sources:
 
-If no relevant changes detected, inform the user and exit.
+**A. Natural language description** — User verbally describes what changed or what needs testing:
+- Parse the description to identify target pages, features, and test gaps
+- Cross-reference with `references/coverage-checklist.md` to find coverage gaps
+- Locate the corresponding source files, POM, and spec
+
+**B. Git diff** — Automatic detection from code changes:
+- Run `git diff --name-only` (current vs base branch) and filter for:
+  - `app/src/views/` — page components
+  - `app/src/components/` — shared components
+
+**Decision logic:**
+- User provided description only → use (A)
+- No description provided → use (B)
+- Both available → merge results from (A) and (B)
+
+If neither source yields relevant changes, inform the user and exit.
 
 ## Step 3: Analyze Delta
 
@@ -48,6 +64,8 @@ Add `data-testid` to new elements only. **Only add attributes — change nothing
 
 ## Step 5: Update POM + Spec
 
+- POM path: `tests/e2e/pages/{PageName}Page.ts`
+- Spec path: `tests/e2e/{domain}/{page-name}.spec.ts` (domain inferred from `src/views/` subdirectory)
 - Update POM class with new/removed locators and action methods
 - Update spec file with new/removed/modified test cases
 - Do NOT touch unrelated tests
@@ -73,7 +91,7 @@ IF any test fails:
 ## Step 7: Generate Dual Reports
 
 1. **HTML report** — `playwright/reports/{page-name}/`
-2. **Markdown report** — `playwright/{page-name}-test-report.md` per `references/report-template.md`
+2. **Markdown report** — `playwright/{page-name}/test-report.md` per `references/report-template.md`
 
 ## Step 8: Completion
 
@@ -83,7 +101,7 @@ Tell the user:
 ✅ 測試已更新並執行完畢。
 📄 報告：
    - HTML: playwright/reports/{page-name}/
-   - MD: playwright/{page-name}-test-report.md
+   - MD: playwright/{page-name}/test-report.md
 ```
 
 If there are failures:

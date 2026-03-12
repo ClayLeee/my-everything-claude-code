@@ -1,7 +1,6 @@
 ---
 name: serena-tool-selection
 description: Decision framework for when to use Serena LSP semantic tools vs basic tools (Grep, Read, Glob, Edit). Use when searching for symbol definitions, tracing references, understanding file structure, refactoring, renaming across codebase, or navigating code architecture.
-version: 1.0.0
 ---
 
 # Serena Tool Selection Guide
