@@ -104,7 +104,6 @@ All agents output in 繁體中文.
 - **build-error-resolver** — Fixes build/type errors with minimal changes. No refactoring — just get the build passing
 - **security-reviewer** — Frontend security audit: XSS (`v-html`, `innerHTML`), token handling, input validation, dependency vulnerabilities, secrets detection
 - **refactor-cleaner** — Dead code cleanup using `knip`/`depcheck`/`ts-prune`. Categorizes findings by risk (SAFE/CAREFUL/RISKY), removes in safe order with verification after each batch
-- **e2e-runner** — Playwright E2E testing specialist: Page Object Model pattern, flaky test quarantine, codegen workflow, artifact management (screenshots, traces, videos)
 
 ### Skills (`skills/`)
 

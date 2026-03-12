@@ -205,6 +205,19 @@ For the complete checklist with all items and rules, see **`references/coverage-
 
 Manual screenshots create clutter, are not gitignored properly, and duplicate built-in functionality.
 
+## Workflow Orchestration
+
+When the user requests E2E testing, detect intent and execute the corresponding `/e2e:*` commands automatically:
+
+| Trigger | Commands to Execute |
+|---------|-------------------|
+| "寫測試" / "write tests" / "深度測試" / "deep test" / new page without spec | `/e2e:analyze` → `/e2e:plan` → `/e2e:create` |
+| "更新測試" / "update tests" / code changed / "補測試" / verbal description of test gaps | `/e2e:maintain` |
+| "跑測試" / "run tests" / "execute tests" | `/e2e:run` |
+| "遠端測試" / "測試網址" / "test URL" / user provides URL | `/e2e:remote` |
+
+Each command runs in a forked subagent (`context: fork`) with its own references. Artifacts written to disk (`analysis.md`, `coverage-plan.md`) serve as handoff between steps.
+
 ## Running Tests
 
 Always use `pnpm` scripts from `app/` directory (not `npx`):
@@ -227,7 +240,7 @@ For the full markdown template, see **`references/report-template.md`**.
 
 ## Additional References
 
-> **Path resolution:** These reference files are in this skill's `references/` directory, adjacent to this SKILL.md file. When a command or agent instructs you to read `references/foo.md`, resolve the path relative to this SKILL.md's location. If the path cannot be resolved directly, use `Glob("**/e2e-testing/references/foo.md")` to locate it.
+> **Path resolution:** These reference files are in this skill's `references/` directory, adjacent to this SKILL.md file. When a command instructs you to read `references/foo.md`, resolve the path relative to this SKILL.md's location. If the path cannot be resolved directly, use `Glob("**/e2e-testing/references/foo.md")` to locate it.
 
 - **`references/auth-patterns.md`** — Credential format, auth.setup.ts, multi-role storageState
 - **`references/code-patterns.md`** — BasePage implementation, POM examples (including tab-internal locators), test structure, flaky patterns, artifact config, codegen workflow
