@@ -14,15 +14,23 @@ Detect code changes, update POM + spec incrementally, execute tests, and generat
 
 All output must be in **繁體中文**.
 
-## Step 1: Load References (MANDATORY — do not skip)
+## Step 1: Locate Skill Directory & Load References (MANDATORY)
 
-Read these files before proceeding:
-- `references/error-discrimination.md` — error classification framework
-- `references/code-patterns.md` — POM and spec patterns for updates
-- `references/coverage-checklist.md` — interaction depth checklist and coverage requirements
-- `references/report-template.md` — markdown report template and rules
+**Step 1a: Find the skill directory**
+Locate the e2e-testing skill directory by finding its SKILL.md:
+1. `Glob("**/e2e-testing/SKILL.md")` — searches CWD (works during plugin development)
+2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches plugin cache
 
-Do NOT proceed to Step 2 without reading all files listed above.
+Extract the **directory path** from the result (remove `/SKILL.md` suffix). This is `$SKILL_DIR`.
+
+**Step 1b: Read references**
+Read the following files using `$SKILL_DIR/references/{filename}`:
+- `$SKILL_DIR/references/error-discrimination.md` — error classification framework
+- `$SKILL_DIR/references/code-patterns.md` — POM and spec patterns for updates
+- `$SKILL_DIR/references/coverage-checklist.md` — interaction depth checklist and coverage requirements
+- `$SKILL_DIR/references/report-template.md` — markdown report template and rules
+
+Do NOT proceed without reading all listed files. If both Glob attempts fail, report the error and stop.
 
 ## Step 2: Determine Change Scope
 

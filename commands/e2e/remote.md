@@ -23,16 +23,24 @@ All output must be in **繁體中文**.
   - Whether login is needed
   - Test depth (single page / multi-page flow)
 
-## Step 2: Load References (MANDATORY — do not skip)
+## Step 2: Locate Skill Directory & Load References (MANDATORY)
 
-Read these files before proceeding:
-- `references/remote-testing.md` — scaffold templates, MCP auth bridging, remote locator strategy
-- `references/mcp-discovery.md` — MCP exploration workflow
-- `references/error-discrimination.md` — error classification framework
-- `references/auth-patterns.md` — authentication patterns (if login needed)
-- `references/report-template.md` — markdown report template and rules
+**Step 2a: Find the skill directory**
+Locate the e2e-testing skill directory by finding its SKILL.md:
+1. `Glob("**/e2e-testing/SKILL.md")` — searches CWD (works during plugin development)
+2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches plugin cache
 
-Do NOT proceed to Step 3 without reading the files listed above.
+Extract the **directory path** from the result (remove `/SKILL.md` suffix). This is `$SKILL_DIR`.
+
+**Step 2b: Read references**
+Read the following files using `$SKILL_DIR/references/{filename}`:
+- `$SKILL_DIR/references/remote-testing.md` — scaffold templates, MCP auth bridging, remote locator strategy
+- `$SKILL_DIR/references/mcp-discovery.md` — MCP exploration workflow
+- `$SKILL_DIR/references/error-discrimination.md` — error classification framework
+- `$SKILL_DIR/references/auth-patterns.md` — authentication patterns (if login needed)
+- `$SKILL_DIR/references/report-template.md` — markdown report template and rules
+
+Do NOT proceed without reading all listed files. If both Glob attempts fail, report the error and stop.
 
 ## Step 3: Scaffold Playwright in Current Directory
 

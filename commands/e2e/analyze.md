@@ -24,12 +24,20 @@ All output must be in **繁體中文**.
 
 Confirm the page file exists. If not, suggest similar files and ask the user to clarify.
 
-## Step 2: Load References (MANDATORY — do not skip)
+## Step 2: Locate Skill Directory & Load References (MANDATORY)
 
-Read these files before proceeding:
-- `references/semantic-analysis.md` — analysis methodology and SET format
+**Step 2a: Find the skill directory**
+Locate the e2e-testing skill directory by finding its SKILL.md:
+1. `Glob("**/e2e-testing/SKILL.md")` — searches CWD (works during plugin development)
+2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches plugin cache
 
-Do NOT proceed to Step 3 without reading this file.
+Extract the **directory path** from the result (remove `/SKILL.md` suffix). This is `$SKILL_DIR`.
+
+**Step 2b: Read references**
+Read the following files using `$SKILL_DIR/references/{filename}`:
+- `$SKILL_DIR/references/semantic-analysis.md` — analysis methodology and SET format
+
+Do NOT proceed without reading all listed files. If both Glob attempts fail, report the error and stop.
 
 ## Step 3: Local Analysis (MANDATORY)
 
@@ -49,7 +57,7 @@ Perform full local analysis of the target page:
 
 IF the dev server is running AND MCP Playwright tools are available:
 
-Read `references/mcp-discovery.md` first, then:
+Read `$SKILL_DIR/references/mcp-discovery.md` first (using the `$SKILL_DIR` resolved in Step 2a), then:
 
 1. `browser_navigate` → target page
 2. `browser_snapshot` → get ARIA tree

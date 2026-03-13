@@ -9,7 +9,7 @@
       "name": "my-everything-claude-code",
       "source": "./",
       "description": "Shared Claude Code configs: hooks, skills, commands, and agents for all projects",
-      "version": "1.0.1-beta.12"
+      "version": "1.0.1-beta.13"
     }
   ]
 }

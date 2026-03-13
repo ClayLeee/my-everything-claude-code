@@ -23,17 +23,25 @@ Look for `playwright/{page-name}/coverage-plan.md` (relative to `package.json` d
 
 > **Note:** Legacy flat-file paths (`playwright/{page-name}-coverage-plan.md`) are also accepted for backward compatibility.
 
-## Step 2: Load References (MANDATORY — do not skip)
+## Step 2: Locate Skill Directory & Load References (MANDATORY)
 
-Read these files before proceeding:
-- `references/code-patterns.md` — POM class patterns and spec file patterns
-- `references/ui-patterns.md` — concrete interaction code for each UI pattern
-- `references/error-discrimination.md` — error classification for test failures
-- `references/test-data-policy.md` — UI-Only test data policy
-- `references/auth-patterns.md` — authentication setup patterns
-- `references/report-template.md` — markdown report template and rules
+**Step 2a: Find the skill directory**
+Locate the e2e-testing skill directory by finding its SKILL.md:
+1. `Glob("**/e2e-testing/SKILL.md")` — searches CWD (works during plugin development)
+2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches plugin cache
 
-Do NOT proceed to Step 3 without reading all files listed above.
+Extract the **directory path** from the result (remove `/SKILL.md` suffix). This is `$SKILL_DIR`.
+
+**Step 2b: Read references**
+Read the following files using `$SKILL_DIR/references/{filename}`:
+- `$SKILL_DIR/references/code-patterns.md` — POM class patterns and spec file patterns
+- `$SKILL_DIR/references/ui-patterns.md` — concrete interaction code for each UI pattern
+- `$SKILL_DIR/references/error-discrimination.md` — error classification for test failures
+- `$SKILL_DIR/references/test-data-policy.md` — UI-Only test data policy
+- `$SKILL_DIR/references/auth-patterns.md` — authentication setup patterns
+- `$SKILL_DIR/references/report-template.md` — markdown report template and rules
+
+Do NOT proceed without reading all listed files. If both Glob attempts fail, report the error and stop.
 
 ## Step 3: Check Auth Setup
 

@@ -21,13 +21,21 @@ All output must be in **繁體中文**.
 - If no argument, look for spec files in `tests/e2e/` (excluding `pages/`, `auth/`, `fixtures/`) and ask the user which to run
 - If the spec file does not exist, suggest `/e2e:analyze` → `/e2e:plan` → `/e2e:create` instead
 
-## Step 2: Load References (MANDATORY — do not skip)
+## Step 2: Locate Skill Directory & Load References (MANDATORY)
 
-Read these files before proceeding:
-- `references/error-discrimination.md` — error classification framework
-- `references/report-template.md` — report format template
+**Step 2a: Find the skill directory**
+Locate the e2e-testing skill directory by finding its SKILL.md:
+1. `Glob("**/e2e-testing/SKILL.md")` — searches CWD (works during plugin development)
+2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches plugin cache
 
-Do NOT proceed to Step 3 without reading both files.
+Extract the **directory path** from the result (remove `/SKILL.md` suffix). This is `$SKILL_DIR`.
+
+**Step 2b: Read references**
+Read the following files using `$SKILL_DIR/references/{filename}`:
+- `$SKILL_DIR/references/error-discrimination.md` — error classification framework
+- `$SKILL_DIR/references/report-template.md` — report format template
+
+Do NOT proceed without reading all listed files. If both Glob attempts fail, report the error and stop.
 
 ## Step 3: Verify Dev Server
 

@@ -240,7 +240,11 @@ For the full markdown template, see **`references/report-template.md`**.
 
 ## Additional References
 
-> **Path resolution:** These reference files are in this skill's `references/` directory, adjacent to this SKILL.md file. When a command instructs you to read `references/foo.md`, resolve the path relative to this SKILL.md's location. If the path cannot be resolved directly, use `Glob("**/e2e-testing/references/foo.md")` to locate it.
+> **Path resolution:** These reference files are in this skill's `references/` directory, adjacent to this SKILL.md file. To locate them reliably (especially in forked subagents where CWD is the user's project):
+> 1. `Glob("**/e2e-testing/SKILL.md")` — finds the skill directory from CWD (works during plugin development)
+> 2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches the plugin cache
+> 3. Extract the directory path from the result (remove `/SKILL.md` suffix) → `$SKILL_DIR`
+> 4. Read references as `$SKILL_DIR/references/{filename}`
 
 - **`references/auth-patterns.md`** — Credential format, auth.setup.ts, multi-role storageState
 - **`references/code-patterns.md`** — BasePage implementation, POM examples (including tab-internal locators), test structure, flaky patterns, artifact config, codegen workflow
