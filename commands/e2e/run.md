@@ -4,6 +4,7 @@ description: "Run existing E2E tests with error classification and dual reports"
 category: E2E Testing
 tags: [e2e, playwright, run, execute]
 args: "spec_path"
+model: haiku
 context: fork
 skills:
   - e2e-testing

@@ -4,6 +4,7 @@ description: "E2E test a remote URL — scaffold, explore via MCP, create tests,
 category: E2E Testing
 tags: [e2e, playwright, remote, url, mcp]
 args: "target_url"
+model: opus
 context: fork
 skills:
   - e2e-testing

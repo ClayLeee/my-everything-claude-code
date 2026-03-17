@@ -3,6 +3,7 @@ name: "e2e:plan"
 description: "Generate coverage plan from page analysis for E2E testing"
 category: E2E Testing
 tags: [e2e, playwright, plan, coverage]
+model: sonnet
 context: fork
 skills:
   - e2e-testing

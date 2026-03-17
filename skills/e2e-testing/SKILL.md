@@ -6,7 +6,8 @@ description: |
   "update E2E tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
   "handle test errors", "retry failed form submission", "classify test failures",
   "test a remote URL", "remote test", "test this URL", "遠端測試", "測試網址",
-  or mentions Playwright testing, test maintenance, or test locators.
+  "record test", "錄製測試", "錄製", "codegen", "record browser actions", "錄製瀏覽器操作",
+  or mentions Playwright testing, test maintenance, recording, codegen, or test locators.
 ---
 
 # E2E Testing Patterns
@@ -215,6 +216,7 @@ When the user requests E2E testing, detect intent and execute the corresponding 
 | "更新測試" / "update tests" / code changed / "補測試" / verbal description of test gaps | `/e2e:maintain` |
 | "跑測試" / "run tests" / "execute tests" | `/e2e:run` |
 | "遠端測試" / "測試網址" / "test URL" / user provides URL | `/e2e:remote` |
+| "錄製測試" / "record test" / "錄製" / "codegen" / "record browser actions" | `/e2e:record` |
 
 Each command runs in a forked subagent (`context: fork`) with its own references. Artifacts written to disk (`analysis.md`, `coverage-plan.md`) serve as handoff between steps.
 
@@ -256,3 +258,4 @@ For the full markdown template, see **`references/report-template.md`**.
 - **`references/test-data-policy.md`** — UI-Only Test Data Policy: forbidden API patterns, lifecycle examples (create with cleanup, edit/delete with setup)
 - **`references/remote-testing.md`** — Remote Test Mode: scaffold minimal Playwright project, MCP auth bridging, remote locator strategy, MCP exploration workflow, RemoteBasePage pattern
 - **`references/ui-patterns.md`** — UI pattern testing code examples: table, select, form, pagination, nested specs
+- **`references/recording-patterns.md`** — Codegen workflow, locator transformation rules, auto-assignment algorithm, CRUD flow detection, code generation templates

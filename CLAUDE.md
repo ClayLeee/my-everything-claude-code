@@ -126,6 +126,7 @@ E2E Testing (`commands/e2e/`):
 - `/e2e:maintain` — incrementally update tests from code changes, run tests, generate reports
 - `/e2e:run` — run existing tests with error classification and dual reports
 - `/e2e:remote` — scaffold Playwright project, explore remote URL via MCP, create and run tests
+- `/e2e:record` — record browser actions with Playwright codegen, convert to POM + spec test code
 
 Workflow (`commands/`):
 - `/before-commit` — run `pnpm before-commit` (type check + lint), then invoke `git-commit` skill to generate commit message

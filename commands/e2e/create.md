@@ -3,6 +3,7 @@ name: "e2e:create"
 description: "Create POM + spec from coverage plan, run tests, and generate dual reports"
 category: E2E Testing
 tags: [e2e, playwright, create, pom, spec]
+model: opus
 context: fork
 skills:
   - e2e-testing

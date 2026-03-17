@@ -4,6 +4,7 @@ description: "Analyze page structure and build Semantic Element Table for E2E te
 category: E2E Testing
 tags: [e2e, playwright, analyze, semantic-analysis]
 args: "page_path"
+model: sonnet
 context: fork
 skills:
   - e2e-testing

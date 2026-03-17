@@ -3,6 +3,7 @@ name: "e2e:maintain"
 description: "Incrementally update E2E tests based on code changes or verbal descriptions, run tests, and generate reports"
 category: E2E Testing
 tags: [e2e, playwright, maintain, update, incremental]
+model: sonnet
 context: fork
 skills:
   - e2e-testing
