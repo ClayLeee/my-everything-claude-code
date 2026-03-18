@@ -52,11 +52,11 @@ process.stdin.on('end', () => {
       }
     }
 
-    // Fire notification (detached, non-blocking)
+    // Fire notification — on Windows children are non-detached,
+    // so Node will wait for them to complete before exiting.
+    // The hook is registered with async:true to avoid blocking Claude.
     notify(title, message);
   } catch (_e) {
     // Silently ignore all errors — never block Claude
   }
-
-  process.exit(0);
 });

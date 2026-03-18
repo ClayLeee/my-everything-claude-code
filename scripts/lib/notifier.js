@@ -65,19 +65,31 @@ function saveConfig(config) {
 }
 
 /**
- * Spawn a detached process that won't block the parent.
- * Reuses the pattern from start-observer.js:308-314.
+ * Spawn a background process.
+ * On macOS/Linux: detached + unref (child survives parent exit).
+ * On Windows: non-detached (detached children get killed when parent
+ * exits in some terminal environments). The caller must wait for
+ * completion — use async hook to avoid blocking Claude Code.
+ * @returns {ChildProcess|null}
  */
-function spawnDetached(cmd, args) {
+function spawnBackground(cmd, args) {
   try {
-    const child = spawn(cmd, args, {
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true
-    });
-    child.unref();
+    if (isWindows) {
+      const child = spawn(cmd, args, {
+        stdio: 'ignore',
+        windowsHide: true
+      });
+      return child;
+    } else {
+      const child = spawn(cmd, args, {
+        detached: true,
+        stdio: 'ignore'
+      });
+      child.unref();
+      return null;
+    }
   } catch (_e) {
-    // Silently ignore spawn errors
+    return null;
   }
 }
 
@@ -96,15 +108,17 @@ function playSound(soundFile) {
   }
 
   if (isWindows) {
-    spawnDetached('powershell', [
+    // Forward slashes prevent backslash consumption in spawn → PowerShell
+    const safePath = file.replace(/\\/g, '/');
+    spawnBackground('powershell', [
       '-NoProfile', '-NonInteractive', '-Command',
-      `(New-Object Media.SoundPlayer '${file}').PlaySync()`
+      `(New-Object Media.SoundPlayer '${safePath}').PlaySync()`
     ]);
   } else if (isMacOS) {
-    spawnDetached('afplay', [file]);
+    spawnBackground('afplay', [file]);
   } else if (isLinux) {
     // Try paplay first (PulseAudio), fallback to aplay (ALSA)
-    spawnDetached('paplay', [file]);
+    spawnBackground('paplay', [file]);
   }
 }
 
@@ -129,15 +143,15 @@ function showToast(title, message) {
       '$n.Dispose()'
     ].join('; ');
 
-    spawnDetached('powershell', [
+    spawnBackground('powershell', [
       '-NoProfile', '-NonInteractive', '-Command', psScript
     ]);
   } else if (isMacOS) {
-    spawnDetached('osascript', [
+    spawnBackground('osascript', [
       '-e', `display notification "${safeMessage}" with title "${safeTitle}"`
     ]);
   } else if (isLinux) {
-    spawnDetached('notify-send', [safeTitle, safeMessage]);
+    spawnBackground('notify-send', [safeTitle, safeMessage]);
   }
 }
 

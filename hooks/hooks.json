@@ -108,7 +108,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/notify.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/notify.js",
+            "async": true
           }
         ]
       }
