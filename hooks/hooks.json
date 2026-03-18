@@ -102,6 +102,17 @@
         ]
       }
     ],
+    "Notification": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/notify.js"
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "matcher": "*",
