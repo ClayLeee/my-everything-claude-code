@@ -1,6 +1,6 @@
 ---
 name: notify-config
-description: "互動式設定桌面通知偏好（音效、Toast、音效檔路徑）"
+description: "Interactive notification preferences (sound, toast, sound file path)"
 category: Workflow
 tags: [notification, sound, toast, config]
 ---

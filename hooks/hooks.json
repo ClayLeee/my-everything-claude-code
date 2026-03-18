@@ -6,7 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"console.error('[Hook] Review changes before push...');console.error('[Hook] Continuing with push (remove this hook to add interactive review)')\""
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/warn-git-push.js",
+            "timeout": 10
           }
         ]
       },
@@ -15,7 +16,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path||'';if(/\\.(md|txt)$/.test(p)&&!/(README|CLAUDE|AGENTS|CONTRIBUTING|SKILL|MEMORY|HOOKS)\\.md$/.test(p)&&!/playwright[\\\\/]/.test(p)){console.error('[Hook] BLOCKED: Unnecessary documentation file creation');console.error('[Hook] File: '+p);console.error('[Hook] Use README.md for documentation instead');process.exit(1)}console.log(d)})\""
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/block-docs.js",
+            "timeout": 10
           }
         ]
       },
@@ -24,7 +26,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/suggest-compact.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/suggest-compact.js",
+            "timeout": 10
           }
         ]
       },
@@ -33,7 +36,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/observe.js pre"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/observe.js pre",
+            "timeout": 10
           }
         ]
       }
@@ -44,7 +48,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node -e \"const fs=require('fs');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const i=JSON.parse(d);const p=i.tool_input?.file_path;if(p&&fs.existsSync(p)){const c=fs.readFileSync(p,'utf8');const lines=c.split('\\n');const matches=[];lines.forEach((l,idx)=>{if(/console\\\\.log/.test(l))matches.push((idx+1)+': '+l.trim())});if(matches.length){console.error('[Hook] WARNING: console.log found in '+p);matches.slice(0,5).forEach(m=>console.error(m));console.error('[Hook] Remove console.log before committing')}}console.log(d)})\""
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/detect-console-log.js",
+            "timeout": 10
           }
         ]
       },
@@ -53,7 +58,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/observe.js post"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/observe.js post",
+            "timeout": 10
           }
         ]
       }
@@ -64,7 +70,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-compact.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/pre-compact.js",
+            "timeout": 30
           }
         ]
       },
@@ -86,7 +93,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-start.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-start.js",
+            "timeout": 10
           }
         ]
       }
@@ -97,7 +105,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check-console-log.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check-console-log.js",
+            "timeout": 30
           }
         ]
       }
@@ -109,6 +118,7 @@
           {
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/notify.js",
+            "timeout": 15,
             "async": true
           }
         ]
@@ -120,7 +130,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-end.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/session-end.js",
+            "timeout": 10
           }
         ]
       },
@@ -129,7 +140,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/evaluate-session.js"
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/evaluate-session.js",
+            "timeout": 60
           }
         ]
       },

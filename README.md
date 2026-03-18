@@ -25,6 +25,7 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 │   ├── instinct-export.md         # Export instincts for sharing
 │   ├── instinct-import.md         # Import instincts from others
 │   ├── before-commit.md            # Run checks then generate commit message
+│   ├── notify-config.md           # Interactive notification settings
 │   ├── learn-eval.md              # Extract patterns with quality evaluation
 │   └── skill-create.md            # Generate SKILL.md from git history
 ├── skills/
@@ -43,8 +44,8 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 ├── hooks/
 │   └── hooks.json                 # All hook definitions
 └── scripts/
-    ├── hooks/                     # Hook scripts
-    └── lib/                       # Shared utilities
+    ├── hooks/                     # Hook scripts (observe, notify, block-docs, etc.)
+    └── lib/                       # Shared utilities (utils, notifier, session-manager, etc.)
 ```
 
 ## Development Workflow
@@ -130,6 +131,7 @@ flowchart TD
 | PreCompact | auto-analyze | Extract instincts from observations |
 | SessionStart | load context | Load previous session summary |
 | Stop | global console.log check | Scan all git-changed files |
+| Notification | desktop notify | Play sound + show Toast when Claude needs attention |
 | SessionEnd | session record | Save session metadata |
 | SessionEnd | evaluate session | Log session length |
 | SessionEnd | auto-analyze | Extract instincts from observations |
@@ -158,12 +160,14 @@ Global rules installed to `~/.claude/rules/` for automatic enforcement:
 ### Commands
 
 - `/before-commit` — Run project checks (`pnpm before-commit`), then generate conventional commit message
+- `/notify:config` — Interactive notification settings (sound, toast, sound file)
 - `/e2e:analyze` — Analyze page structure and build Semantic Element Table
 - `/e2e:plan` — Generate coverage plan from analysis artifact
 - `/e2e:create` — Create POM + spec, run tests, generate dual reports (HTML + MD)
 - `/e2e:maintain` — Incrementally update tests from code changes, run tests, generate reports
 - `/e2e:run` — Run existing tests with error classification and dual reports
 - `/e2e:remote` — Scaffold Playwright project, explore remote URL via MCP, create and run tests
+- `/e2e:record` — Record browser actions with Playwright codegen, convert to POM + spec
 - `/cl:status` — Show learned instincts with confidence scores
 - `/cl:analyze` — Manually trigger observation analysis
 - `/cl:log` — Show recent observer log entries
@@ -184,6 +188,7 @@ Global rules installed to `~/.claude/rules/` for automatic enforcement:
 | Code changed, update existing tests | **Maintain** | maintain (includes test run + dual reports) |
 | Run existing tests | **Run** | run (includes dual reports) |
 | Test a remote URL | **Remote** | remote (includes test run + dual reports) |
+| Record browser actions | **Record** | record (codegen → POM + spec) |
 
 ### Create Mode — Build New Tests
 
