@@ -1,5 +1,17 @@
 # Code Patterns
 
+## Table of Contents
+
+- [BasePage Shared Class](#basepage-shared-class)
+- [POM Examples](#pom-examples) (Basic, Deep Testing with Nested Dialog/Tab)
+- [Test Structure Example](#test-structure-example)
+- [Flaky Test Patterns](#flaky-test-patterns) (Quarantine, Identify, Common Causes)
+- [Artifact Configuration](#artifact-configuration)
+- [Codegen Workflow](#codegen-workflow)
+- [Playwright Configuration Template](#playwright-configuration-template)
+
+---
+
 ## BasePage Shared Class — `tests/e2e/pages/BasePage.ts`
 
 All POM classes extend `BasePage` to share common functionality:

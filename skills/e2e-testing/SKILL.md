@@ -2,12 +2,14 @@
 name: e2e-testing
 description: |
   Playwright E2E testing patterns, Page Object Model, configuration, artifact management, and flaky test strategies.
-  This skill should be used when the user asks to "write E2E tests", "add Playwright tests", "create page tests",
-  "update E2E tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
+  Use this skill whenever the user mentions E2E tests, Playwright, test automation, or page testing — even if they
+  don't explicitly say "E2E". Trigger phrases include: "write tests", "add Playwright tests", "create page tests",
+  "update tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
   "handle test errors", "retry failed form submission", "classify test failures",
   "test a remote URL", "remote test", "test this URL", "遠端測試", "測試網址",
   "record test", "錄製測試", "錄製", "codegen", "record browser actions", "錄製瀏覽器操作",
-  or mentions Playwright testing, test maintenance, recording, codegen, or test locators.
+  "測試這個頁面", "幫我測這個功能", "這個功能怎麼驗證", "跑測試", "run tests".
+  Also trigger when the user discusses test maintenance, recording, locators, test reports, or test coverage gaps.
 ---
 
 # E2E Testing Patterns
@@ -218,7 +220,7 @@ When the user requests E2E testing, detect intent and execute the corresponding 
 | "遠端測試" / "測試網址" / "test URL" / user provides URL | `/e2e:remote` |
 | "錄製測試" / "record test" / "錄製" / "codegen" / "record browser actions" | `/e2e:record` |
 
-Each command runs in a forked subagent (`context: fork`) with its own references. Artifacts written to disk (`analysis.md`, `coverage-plan.md`) serve as handoff between steps.
+Most commands run in a forked subagent (`context: fork`) with their own references. The exception is `/e2e:record`, which runs inline (Phase 1 needs user interaction for supplementary input) and spawns Phase 2 via the Agent tool. Artifacts written to disk (`analysis.md`, `coverage-plan.md`, `recording-log.md`) serve as handoff between steps.
 
 ## Running Tests
 

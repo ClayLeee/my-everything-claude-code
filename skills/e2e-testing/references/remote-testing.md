@@ -2,6 +2,20 @@
 
 Patterns for E2E testing remote URLs without a local project.
 
+## Table of Contents
+
+- [When to Use](#when-to-use)
+- [Scaffold Minimal Playwright Project](#scaffold-minimal-playwright-project) (Directory Structure, Templates, Setup)
+- [Remote Locator Strategy](#remote-locator-strategy) (Priority, MCP ARIA Mapping, Translation Rules)
+- [MCP Authentication & Auth Bridging](#mcp-authentication--auth-bridging) (Login Flow, Export State, Config)
+- [MCP Exploration Workflow](#mcp-exploration-workflow) (Auth, Page Exploration, Form Dry-Run, Discovery Report)
+- [RemoteBasePage Pattern](#remotebasepage-pattern)
+- [Test Scenario Generation Rules](#test-scenario-generation-rules)
+- [Report Adaptation](#report-adaptation)
+- [Known Limitations](#known-limitations)
+
+---
+
 ## When to Use
 
 - User provides a URL rather than a local project path

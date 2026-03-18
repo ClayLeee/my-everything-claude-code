@@ -2,6 +2,17 @@
 
 Patterns for Playwright Codegen recording → AI-powered POM/Spec transformation.
 
+## Table of Contents
+
+- [Codegen Startup & Output](#codegen-startup--output) (Dependency Check, Launch, Output Format, Limitations, .gitignore)
+- [Raw Code → POM/Spec Conversion Rules](#raw-code--pomspec-conversion-rules) (Action Parsing, URL Detection, Grouping)
+- [Locator Conversion Strategy](#locator-conversion-strategy) (Local Mode, Remote Mode)
+- [Auto-Assignment Algorithm](#auto-assignment-algorithm) (URL Extraction, Find Files, Decision Matrix, Insertion Point)
+- [CRUD Flow Detection](#crud-flow-detection) (Create, Edit, Delete, Recording Data Exception)
+- [Code Generation Templates](#code-generation-templates) (POM, Spec, Serial CRUD, Supplementary Actions)
+
+---
+
 ## Codegen Startup & Output
 
 ### Dependency Check
