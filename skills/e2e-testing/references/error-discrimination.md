@@ -2,215 +2,302 @@
 
 When E2E tests encounter errors during execution, use this framework to classify errors as **recoverable** (fix and retry) or **non-recoverable** (report as FAIL).
 
+## Table of Contents
+
+- [Error Detection Layers](#error-detection-layers) (API-first error sourcing with auxiliary UI verification)
+- [Classification Priority](#classification-priority) (four-layer evaluation order: HTTP status → error code → field → message)
+- [Decision Flowchart](#decision-flowchart) (visual flow from form submission to classification outcome)
+- [Error Classification Table](#error-classification-table) (signal-to-action mapping for all error types)
+- [ENVIRONMENT Errors — Fix Environment, NOT Test Code](#environment-errors--fix-environment-not-test-code) (fix entity state via UI, never modify test code)
+- [Error Classification Config](#error-classification-config) (project-specific config interface with structured and unstructured API examples)
+- [Retry Strategy](#retry-strategy) (max 2 retries with fix strategies by error type)
+- [Error Detection Code Examples](#error-detection-code-examples) (API interception, classification function, retry loop, UI feedback verification)
+
+## Error Detection Layers
+
+API response is the **primary** error source — it provides HTTP status, error code, and field-level detail. UI signals (toast, inline validation) serve as **auxiliary** verification to confirm the UI correctly communicates errors to users.
+
+| Layer | Source | Role | Method |
+|---|---|---|---|
+| **Primary** | API Response | Classification, retry decisions, field identification | `page.waitForResponse()` → `status` + `response.json()` |
+| Auxiliary | UI feedback (toast, snackbar, banner, alert, etc.) | Verify UI renders the error to the user | `feedbackError.waitFor()` → `innerText` |
+| Auxiliary | Inline validation | Client-side validation (no API call) | `.text-destructive` presence check |
+| Auxiliary | Page-level state | Structural problems (empty table, redirect) | URL / DOM checks |
+
+**Why API-first?** Toast text is a second-hand rendering — it may abbreviate, localize, or omit details from the original API response. `response.json()` gives you the raw `status`, `message`, `field`, and `code` that the UI derived its display from.
+
+## Classification Priority
+
+Classification uses **four layers**, evaluated in order. Stop at the first layer that produces a definitive result:
+
+```
+Layer 1: HTTP Status Code        ← universal, always available
+  ↓
+Layer 2: body.code / body.type   ← structured error code, project-defined
+  ↓
+Layer 3: body.field              ← field-level detail = likely recoverable
+  ↓
+Layer 4: body.message keywords   ← last resort fallback for unstructured APIs
+```
+
+**Layer 1 (HTTP Status)** is the only universal layer. Layers 2–4 depend on your API's response structure. Inspect your API's actual error responses (via DevTools Network tab or MCP `browser_network_requests`) to determine which layers apply.
+
 ## Decision Flowchart
 
 ```
-ERROR DETECTED
+FORM SUBMITTED
     │
-[1] Error CONTEXT?
-    ├── FORM SUBMISSION ──▶ [2]
-    ├── PAGE/DATA LOADING ──▶ [4]
-    └── ELEMENT INTERACTION ──▶ [5]
+    ▼
+[1] Intercept API response (waitForResponse)
+    │
+    ├── response.ok() ──▶ SUCCESS
+    │       └── Auxiliary: verify UI feedback visible
+    │
+    └── response.status() >= 400 ──▶ [2]
 
-[2] HTTP STATUS CODE?
-    ├── 400 / 409 / 422 ──▶ [3] (potentially recoverable)
+[2] HTTP STATUS CODE (Layer 1 — universal)
     ├── 401 / 403 ──▶ FAIL (permission issue)
-    └── 500+ ──▶ FAIL (server error)
+    ├── 500+ ──▶ FAIL (server error)
+    └── 400 / 409 / 422 ──▶ [3] Parse response body
 
-[3] Does the error message indicate an ENVIRONMENT/DATA STATE issue?
-    ├── YES (disabled, archived, locked, suspended, etc.) ──▶ ENVIRONMENT (see below)
-    └── NO ──▶ [3b]
+[3] STRUCTURED ERROR CODE (Layer 2 — if API provides body.code/body.type)
+    ├── Code matches environment list ──▶ ENVIRONMENT
+    ├── Code matches recoverable list ──▶ RECOVERABLE
+    ├── Code matches fail list ──▶ FAIL
+    └── No code field or unrecognized ──▶ [4]
 
-[3b] Does the error message contain actionable field information?
-    ├── YES (name duplicate, invalid format, etc.) ──▶ RECOVERABLE, fix and retry
-    └── NO (operation failed, insufficient permissions, etc.) ──▶ FAIL
+[4] FIELD PRESENCE (Layer 3)
+    ├── body.field exists ──▶ RECOVERABLE (fix that field, retry)
+    └── No field ──▶ [5]
 
-[4] Page/data loading error ──▶ always FAIL
+[5] MESSAGE FALLBACK (Layer 4 — last resort for unstructured APIs)
+    ├── Message matches project-defined patterns ──▶ classify accordingly
+    └── No match ──▶ FAIL
 
-[5] Element interaction error (timeout, element disappeared) ──▶ always FAIL
+NON-FORM ERRORS (no API call involved):
+    ├── Playwright timeout ──▶ FAIL
+    ├── Element not found / disappeared ──▶ FAIL
+    ├── Empty table on initial load ──▶ FAIL
+    └── Redirect to login ──▶ FAIL (session expired)
 ```
 
 ## Error Classification Table
 
 | Signal | HTTP Status | Classification | Action |
 |---|---|---|---|
-| Toast: field error (name duplicate, invalid format) | 400/409/422 | RECOVERABLE | Parse field, fix value, retry |
-| Inline validation (`.text-destructive`) | N/A | RECOVERABLE | Fix field value, resubmit |
-| Toast: entity state error (disabled, archived, locked) | 400/403/409 | ENVIRONMENT | **Do NOT modify test code.** Fix entity state through UI (MCP), then retry. |
-| Toast: generic error (operation failed) | 400+ | FAIL | Report failure |
-| Toast: insufficient permissions | 403 | FAIL | Report failure |
-| Server error | 500/502/503 | FAIL | Report failure |
+| API: permission denied | 401/403 | FAIL | Report failure |
+| API: server error | 500/502/503 | FAIL | Report failure |
+| `body.code` matches environment code | 400/409 | ENVIRONMENT | **Do NOT modify test code.** Fix entity state via UI (MCP), then retry. |
+| `body.code` matches recoverable code | 400/409/422 | RECOVERABLE | Read `body.field` → fix value → retry |
+| `body.field` present (no code match) | 400/409/422 | RECOVERABLE | Fix that field → retry |
+| No structured info, message fallback | 400+ | Depends on pattern | Project-specific |
+| Generic error (no actionable detail) | 400+ | FAIL | Report failure |
+| Inline validation (no API call) | N/A | RECOVERABLE | Fix field value, resubmit |
 | Playwright timeout | N/A | FAIL | Report failure |
 | Empty table (initial load) | 200 | FAIL | Report failure (data issue) |
 | Dialog did not open | N/A | FAIL | Report failure |
 
 ## ENVIRONMENT Errors — Fix Environment, NOT Test Code
 
-**ENVIRONMENT errors mean the test data or environment state is wrong, NOT the test code.** When the API error message describes a state/condition of the entity (disabled, archived, suspended, locked, etc.), the test logic is correct but the environment doesn't support the operation.
+**ENVIRONMENT errors mean the test data or environment state is wrong, NOT the test code.** When the API response body describes a state/condition of the entity (disabled, archived, suspended, locked, etc.), the test logic is correct but the environment doesn't support the operation.
 
 **Mandatory behavior:**
 1. **Do NOT modify test code** — the test is correct
-2. **Identify the root cause** — parse the error message to determine which entity is in what state (e.g., "project X is disabled")
+2. **Identify the root cause** — parse `body.message` (or `body.error`) to determine which entity is in what state (e.g., "project X is disabled")
 3. **Fix the environment through UI** — use Playwright MCP tools (`browser_navigate`, `browser_click`, `browser_fill_form`, etc.) to navigate to the entity's settings and restore it to the required state (e.g., re-enable the project)
 4. **Retry the test** — after fixing the environment, re-run the failing test (max 1 environment-fix retry)
 5. **If UI fix is not possible** — report clearly to the user: what entity, what state, what needs to change. Do NOT rewrite the test.
 
-**Example:** Test tries to create an issue in a project → API returns "project is disabled" →
+**Example:** Test tries to create an issue in a project → API returns `{ "message": "專案已停用", "code": "PROJECT_DISABLED" }` →
 1. Use MCP: `browser_navigate` to the project settings page
 2. Find and click the "enable" / "activate" button
 3. Confirm the project is re-enabled
 4. Re-run the test
 
-## Recoverable Error Keywords
+## Error Classification Config
 
-These keywords in error toasts, combined with HTTP 400/409/422, indicate a recoverable error. The API returns error messages in zh-TW, so both Chinese and English keywords are listed:
+Projects define how their API's error codes and messages map to classifications via `ErrorClassificationConfig`. The interface, `classifyApiError()` function, and `submitAndIntercept()` helper are in the **error-utils template** — use `scaffold.js` to create it:
 
-```
-重複 / already exists / duplicate
-已被使用 / in use / taken
-格式無效 / 格式不正確 / invalid format
-必填 / 不得為空 / required
-長度不足 / 超過長度 / too short / too long
-不可早於 / 不可晚於 / must not be before / must not be after
+```bash
+echo '{"targetDir":"app","templates":["error-utils"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
-## Environment Error Keywords
+This creates `tests/fixtures/error-utils.ts` with:
+- `ErrorClassificationConfig` interface — fields: `codeField`, `messageField`, `fieldField`, `environmentCodes`, `recoverableCodes`, `environmentKeywords`, `recoverableKeywords`
+- `classifyApiError(status, body, config)` — 4-layer classification function (HTTP status → error code → field → message)
+- `submitAndIntercept(page, submitBtn, apiUrlPattern)` — form submit + API response interception
 
-These keywords indicate the error is caused by entity/data state, NOT test code. Do NOT modify test code when these appear:
+### Example: Structured API (preferred)
 
+If your API returns structured error codes like `{ "code": "DUPLICATE_NAME", "field": "name", "message": "..." }`:
+
+```typescript
+const config: ErrorClassificationConfig = {
+  codeField: "code",
+  messageField: "message",
+  fieldField: "field",
+  environmentCodes: [
+    "ENTITY_DISABLED", "ENTITY_ARCHIVED", "ENTITY_LOCKED",
+    "PROJECT_SUSPENDED", "ACCOUNT_FROZEN",
+  ],
+  recoverableCodes: [
+    "DUPLICATE_NAME", "DUPLICATE_EMAIL", "INVALID_FORMAT",
+    "FIELD_REQUIRED", "VALUE_TOO_LONG", "VALUE_TOO_SHORT",
+  ],
+};
 ```
-已停用 / 被停用 / disabled / deactivated
-已封存 / 已歸檔 / archived
-已鎖定 / locked
-已暫停 / suspended
-已關閉 / closed
-已凍結 / frozen
-唯讀 / read-only / readonly
-不允許 / not allowed (when referring to entity state)
-無法操作 / cannot operate
+
+### Example: Unstructured API (fallback)
+
+If your API only returns `{ "message": "名稱已被使用" }` with no error code:
+
+```typescript
+const config: ErrorClassificationConfig = {
+  messageField: "message",
+  environmentKeywords: [
+    "disabled", "deactivated", "archived", "locked",
+    "suspended", "frozen", "read-only", "cannot operate",
+    // Add your API's language-specific keywords:
+    "已停用", "已封存", "已鎖定", "已暫停",
+  ],
+  recoverableKeywords: [
+    "duplicate", "already exists", "in use", "taken",
+    "invalid format", "required", "too short", "too long",
+    // Add your API's language-specific keywords:
+    "重複", "已被使用", "格式無效", "必填",
+  ],
+};
 ```
 
-## Non-Recoverable Error Keywords
+### How to discover your API's error structure
 
-These keywords always mean FAIL — do not retry:
-
-```
-權限不足 / unauthorized / forbidden
-操作失敗 / operation failed
-系統錯誤 / 伺服器錯誤 / server error / internal error
-連線逾時 / timeout
-找不到 / not found
-```
+1. Open DevTools Network tab (or use MCP `browser_network_requests`)
+2. Trigger form submission errors (duplicate name, empty required field, invalid format)
+3. Inspect the response body to identify: which fields exist (`code`? `type`? `field`? `errors[]`?), what values they contain
+4. Build your `ErrorClassificationConfig` from the observed patterns
 
 ## Retry Strategy
 
 - Maximum **2 retries** (3 total attempts)
 - After retries exhausted → report as FAIL
 
-### Fix Strategies by Error Pattern
+### Fix Strategies by Error Type
 
-| Error Pattern | Strategy |
+| Error Type | Strategy |
 |---|---|
-| duplicate / already exists / in use | Append timestamp suffix `_ts{Date.now()}` to the conflicting value |
-| invalid format | Switch to correct format (e.g., valid email, URL, date) |
-| required / must not be empty | Fill in with test data |
+| Duplicate / conflict | Append timestamp suffix `_ts{Date.now()}` to `body[fieldField]` value |
+| Invalid format | Switch to correct format (e.g., valid email, URL, date) |
+| Required / empty | Fill in with test data |
+
+Use `body[config.fieldField]` (e.g., `body.field`) to target the exact input. If the API doesn't provide a field name, infer from `body[config.codeField]` or fall back to the first empty required field.
 
 ### Retry Flow
 
 ```
-1. Detect error toast → read message text
-2. Classify: recoverable or non-recoverable?
-3. If recoverable → apply fix strategy → resubmit form → wait for result
-4. If still failing after max retries → FAIL
+1. Intercept API response → parse status + body
+2. Classify: recoverable, environment, or non-recoverable?
+3. If recoverable → apply fix strategy (use body.field if available) → resubmit → wait for response
+4. If environment → fix entity state via MCP UI → re-run test (max 1 retry)
+5. If still failing after max retries → FAIL
 ```
 
 ## Error Detection Code Examples
 
-### Toast Detection
-
-The project uses vue-sonner. Error toasts use `[data-sonner-toast][data-type="error"]`:
-
-```typescript
-// In BasePage — already available as this.toastError
-readonly toastError = this.page.locator('[data-sonner-toast][data-type="error"]');
-
-// Read error message text
-async getErrorToast(): Promise<string> {
-  await this.toastError.waitFor({ state: "visible", timeout: 5000 });
-  return this.toastError.locator("[data-content]").innerText();
-}
-```
-
-### Inline Validation Detection
-
-```typescript
-// Inline validation errors use .text-destructive class
-const inlineError = page.locator(".text-destructive");
-if (await inlineError.count() > 0) {
-  const errorText = await inlineError.first().innerText();
-  // Classify and handle
-}
-```
-
-### Recoverable Error Check
-
-```typescript
-const RECOVERABLE_KEYWORDS = [
-  "重複", "already exists", "duplicate",
-  "已被使用", "in use", "taken",
-  "格式無效", "格式不正確", "invalid format",
-  "必填", "不得為空", "required",
-  "長度不足", "超過長度",
-  "不可早於", "不可晚於",
-];
-
-function isRecoverable(errorMessage: string): boolean {
-  const msg = errorMessage.toLowerCase();
-  return RECOVERABLE_KEYWORDS.some((kw) => msg.includes(kw.toLowerCase()));
-}
-```
+The `submitAndIntercept()`, `classifyApiError()`, and `ErrorClassificationConfig` implementations are in the **error-utils template** (`tests/fixtures/error-utils.ts`) — see § Error Classification Config above for scaffold instructions.
 
 ### Retry Loop Example
 
 ```typescript
+import { classifyApiError, submitAndIntercept } from '../../fixtures/error-utils';
+
 const MAX_RETRIES = 2;
 let attempt = 0;
 
 while (attempt <= MAX_RETRIES) {
   await fillForm(page, testData);
-  await submitBtn.click();
 
-  // Wait for either success or error toast
-  const successToast = page.locator('[data-sonner-toast][data-type="success"]');
-  const errorToast = page.locator('[data-sonner-toast][data-type="error"]');
+  // Primary: intercept API response
+  const { ok, status, body } = await submitAndIntercept(
+    page, submitBtn, "/api/items"
+  );
 
-  const result = await Promise.race([
-    successToast.waitFor({ state: "visible", timeout: 10000 }).then(() => "success"),
-    errorToast.waitFor({ state: "visible", timeout: 10000 }).then(() => "error"),
-  ]);
-
-  if (result === "success") break;
-
-  // Read and classify error
-  const errorMsg = await errorToast.locator("[data-content]").innerText();
-
-  if (!isRecoverable(errorMsg) || attempt === MAX_RETRIES) {
-    throw new Error(`Form submission failed: ${errorMsg}`);
+  if (ok) {
+    // Auxiliary: verify UI feedback rendered to user (if configured)
+    if (basePage.feedbackSuccess) {
+      await expect(basePage.feedbackSuccess).toBeVisible();
+    }
+    break;
   }
 
-  // Apply fix strategy and retry
-  if (/重複|already exists|duplicate|已被使用|in use|taken/i.test(errorMsg)) {
-    testData.name = `${testData.baseName}_ts${Date.now()}`;
+  // Classify using project-specific config
+  const errorClass = classifyApiError(status, body, errorConfig);
+  const msgField = errorConfig.messageField || "message";
+  const errorMsg = body?.[msgField] || `HTTP ${status}`;
+
+  if (errorClass === "fail" || attempt === MAX_RETRIES) {
+    throw new Error(`Form submission failed (${status}): ${errorMsg}`);
   }
 
-  // Dismiss toast before retrying
-  await errorToast.click();
-  await errorToast.waitFor({ state: "hidden" });
+  if (errorClass === "environment") {
+    throw new Error(
+      `ENVIRONMENT error — fix entity state, do NOT modify test code: ${errorMsg}`
+    );
+  }
+
+  // RECOVERABLE — apply fix strategy using body[fieldField] when available
+  const field = errorConfig.fieldField ? body?.[errorConfig.fieldField] : undefined;
+  const code = errorConfig.codeField ? body?.[errorConfig.codeField] : undefined;
+
+  // Determine fix strategy from code or message
+  if (code?.includes("DUPLICATE") || /duplicate|conflict|already.exist/i.test(errorMsg)) {
+    testData[field || "name"] = `${testData.baseName}_ts${Date.now()}`;
+  } else if (code?.includes("REQUIRED") || field) {
+    testData[field || "name"] = `[E2E] Retry ${Date.now().toString(36)}`;
+  }
+
+  // Auxiliary: dismiss error feedback if visible before retrying
+  if (basePage.feedbackError && await basePage.feedbackError.isVisible()) {
+    await basePage.feedbackError.click();
+    await basePage.feedbackError.waitFor({ state: "hidden" });
+  }
+
   attempt++;
 }
 ```
 
-### Page-Level Error States
+### Auxiliary: UI Feedback Verification
+
+After API classification, verify the UI correctly communicated the result to the user. BasePage provides configurable `feedbackSuccess` / `feedbackError` locators via `FeedbackConfig` — see `code-patterns.md` § BasePage for setup.
+
+```typescript
+// After successful API response — verify success feedback shown
+if (basePage.feedbackSuccess) {
+  await expect(basePage.feedbackSuccess).toBeVisible({ timeout: 5000 });
+}
+
+// After failed API response — optionally verify feedback matches API error
+const feedbackText = await basePage.getErrorFeedback();
+if (feedbackText) {
+  expect(feedbackText).toContain(body.message);  // UI should reflect API error
+}
+```
+
+> If the project has no UI feedback mechanism (or uses one that's hard to detect), set `FeedbackConfig` to `{}`. The API response remains the primary error source — UI feedback verification is skipped gracefully when unconfigured.
+
+### Auxiliary: Inline Validation Detection
+
+Client-side validation fires **before** any API call. If inline errors appear, no API response will be intercepted:
+
+```typescript
+// Inline validation errors — project-specific selector
+const inlineError = page.locator(".text-destructive");
+if (await inlineError.count() > 0) {
+  const errorText = await inlineError.first().innerText();
+  // Fix field value and resubmit — no API classification needed
+}
+```
+
+### Auxiliary: Page-Level Error States
 
 ```typescript
 // Empty table (data loading issue)

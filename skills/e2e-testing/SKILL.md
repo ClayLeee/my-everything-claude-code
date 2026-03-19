@@ -8,7 +8,11 @@ description: |
   "handle test errors", "retry failed form submission", "classify test failures",
   "test a remote URL", "remote test", "test this URL", "遠端測試", "測試網址",
   "record test", "錄製測試", "錄製", "codegen", "record browser actions", "錄製瀏覽器操作",
-  "測試這個頁面", "幫我測這個功能", "這個功能怎麼驗證", "跑測試", "run tests".
+  "測試這個頁面", "幫我測這個功能", "這個功能怎麼驗證", "跑測試", "run tests",
+  "build POM", "create POM", "Page Object Model", "建 POM", "更新 POM", "POM class",
+  "分析頁面", "page analysis", "analyze page", "分析元件", "semantic analysis",
+  "coverage plan", "覆蓋計畫", "測試計畫", "產生計畫", "generate plan",
+  "更新 analysis", "update analysis", "補 analysis", "重新分析".
   Also trigger when the user discusses test maintenance, recording, locators, test reports, or test coverage gaps.
 ---
 
@@ -18,9 +22,9 @@ Playwright patterns for building stable, fast, and maintainable E2E test suites.
 
 ## Auth & Login Strategy
 
-Test accounts stored in `.env.test.local` (gitignored). Five roles: sysadmin, orgOwner, projectManager, engineer, qa.
+Test accounts stored in `.env.test.local` (gitignored). Define roles matching your project's permission model (e.g., admin, manager, member, viewer).
 
-Use `storageState` to skip login — the auth setup project runs once, saves JWT to `.auth/sysadmin.json`, and all subsequent tests start authenticated. No `beforeEach` login needed.
+Use `storageState` to skip login — the auth setup project runs once, saves JWT to `.auth/{role}.json`, and all subsequent tests start authenticated. No `beforeEach` login needed.
 
 - `.auth/` and `.env.test.local` must be in `.gitignore`
 - For full credential format, auth.setup.ts, and multi-role config, see **`references/auth-patterns.md`**
@@ -29,10 +33,11 @@ Use `storageState` to skip login — the auth setup project runs once, saves JWT
 
 All POM classes extend `BasePage` (`tests/e2e/pages/BasePage.ts`) which provides:
 
-- Shared `page`, `toastSuccess`, `toastError` locators (vue-sonner `[data-sonner-toast][data-type="success|error"]`)
-- `waitForApi(urlPattern)` — wait for API response
+- Shared `page`, configurable `feedbackSuccess` / `feedbackError` locators via `FeedbackConfig` (presets: Sonner, MUI, Ant Design, React Hot Toast, or custom selectors)
+- `interceptApi(urlPattern, action)` — intercept API response, return `{ ok, status, body }` for error classification (primary error detection)
+- `waitForApi(urlPattern)` — fire-and-forget wait for API response
 - `waitForNavigation(urlPattern)` — wait for SPA route change
-- `getSuccessToast()` / `getErrorToast()` — read toast message text
+- `getSuccessFeedback()` / `getErrorFeedback()` — read UI feedback message text (auxiliary verification, returns `null` if unconfigured)
 - Abstract `goto()` — each POM implements its own navigation
 
 For full implementation, see **`references/code-patterns.md`** § BasePage.
@@ -53,7 +58,7 @@ For full POM examples (basic + deep testing), see **`references/code-patterns.md
 
 ## No Mock Data
 
-**All E2E tests must hit the real running dev server.** Never use fabricated API responses. This rule is absolute — there are no exceptions.
+**All E2E tests must hit the real running dev server.** Never use fabricated API responses — mocked responses diverge from real API behavior over time, creating tests that pass locally but miss real bugs. E2E tests exist to verify the full stack as a user experiences it.
 
 ### Forbidden
 
@@ -72,7 +77,7 @@ For full POM examples (basic + deep testing), see **`references/code-patterns.md
 
 ## UI-Only Test Data Policy
 
-All test data manipulation MUST go through the UI — no `request` fixture, no API calls in `beforeEach`/`afterEach`. Tests behave exactly like a real user.
+All test data manipulation goes through the UI — no `request` fixture, no API calls in `beforeEach`/`afterEach`. This ensures tests exercise the same code paths a real user would, catching UI-layer bugs that API-only setup would skip (broken forms, missing validation, incorrect navigation).
 
 ### Naming Convention
 
@@ -85,7 +90,7 @@ Use `[E2E]` prefix for test-created data so it's identifiable and cleanable:
 For **create** tests:
 1. Open dialog/form through UI (click add button)
 2. Fill all required fields through UI interactions
-3. Submit → wait for API response → assert success toast + list update
+3. Submit → wait for API response → assert success feedback + list update
 4. Clean up through UI — search `[E2E]` data → delete via UI delete button
 
 For **edit** tests:
@@ -122,9 +127,9 @@ Not every feature requires all scenario types. Use judgement:
 
 ## Incremental Test Maintenance
 
-When UI code changes, incrementally update tests — never rebuild from scratch. Key rules:
+When UI code changes, incrementally update tests — rebuilding from scratch loses accumulated edge case coverage, flaky markers, and test ordering that were refined over time. Key rules:
 
-- **Never** delete and recreate a spec file — always edit in place
+- Edit spec files in place — deleting and recreating loses git history, flaky annotations, and manual tweaks
 - Preserve existing test order, `test.describe` grouping, and flaky markers
 - Before modifying any spec, produce a Change Analysis (changed files, affected specs, new/obsolete/modified scenarios)
 
@@ -136,7 +141,7 @@ When UI code changes, incrementally update tests — never rebuild from scratch.
 4. `getByPlaceholder()` — For form inputs
 5. CSS selectors — Last resort only
 
-**Never use**: XPath, auto-generated class names
+**Never use**: XPath (breaks on any DOM restructure, unreadable in POM classes, no framework support for injection), auto-generated class names (change every build)
 
 > **Remote Test Mode exception**: When testing remote URLs without source code access, the priority order is reversed: `getByRole()` > `getByText()` > `getByPlaceholder()` > `getByLabel()` > CSS > `[data-testid]` (only if already present on the remote site). See **`references/remote-testing.md`** § Remote Locator Strategy for the full MCP ARIA → Playwright locator mapping table.
 
@@ -158,20 +163,37 @@ When UI code changes, incrementally update tests — never rebuild from scratch.
 
 ### Placement Rules
 
-**Add to:** interactive elements (buttons, links, toggles), all form inputs, tab triggers, table wrappers, dialog content wrappers, toast containers.
+**Add to:** interactive elements (buttons, links, toggles), all form inputs, tab triggers, table wrappers, dialog content wrappers, feedback/notification containers.
 
 **Do NOT add to:** purely decorative elements, layout wrappers, elements already uniquely identifiable by role + accessible name.
 
-### Vue Syntax
+### Framework Syntax
 
-```vue
-<!-- Static -->
-<Button data-testid="project-list-add-btn">新增</Button>
-<!-- Dynamic -->
-<Button :data-testid="`project-list-row-${project.id}-edit-btn`">編輯</Button>
-<!-- shadcn-vue pass-through -->
-<DialogContent data-testid="project-list-edit-dialog">
+**Vue:**
+```html
+<Button data-testid="add-btn">新增</Button>
+<Button :data-testid="`row-${item.id}-edit-btn`">編輯</Button>
 ```
+
+**React / Next.js:**
+```tsx
+<Button data-testid="add-btn">新增</Button>
+<Button data-testid={`row-${item.id}-edit-btn`}>編輯</Button>
+```
+
+**Svelte:**
+```svelte
+<Button data-testid="add-btn">新增</Button>
+<Button data-testid={`row-${item.id}-edit-btn`}>編輯</Button>
+```
+
+**Angular:**
+```html
+<button data-testid="add-btn">新增</button>
+<button [attr.data-testid]="'row-' + item.id + '-edit-btn'">編輯</button>
+```
+
+**UI library pass-through** — most component libraries (shadcn, shadcn-vue, MUI, Radix, etc.) forward `data-testid` to the rendered DOM element. Verify by inspecting the output in DevTools.
 
 The POM class itself serves as the registry of all `data-testid` values — no separate mapping file.
 
@@ -179,10 +201,10 @@ The POM class itself serves as the registry of all `data-testid` values — no s
 
 ### Component Tree Recursive Analysis
 
-1. Read the page's `index.vue` (or main component)
+1. Read the page's main component (e.g., `index.vue`, `page.tsx`, `+page.svelte`, `page.component.ts`)
 2. Identify all imported child components
 3. Recursively read children to find further children
-4. Stop at leaf nodes (shadcn-vue primitives, HTML elements)
+4. Stop at leaf nodes (UI library primitives — shadcn, MUI, Ant Design, etc. — and HTML elements)
 5. Record all interactive elements at each level
 6. For containers with tabs, list every tab panel and its inner components separately in the Coverage Plan — each tab is a sub-page requiring its own analysis
 
@@ -198,7 +220,7 @@ One page = one spec file. Use nested `test.describe` mirroring the component hie
 
 Apply to every container (dialog, tab panel, form) found in the Coverage Plan. Covers four categories: **Container Patterns** (dialog, tabs, popover, accordion), **Data Display** (table, pagination, empty state), **Form Patterns** (fields, validation, submit, select, rich text), and **Action Patterns** (toggle, delete confirm, drag-and-drop, multi-role).
 
-Key mandatory items: every form MUST have a "fill + submit + verify toast" test; every table MUST have row count + per-column-type assertions; every tab panel MUST be treated as a sub-page with its own recursive checklist application.
+Key mandatory items: every form needs a "fill + submit + verify feedback" test (this catches broken submissions that silent-fail); every table needs row count + per-column-type assertions (catches data binding and rendering bugs); every tab panel is treated as a sub-page with its own recursive checklist (tabs often have independent data loading that needs separate coverage).
 
 For the complete checklist with all items and rules, see **`references/coverage-checklist.md`** § Interaction Depth Checklist. For runnable code examples of each pattern, see **`references/ui-patterns.md`**.
 
@@ -224,40 +246,65 @@ Most commands run in a forked subagent (`context: fork`) with their own referenc
 
 ## Running Tests
 
-Always use `pnpm` scripts from `app/` directory (not `npx`):
+Use the project's package manager scripts (not `npx` directly). Set `E2E_REPORT_NAME` to organize reports per page:
 
 ```bash
-cd app
-# Always set E2E_REPORT_NAME to avoid playwright/reports/latest/ fallback
+# Run specific spec with named report
 E2E_REPORT_NAME=project-list pnpm test:e2e -- tests/e2e/projects/project-list.spec.ts
-E2E_REPORT_NAME=login pnpm test:e2e -- tests/e2e/auth/login.spec.ts
-E2E_REPORT_NAME=project-list pnpm test:e2e -- --headed   # See browser
-pnpm test:e2e:ui                                          # Interactive UI (no report)
-pnpm test:e2e:report                                      # View HTML report
+# Run headed (visible browser)
+E2E_REPORT_NAME=project-list pnpm test:e2e -- --headed
+# Interactive UI mode (no report)
+pnpm test:e2e:ui
+# View HTML report
+pnpm test:e2e:report
 ```
+
+> Adapt the commands to your project's `package.json` scripts. The key convention is setting `E2E_REPORT_NAME` so reports go to `playwright/reports/{page-name}/` instead of a generic `latest/` folder.
 
 ## Dual Test Reports
 
-Every test run produces: (1) HTML report at `playwright/reports/{page-name}/` — requires `E2E_REPORT_NAME={page-name}` env var (otherwise falls back to `playwright/reports/latest/`), (2) Markdown report at `playwright/reports/{page-name}/test-report.md` (no date in filename, overwrites on re-run). All paths are relative to the `package.json` directory. Use 繁體中文 for markdown reports, one table per `test.describe` group.
+Every test run produces: (1) HTML report at `playwright/reports/{page-name}/`, (2) Markdown report at `playwright/reports/{page-name}/test-report.md` (no date in filename, overwrites on re-run). All paths are relative to the `package.json` directory. Use 繁體中文 for markdown reports, one table per `test.describe` group.
 
 For the full markdown template, see **`references/report-template.md`**.
 
 ## Additional References
 
-> **Path resolution:** These reference files are in this skill's `references/` directory, adjacent to this SKILL.md file. To locate them reliably (especially in forked subagents where CWD is the user's project):
-> 1. `Glob("**/e2e-testing/SKILL.md")` — finds the skill directory from CWD (works during plugin development)
-> 2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches the plugin cache
-> 3. Extract the directory path from the result (remove `/SKILL.md` suffix) → `$SKILL_DIR`
-> 4. Read references as `$SKILL_DIR/references/{filename}`
+### Resolve `$SKILL_DIR` {#resolve-skill-dir}
 
-- **`references/auth-patterns.md`** — Credential format, auth.setup.ts, multi-role storageState
-- **`references/code-patterns.md`** — BasePage implementation, POM examples (including tab-internal locators), test structure, flaky patterns, artifact config, codegen workflow
+All commands need the skill directory path to access references, scripts, and templates. Resolve it once per session:
+
+1. `Glob("**/e2e-testing/SKILL.md")` — searches from CWD (works during plugin development)
+2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches the plugin cache
+3. Extract the directory path from the result (remove `/SKILL.md` suffix) → `$SKILL_DIR`
+4. Access resources as `$SKILL_DIR/references/`, `$SKILL_DIR/scripts/`, `$SKILL_DIR/templates/`
+
+### Scripts
+
+- **`scripts/scaffold.js`** — Template scaffolder: reads templates, replaces `{{VAR}}` placeholders, writes to target paths. stdin JSON: `{ targetDir, templates[], variables{}, overwrite }` → stdout JSON: `{ created[], skipped[], errors[] }`
+- **`scripts/generate-report.js`** — Report generator: calculates summary stats, generates 繁體中文 markdown report. stdin JSON: `{ pageName, pageNameZh, testDate, testUrl, testAccount, describeGroups[], outputDir }` → stdout JSON: `{ outputPath, summary }`
+
+### Templates
+
+- **`templates/BasePage.ts`** — Full BasePage class with FeedbackConfig, FeedbackSelector, FEEDBACK_PRESETS (sonner, mui, antd, reactHotToast, dataTestId)
+- **`templates/RemoteBasePage.ts`** — Minimal remote testing base class (no FeedbackConfig)
+- **`templates/playwright.config.local.ts`** — Local config with `{{BASE_URL}}`, `{{WEB_SERVER_COMMAND}}` placeholders
+- **`templates/playwright.config.remote.ts`** — Remote config with `{{BASE_URL}}` placeholder, no webServer
+- **`templates/auth.ts`** — Credential loader (dotenv → accounts object)
+- **`templates/auth.setup.ts`** — Auth setup project (sysadmin login → storageState)
+- **`templates/env.test.local`** — .env.test.local template with role-based credential vars
+- **`templates/error-utils.ts`** — ErrorClassificationConfig interface, classifyApiError function, submitAndIntercept helper
+
+### References
+
+- **`references/auth-patterns.md`** — storageState concept, multi-role auth guidance, scaffold pointers
+- **`references/code-patterns.md`** — BasePage API surface, POM examples (including tab-internal locators), test structure, flaky patterns, artifact config, codegen workflow
 - **`references/coverage-checklist.md`** — Coverage Plan decomposition rules, validation rules, Interaction Depth Checklist details
-- **`references/error-discrimination.md`** — Error Discrimination Framework: error classification decision flow, recoverable vs non-recoverable determination, retry strategy, detection code examples
+- **`references/error-discrimination.md`** — Error Discrimination Framework: error classification decision flow, recoverable vs non-recoverable determination, retry strategy, code examples (with import from error-utils)
 - **`references/mcp-discovery.md`** — MCP-Driven Test Discovery: session auth, page exploration, form dry-run, MCP→Spec translation
-- **`references/report-template.md`** — Markdown report template and rules
+- **`references/report-template.md`** — Report generation via generate-report.js, key rules
 - **`references/semantic-analysis.md`** — Semantic Analysis: recursive extraction procedure, Semantic Element Table (SET), behavior taxonomy, column assertion rules, worked example
 - **`references/test-data-policy.md`** — UI-Only Test Data Policy: forbidden API patterns, lifecycle examples (create with cleanup, edit/delete with setup)
-- **`references/remote-testing.md`** — Remote Test Mode: scaffold minimal Playwright project, MCP auth bridging, remote locator strategy, MCP exploration workflow, RemoteBasePage pattern
-- **`references/ui-patterns.md`** — UI pattern testing code examples: table, select, form, pagination, nested specs
+- **`references/remote-testing.md`** — Remote Test Mode: scaffold via script, MCP auth bridging, remote locator strategy, MCP exploration workflow
+- **`references/ui-patterns.md`** — Core UI pattern code examples: table, select, form, edit, pagination, search, toggle, delete, nested specs
+- **`references/ui-patterns-extended.md`** — Extended UI patterns (load on-demand): sortable columns, tabs, accordion, popover/filter, date picker, rich text editor, file upload, drag-and-drop
 - **`references/recording-patterns.md`** — Codegen workflow, locator transformation rules, auto-assignment algorithm, CRUD flow detection, code generation templates

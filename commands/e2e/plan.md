@@ -1,12 +1,9 @@
 ---
 name: "e2e:plan"
 description: "Generate coverage plan from page analysis for E2E testing"
-category: E2E Testing
-tags: [e2e, playwright, plan, coverage]
 model: sonnet
 context: fork
-skills:
-  - e2e-testing
+allowed-tools: Read, Glob, Grep, Write
 ---
 
 # E2E Plan — Coverage Plan Generation
@@ -26,19 +23,13 @@ Look for `playwright/{page-name}/analysis.md` files (relative to `package.json` 
 
 ## Step 2: Locate Skill Directory & Load References (MANDATORY)
 
-**Step 2a: Find the skill directory**
-Locate the e2e-testing skill directory by finding its SKILL.md:
-1. `Glob("**/e2e-testing/SKILL.md")` — searches CWD (works during plugin development)
-2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches plugin cache
+**Resolve `$SKILL_DIR`** per SKILL.md § Resolve `$SKILL_DIR` — Glob for `**/e2e-testing/SKILL.md`, extract directory path.
 
-Extract the **directory path** from the result (remove `/SKILL.md` suffix). This is `$SKILL_DIR`.
+**Read references** from `$SKILL_DIR/references/`:
+- `coverage-checklist.md` — interaction depth checklist and coverage requirements
+- `ui-patterns.md` — core UI interaction patterns (table, form, select, pagination, search, toggle, delete, edit)
 
-**Step 2b: Read references**
-Read the following files using `$SKILL_DIR/references/{filename}`:
-- `$SKILL_DIR/references/coverage-checklist.md` — interaction depth checklist and coverage requirements
-- `$SKILL_DIR/references/ui-patterns.md` — UI interaction patterns for tables, forms, tabs, selects, pagination
-
-Do NOT proceed without reading all listed files. If both Glob attempts fail, report the error and stop.
+Do NOT proceed without reading. If resolution fails, report the error and stop.
 
 ## Step 3: Read Analysis Artifact
 

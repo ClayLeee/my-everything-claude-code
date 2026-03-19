@@ -20,7 +20,7 @@ Use `[E2E]` prefix for test-created data: `[E2E] Create Test`, `[E2E] Delete Tar
 
 1. Open dialog/form through UI (click add button)
 2. Fill all required fields through UI interactions
-3. Submit → wait for API response → assert success toast + list update
+3. Submit → wait for API response → assert success feedback + list update
 4. **Clean up through UI** — search `[E2E]` data → delete via UI. If no delete UI exists, accept persistence (document in comment)
 
 ### Edit Tests
@@ -47,7 +47,7 @@ test.describe.serial('Create → Verify → Delete', () => {
   const TEST_NAME = `[E2E] Test ${Date.now().toString(36)}`
 
   test('should create item via UI form', async ({ page }) => {
-    // open dialog → fill → submit → assert toast
+    // open dialog → fill → submit → assert feedback
   })
   test('should verify created item in list', async ({ page }) => {
     // search → assert visible
@@ -65,7 +65,7 @@ test.describe('Create Project', () => {
   test.describe.serial('Create → Cleanup', () => {
     const TEST_NAME = `[E2E] Create Test ${Date.now().toString(36)}`
 
-    test('should create project and show success toast', async ({ page }) => {
+    test('should create project and show success feedback', async ({ page }) => {
       const listPage = new ProjectListPage(page)
       await listPage.goto()
       await listPage.addButton.click()
@@ -73,8 +73,8 @@ test.describe('Create Project', () => {
       const apiPromise = listPage.waitForApi('/v3/projects')
       await listPage.createDialog.submitBtn.click()
       await apiPromise
-      const toast = await listPage.getSuccessToast()
-      expect(toast).toContain('成功')
+      const feedback = await listPage.getSuccessFeedback()
+      expect(feedback).toContain('成功')
     })
 
     test('should clean up via UI delete', async ({ page }) => {
@@ -87,8 +87,8 @@ test.describe('Create Project', () => {
       const name = await listPage.tableRows.first().locator('td').first().textContent()
       await listPage.deleteDialog.confirmInput.fill(name?.trim() ?? '')
       await listPage.deleteDialog.submitBtn.click()
-      const toast = await listPage.getSuccessToast()
-      expect(toast).toContain('成功')
+      const feedback = await listPage.getSuccessFeedback()
+      expect(feedback).toContain('成功')
     })
   })
 })
@@ -110,7 +110,7 @@ test.describe('Delete Project', () => {
       const apiPromise = listPage.waitForApi('/v3/projects')
       await listPage.createDialog.submitBtn.click()
       await apiPromise
-      expect(await listPage.getSuccessToast()).toContain('成功')
+      expect(await listPage.getSuccessFeedback()).toContain('成功')
     })
 
     test('should delete after confirmation', async ({ page }) => {
@@ -125,7 +125,7 @@ test.describe('Delete Project', () => {
       const apiPromise = listPage.waitForApi('/v3/projects/')
       await listPage.deleteDialog.submitBtn.click()
       await apiPromise
-      expect(await listPage.getSuccessToast()).toContain('成功')
+      expect(await listPage.getSuccessFeedback()).toContain('成功')
     })
   })
 })

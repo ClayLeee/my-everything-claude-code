@@ -66,38 +66,13 @@ Scaffold Playwright in the **current working directory**. If `playwright.config.
 
 ### playwright.config.ts Template
 
-```typescript
-import { defineConfig } from '@playwright/test';
+Scaffold via:
 
-const reportName = process.env.E2E_REPORT_NAME || 'latest';
-
-export default defineConfig({
-  testDir: './tests/e2e',
-  fullyParallel: false,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 1,
-  workers: 1,
-  timeout: 30_000,
-  expect: { timeout: 10_000 },
-
-  reporter: [
-    ['list'],
-    ['html', { outputFolder: `playwright/reports/${reportName}`, open: 'never' }],
-  ],
-
-  use: {
-    baseURL: '{REMOTE_URL}',  // Replace with actual target URL
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    // storageState: '.auth/remote.json',  // Uncomment if auth needed
-  },
-
-  outputDir: 'playwright/test-results',
-
-  // No webServer — testing remote URL directly
-});
+```bash
+echo '{"targetDir":".","templates":["playwright.config.remote"],"variables":{"BASE_URL":"https://example.com"}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
+
+This creates a config with: no `webServer`, `fullyParallel: false`, `workers: 1`, `storageState` commented out (uncomment if auth needed).
 
 ### Setup Commands
 
@@ -288,32 +263,15 @@ After exploration, produce a Discovery Report documenting:
 
 ## RemoteBasePage Pattern
 
-```typescript
-import { type Page } from '@playwright/test';
+Scaffold via:
 
-export abstract class RemoteBasePage {
-  constructor(protected page: Page) {}
-
-  abstract goto(): Promise<void>;
-
-  async waitForNavigation(urlPattern: string | RegExp) {
-    await this.page.waitForURL(urlPattern, { timeout: 15_000 });
-  }
-
-  async waitForApi(urlPattern: string | RegExp) {
-    return this.page.waitForResponse(
-      (response) => {
-        const url = response.url();
-        if (typeof urlPattern === 'string') return url.includes(urlPattern);
-        return urlPattern.test(url);
-      },
-      { timeout: 15_000 }
-    );
-  }
-}
+```bash
+echo '{"targetDir":".","templates":["RemoteBasePage"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
-**Note**: This does NOT extend the local project's `BasePage`. It is an independent minimal base class because there is no local project to inherit from. No `toastSuccess`/`toastError` locators — toast selectors vary by site and must be discovered via MCP exploration.
+This creates `tests/e2e/pages/RemoteBasePage.ts` — an independent minimal base class with `goto()`, `waitForNavigation()`, and `waitForApi()`.
+
+**Note**: This does NOT extend the local project's `BasePage`. It is an independent minimal base class because there is no local project to inherit from. No `feedbackSuccess`/`feedbackError` locators — UI feedback selectors vary by site and must be discovered via MCP exploration.
 
 ## Test Scenario Generation Rules
 
@@ -345,7 +303,7 @@ All other fields follow the existing template.
 
 1. **No `data-testid` injection** — Locators rely on ARIA roles and text; may break if the remote site changes its UI text or structure
 2. **No internal API access** — Cannot call backend endpoints directly; use `waitForResponse` with observable URL patterns from network tab
-3. **Toast/notification locators are site-specific** — Cannot assume `vue-sonner` or any specific toast library; must discover via MCP exploration
+3. **Toast/notification locators are site-specific** — Cannot assume Sonner or any specific toast library; must discover via MCP exploration
 4. **Form validation behavior varies** — Must be explored empirically; inline errors, toast errors, and redirect patterns differ per site
 5. **Cookie limitations** — `httpOnly` cookies cannot be exported via JavaScript; if the site uses httpOnly session cookies, storageState bridging may be incomplete. In such cases, consider using Playwright's own login flow in a setup project
 6. **CORS and CSP** — Some sites may block Playwright's browser context; if tests fail with security errors, report to user

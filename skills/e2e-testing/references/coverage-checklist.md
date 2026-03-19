@@ -5,7 +5,7 @@
 ### Decomposition Rules
 
 - **Tabbed containers** — Each tab panel gets its own row(s). Tab switching alone is NOT valid. Analyze the component rendered inside each tab and list its interactive elements separately.
-- **Dialogs with forms** — List every form's fields. Every form MUST have a "fill + submit + verify toast" scenario.
+- **Dialogs with forms** — List every form's fields. Every form MUST have a "fill + submit + verify feedback" scenario.
 - **Nested dialogs** — If a tab/dialog opens another dialog (e.g. "Add Member" inside Members tab), that inner dialog gets its own row.
 
 ### Validation Rules
@@ -14,7 +14,7 @@ Apply before writing any test code:
 
 1. **Every component found in recursive analysis MUST appear** — if excluded, add a row with reason: `N/A — no interactive elements`
 2. **Every tab panel MUST have its own row(s)** with the tab's internal interactive elements — not just "tab switching"
-3. **Every form MUST have a "fill + submit + verify toast" scenario** — never optional
+3. **Every form MUST have a "fill + submit + verify feedback" scenario** — never optional
 4. **Every table inside a tab MUST have row count + column assertions** — not just "table is visible"
 5. **Every CRUD button inside a tab MUST have its own test scenario**
 6. **Count check**: `number of Coverage Plan rows` ≥ `number of non-leaf components in tree`. Fewer rows = missed components
@@ -41,10 +41,10 @@ Apply to every container (dialog, tab panel, form) found in the Coverage Plan. A
 
 - **Form fields** — verify all expected fields are present. Fill all required fields with valid data.
 - **Required field validation** — submit empty or clear a required field, expect error message or disabled submit.
-- **Form submit success** — **MANDATORY.** Fill valid data → submit → verify success toast + data update. Extend timeout for slow operations instead of skipping.
-- **Form submit failure** — invalid input that triggers real API error → verify error toast or inline error.
-- **Select / Dropdown** — click trigger → wait for content visible → select option → verify trigger displays selected value. Note: shadcn-vue portals dropdown content outside the parent container.
-- **Rich text editor (Tiptap)** — click editor → type text → verify content appears. Do NOT test toolbar formatting unless requested.
+- **Form submit success** — **MANDATORY.** Fill valid data → submit → verify success feedback + data update. Extend timeout for slow operations instead of skipping.
+- **Form submit failure** — invalid input that triggers real API error → verify error feedback or inline error.
+- **Select / Dropdown** — click trigger → wait for content visible → select option → verify trigger displays selected value. Note: many UI libraries (shadcn, Radix, Headless UI, MUI, etc.) portal dropdown content outside the parent container.
+- **Rich text editor** — click editor → type text → verify content appears. Do NOT test toolbar formatting unless requested.
 
 ### Action Patterns
 

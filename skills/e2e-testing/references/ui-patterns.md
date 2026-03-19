@@ -1,6 +1,24 @@
 # UI Pattern Testing Examples
 
-Runnable code patterns for common UI interactions. Each section corresponds to a behavior from the Behavior Taxonomy in `semantic-analysis.md`.
+Core code patterns for common UI interactions. Each section corresponds to a behavior from the Behavior Taxonomy in `semantic-analysis.md` or the Interaction Depth Checklist in `coverage-checklist.md`.
+
+For specialized patterns (sortable columns, tabs, accordion, popover, date picker, rich text editor, file upload, drag and drop), see **`ui-patterns-extended.md`**.
+
+## Table of Contents
+
+- [Table Display & Row Assertions](#table-display--row-assertions) (row count, column content, action buttons)
+- [Select / Dropdown (Portaled Content)](#select--dropdown-portaled-content) (handling portaled dropdowns from UI libraries)
+- [Form Fill + Submit + Feedback](#form-fill--submit--feedback) (serial create + cleanup with API wait and feedback)
+- [Form Submit with API Interception](#form-submit-with-api-interception) (interceptApi for precise error classification)
+- [Form Validation (Empty / Invalid Fields)](#form-validation-empty--invalid-fields) (inline error, cancel reset)
+- [Edit Flow (Read → Modify → Save → Restore)](#edit-flow-read--modify--save--restore) (record original, edit via UI, restore)
+- [Pagination](#pagination) (page info display, next page navigation)
+- [Search / Filter](#search--filter) (keyword filtering, empty state)
+- [Toggle / Switch](#toggle--switch) (toggle state, API wait, restore)
+- [Delete with Confirmation Dialog](#delete-with-confirmation-dialog) (serial create target + delete with confirm input)
+- [Nested Spec Structure (Tabbed Dialog)](#nested-spec-structure-tabbed-dialog) (mirroring component hierarchy with test.describe)
+
+---
 
 ## Table Display & Row Assertions
 
@@ -28,9 +46,9 @@ test.describe('Table Display', () => {
 })
 ```
 
-## Select / Dropdown (shadcn-vue)
+## Select / Dropdown (Portaled Content)
 
-shadcn-vue portals dropdown content outside the parent container. Target the portal content directly:
+Many UI libraries (shadcn, shadcn-vue, Radix, Headless UI, MUI, etc.) portal dropdown content outside the parent container. Target the portal content directly:
 
 ```typescript
 test('should select role from dropdown', async () => {
@@ -46,7 +64,7 @@ test('should select role from dropdown', async () => {
 })
 ```
 
-## Form Fill + Submit + Toast
+## Form Fill + Submit + Feedback
 
 ```typescript
 test.describe.serial('Create Item → Cleanup', () => {
@@ -65,8 +83,8 @@ test.describe.serial('Create Item → Cleanup', () => {
     await listPage.createDialog.submitBtn.click()
     await apiPromise
 
-    const toast = await listPage.getSuccessToast()
-    expect(toast).toContain('成功')
+    const feedback = await listPage.getSuccessFeedback()
+    expect(feedback).toContain('成功')
   })
 
   test('should clean up created item via UI', async () => {
@@ -84,8 +102,55 @@ test.describe.serial('Create Item → Cleanup', () => {
     await listPage.deleteDialog.submitBtn.click()
     await apiPromise
 
-    expect(await listPage.getSuccessToast()).toContain('成功')
+    expect(await listPage.getSuccessFeedback()).toContain('成功')
   })
+})
+```
+
+## Form Submit with API Interception
+
+Use `interceptApi` for precise error classification instead of relying on UI feedback alone. See `error-discrimination.md` for the full classification framework.
+
+```typescript
+test('should create item with API verification', async () => {
+  await listPage.addButton.click()
+  await expect(listPage.createDialog.container).toBeVisible()
+
+  await listPage.createDialog.nameInput.fill(`[E2E] Test ${Date.now().toString(36)}`)
+
+  // interceptApi: capture HTTP status + response body
+  const { ok, status, body } = await listPage.interceptApi(
+    '/v3/items',
+    () => listPage.createDialog.submitBtn.click()
+  )
+
+  expect(ok).toBe(true)
+  expect(status).toBe(200)
+
+  // Auxiliary: verify UI feedback rendered correctly
+  if (listPage.feedbackSuccess) {
+    await expect(listPage.feedbackSuccess).toBeVisible()
+  }
+})
+
+test('should handle duplicate name error via API response', async () => {
+  await listPage.addButton.click()
+  await listPage.createDialog.nameInput.fill('existing-item-name')
+
+  const { ok, status, body } = await listPage.interceptApi(
+    '/v3/items',
+    () => listPage.createDialog.submitBtn.click()
+  )
+
+  expect(ok).toBe(false)
+  expect(status).toBe(409)
+  // Structured API response provides field-level detail
+  expect(body.field).toBe('name')
+
+  // Auxiliary: verify error feedback shown to user
+  if (listPage.feedbackError) {
+    await expect(listPage.feedbackError).toBeVisible()
+  }
 })
 ```
 
@@ -112,6 +177,60 @@ test('should reset form on cancel', async () => {
   // Reopen — form should be empty
   await listPage.addButton.click()
   await expect(listPage.createDialog.nameInput).toHaveValue('')
+})
+```
+
+## Edit Flow (Read → Modify → Save → Restore)
+
+Edit uses existing data — do NOT create via API. Record original values, edit through UI, assert success, then restore.
+
+```typescript
+test.describe('Edit Item', () => {
+  let originalName: string
+
+  test('should edit name and save', async () => {
+    // Open edit dialog for first row
+    await listPage.tableRows.first().locator('[data-testid="edit-btn"]').click()
+    await expect(listPage.editDialog.container).toBeVisible()
+
+    // Record original value
+    originalName = await listPage.editDialog.nameInput.inputValue()
+
+    // Modify
+    const newName = `${originalName} [EDITED]`
+    await listPage.editDialog.nameInput.clear()
+    await listPage.editDialog.nameInput.fill(newName)
+
+    // Submit and verify
+    const { ok } = await listPage.interceptApi(
+      '/v3/items/',
+      () => listPage.editDialog.submitBtn.click()
+    )
+    expect(ok).toBe(true)
+
+    if (listPage.feedbackSuccess) {
+      await expect(listPage.feedbackSuccess).toBeVisible()
+    }
+
+    // Verify the change is reflected in the table
+    await expect(listPage.tableRows.first()).toContainText(newName)
+  })
+
+  test('should restore original name', async () => {
+    await listPage.tableRows.first().locator('[data-testid="edit-btn"]').click()
+    await expect(listPage.editDialog.container).toBeVisible()
+
+    await listPage.editDialog.nameInput.clear()
+    await listPage.editDialog.nameInput.fill(originalName)
+
+    const { ok } = await listPage.interceptApi(
+      '/v3/items/',
+      () => listPage.editDialog.submitBtn.click()
+    )
+    expect(ok).toBe(true)
+
+    await expect(listPage.tableRows.first()).toContainText(originalName)
+  })
 })
 ```
 
@@ -194,7 +313,7 @@ test.describe.serial('Create Target → Delete', () => {
     const apiPromise = listPage.waitForApi('/v3/items')
     await listPage.createDialog.submitBtn.click()
     await apiPromise
-    expect(await listPage.getSuccessToast()).toContain('成功')
+    expect(await listPage.getSuccessFeedback()).toContain('成功')
   })
 
   test('should delete with confirmation', async () => {
@@ -211,7 +330,7 @@ test.describe.serial('Create Target → Delete', () => {
     const apiPromise = listPage.waitForApi('/v3/items/')
     await listPage.deleteDialog.submitBtn.click()
     await apiPromise
-    expect(await listPage.getSuccessToast()).toContain('成功')
+    expect(await listPage.getSuccessFeedback()).toContain('成功')
   })
 })
 ```
@@ -223,6 +342,7 @@ Mirror the component hierarchy with `test.describe` nesting. Each tab panel gets
 ```typescript
 test.describe('Project List Page', () => {
   test.describe('Table Display', () => { /* row count + per-column assertions */ })
+  test.describe('Table Sorting', () => { /* click header → verify order */ })
   test.describe('Search', () => { /* keyword + empty state */ })
 
   test.describe('Create Project Dialog', () => {
@@ -234,20 +354,20 @@ test.describe('Project List Page', () => {
   test.describe('Edit Project Dialog', () => {
     test.describe('Info Tab', () => {
       test('should display prefilled fields', async () => { /* open → check values */ })
-      test('should edit and save', async () => { /* change → submit → toast → restore */ })
+      test('should edit and save', async () => { /* change → submit → verify → restore */ })
     })
 
     test.describe('Members Tab', () => {
       test('should display members table', async () => { /* row count + columns */ })
       test.describe.serial('Add Member → Remove', () => {
-        test('should add member via form', async () => { /* fill → submit → toast */ })
+        test('should add member via form', async () => { /* fill → submit → feedback */ })
         test('should remove added member', async () => { /* click delete → confirm → removal */ })
       })
     })
 
     test.describe('Settings Tab', () => {
       test('should toggle feature flag', async () => { /* toggle → restore */ })
-      test('should save settings', async () => { /* change → submit → toast */ })
+      test('should save settings', async () => { /* change → submit → feedback */ })
     })
   })
 

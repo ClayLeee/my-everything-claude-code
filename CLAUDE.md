@@ -64,6 +64,12 @@ All under `scripts/hooks/`, written in Node.js (pure stdlib, no npm dependencies
 - **session-aliases.js** — session aliasing system
 - **notifier.js** — cross-platform sound + Toast notification (Windows/macOS/Linux), config via `~/.claude/homunculus/notify-config.json`
 
+### E2E Testing Scripts
+
+Under `skills/e2e-testing/scripts/`, same convention as hook scripts (stdin JSON → stdout JSON, pure stdlib):
+- **scaffold.js** — reads templates from `../templates/`, replaces `{{VAR}}` placeholders, writes to target project paths
+- **generate-report.js** — calculates test summary stats, generates 繁體中文 markdown report
+
 ## Code Conventions
 
 ### Script Requirements
@@ -72,6 +78,9 @@ All under `scripts/hooks/`, written in Node.js (pure stdlib, no npm dependencies
 - Error handling: try-catch with silent failures, never crash the plugin
 - File I/O: synchronous, check existence before operations, ensure directories exist before writing
 - Hook scripts read JSON from stdin and write JSON to stdout; diagnostic output goes to stderr
+
+### Command Frontmatter
+Per official Claude Code docs, valid fields: `name`, `description`, `argument-hint`, `model`, `context`, `allowed-tools`, `disable-model-invocation`, `user-invocable`, `agent`, `hooks`. Do NOT use: `category`, `tags`, `args`, `skills` (these have no effect in command frontmatter).
 
 ### Allowed Documentation Files
 The hook system blocks creation of `.md` files except: `README.md`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SKILL.md`, `MEMORY.md`, `HOOKS.md`, and any `.md` files under `playwright/` directories (E2E analysis/plan/report artifacts).
@@ -113,8 +122,7 @@ All agents output in 繁體中文.
 ### Skills (`skills/`)
 
 - **continuous-learning-v2** — Instinct-based learning from session observations (core system, see above)
-- **e2e-testing** — Playwright E2E testing patterns: POM examples, config templates, flaky test strategies, artifact management, multi-role test credentials
-- **serena-tool-selection** — Decision framework for choosing between Serena LSP semantic tools and basic tools (Grep, Read, Glob, Edit)
+- **e2e-testing** — Playwright E2E testing patterns with 3-level progressive disclosure: SKILL.md (core conventions, ~310 lines) → references/ (12 judgment-based guides) → templates/ (8 deterministic code files) + scripts/ (scaffold.js, generate-report.js). Commands resolve `$SKILL_DIR` via Glob and load only the references they need
 
 ### Commands
 

@@ -1,12 +1,8 @@
 ---
 name: "e2e:maintain"
 description: "Incrementally update E2E tests based on code changes or verbal descriptions, run tests, and generate reports"
-category: E2E Testing
-tags: [e2e, playwright, maintain, update, incremental]
 model: sonnet
 context: fork
-skills:
-  - e2e-testing
 ---
 
 # E2E Maintain — Incremental Update + Execute + Report
@@ -17,21 +13,14 @@ All output must be in **繁體中文**.
 
 ## Step 1: Locate Skill Directory & Load References (MANDATORY)
 
-**Step 1a: Find the skill directory**
-Locate the e2e-testing skill directory by finding its SKILL.md:
-1. `Glob("**/e2e-testing/SKILL.md")` — searches CWD (works during plugin development)
-2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches plugin cache
+**Resolve `$SKILL_DIR`** per SKILL.md § Resolve `$SKILL_DIR` — Glob for `**/e2e-testing/SKILL.md`, extract directory path.
 
-Extract the **directory path** from the result (remove `/SKILL.md` suffix). This is `$SKILL_DIR`.
+**Read references** from `$SKILL_DIR/references/`:
+- `error-discrimination.md` — error classification framework
+- `code-patterns.md` — POM and spec patterns for updates
+- `coverage-checklist.md` — interaction depth checklist and coverage requirements
 
-**Step 1b: Read references**
-Read the following files using `$SKILL_DIR/references/{filename}`:
-- `$SKILL_DIR/references/error-discrimination.md` — error classification framework
-- `$SKILL_DIR/references/code-patterns.md` — POM and spec patterns for updates
-- `$SKILL_DIR/references/coverage-checklist.md` — interaction depth checklist and coverage requirements
-- `$SKILL_DIR/references/report-template.md` — markdown report template and rules
-
-Do NOT proceed without reading all listed files. If both Glob attempts fail, report the error and stop.
+Do NOT proceed without reading. If resolution fails, report the error and stop.
 
 ## Step 2: Determine Change Scope
 
@@ -101,7 +90,11 @@ IF any test fails:
 ## Step 7: Generate Dual Reports
 
 1. **HTML report** — `playwright/reports/{page-name}/`
-2. **Markdown report** — `playwright/reports/{page-name}/test-report.md` per `references/report-template.md`
+2. **Markdown report** — Generate via `generate-report.js`:
+
+```bash
+echo '{"pageName":"{page-name}","pageNameZh":"{page-name-zh}","testDate":"YYYY-MM-DD","testUrl":"{test-url}","testAccount":"{account}","describeGroups":[...],"outputDir":"playwright/reports/{page-name}"}' | node $SKILL_DIR/scripts/generate-report.js
+```
 
 ## Step 8: Completion
 

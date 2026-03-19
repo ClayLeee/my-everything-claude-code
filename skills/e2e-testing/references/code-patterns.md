@@ -14,54 +14,50 @@
 
 ## BasePage Shared Class — `tests/e2e/pages/BasePage.ts`
 
-All POM classes extend `BasePage` to share common functionality:
+All POM classes extend `BasePage` to share common functionality. The full implementation is in the **scaffold template** — use `scaffold.js` to create it:
+
+```bash
+echo '{"targetDir":"app","templates":["BasePage"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
+```
+
+**Key API surface:**
+- `constructor(page, feedback?)` — accepts a `FeedbackConfig` (presets: `sonner`, `mui`, `antd`, `reactHotToast`, `dataTestId`, or custom)
+- `interceptApi(urlPattern, action)` — intercept API response → `{ ok, status, body }` for error classification
+- `waitForApi(urlPattern)` — fire-and-forget wait for API response
+- `waitForNavigation(urlPattern)` — wait for SPA route change
+- `getSuccessFeedback()` / `getErrorFeedback()` — read UI feedback message text (returns `null` if unconfigured)
+- Abstract `goto()` — each POM implements its own navigation
+
+### Usage per project
 
 ```typescript
-import type { Locator, Page } from "@playwright/test";
+// Sonner project (default)
+class MyPage extends BasePage {
+  constructor(page: Page) { super(page); }
+}
 
-export abstract class BasePage {
-  readonly page: Page;
-  // vue-sonner renders [data-sonner-toast] with [data-type] attribute
-  readonly toastSuccess: Locator;
-  readonly toastError: Locator;
+// MUI project
+class MyPage extends BasePage {
+  constructor(page: Page) { super(page, FEEDBACK_PRESETS.mui); }
+}
 
+// Custom selectors
+class MyPage extends BasePage {
   constructor(page: Page) {
-    this.page = page;
-    this.toastSuccess = page.locator('[data-sonner-toast][data-type="success"]');
-    this.toastError = page.locator('[data-sonner-toast][data-type="error"]');
-  }
-
-  /** Navigate to the page's route */
-  abstract goto(): Promise<void>;
-
-  /** Wait for API response matching the URL pattern */
-  async waitForApi(urlPattern: string, status = 200) {
-    await this.page
-      .waitForResponse(
-        (resp) => resp.url().includes(urlPattern) && resp.status() === status,
-        { timeout: 10000 }
-      )
-      .catch(() => {});
-  }
-
-  /** Wait for navigation to complete */
-  async waitForNavigation(urlPattern: string) {
-    await this.page.waitForURL(urlPattern, { timeout: 15000 });
-  }
-
-  /** Get toast success message text (targets [data-content] for message only) */
-  async getSuccessToast(): Promise<string> {
-    await this.toastSuccess.waitFor({ state: "visible", timeout: 5000 });
-    return this.toastSuccess.locator("[data-content]").innerText();
-  }
-
-  /** Get toast error message text (targets [data-content] for message only) */
-  async getErrorToast(): Promise<string> {
-    await this.toastError.waitFor({ state: "visible", timeout: 5000 });
-    return this.toastError.locator("[data-content]").innerText();
+    super(page, {
+      success: { selector: ".toast-success", textSelector: ".toast-body" },
+      error: { selector: ".toast-error", textSelector: ".toast-body" },
+    });
   }
 }
+
+// No UI feedback (API-only verification)
+class MyPage extends BasePage {
+  constructor(page: Page) { super(page, {}); }
+}
 ```
+
+> **Error handling:** Use `interceptApi()` as the primary error detection method — it returns HTTP status and response body for precise classification. `getSuccessFeedback()` / `getErrorFeedback()` serve as auxiliary verification that the UI correctly communicated the result. See **`error-discrimination.md`** for the full API-first classification framework.
 
 ## POM Examples
 
@@ -273,50 +269,14 @@ After recording:
 >
 > **Test Data Lifecycle** — see `test-data-policy.md` for UI-Only test data lifecycle examples (create with cleanup, delete with setup).
 >
-> **UI Pattern Testing** — see `ui-patterns.md` for runnable code patterns (table, select, form, pagination, nested specs).
+> **UI Pattern Testing** — see `ui-patterns.md` for core patterns (table, form, select, edit, pagination, search, toggle, delete) and `ui-patterns-extended.md` for specialized patterns (tabs, accordion, date picker, rich text, file upload, drag-and-drop).
 
 ## Playwright Configuration Template — `playwright.config.ts`
 
-```typescript
-import { defineConfig, devices } from '@playwright/test'
+Use `scaffold.js` to create the config with project-specific values:
 
-export default defineConfig({
-  testDir: './tests/e2e',
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: [
-    ['html', { outputFolder: 'playwright/reports' }],
-  ],
-  outputDir: 'playwright/test-results',
-  use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:5173',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    actionTimeout: 10000,
-    navigationTimeout: 30000,
-  },
-  projects: [
-    {
-      name: "setup",
-      testMatch: /.*\.setup\.ts/,
-    },
-    {
-      name: 'chromium',
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: ".auth/sysadmin.json",
-      },
-      dependencies: ["setup"],
-    },
-  ],
-  webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
-})
+```bash
+echo '{"targetDir":"app","templates":["playwright.config.local"],"variables":{"BASE_URL":"http://localhost:5173","WEB_SERVER_COMMAND":"pnpm dev"}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
+
+For remote testing, use `playwright.config.remote` template instead. See `templates/` for the full source.

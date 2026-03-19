@@ -1,62 +1,16 @@
 # Auth Patterns
 
-## Test Credentials — `.env.test.local` Format
+## Test Credentials & Auth Loader
 
-```env
-# Sysadmin — system-level administration
-TEST_AD_USERNAME=
-TEST_AD_PASSWORD=
+Scaffold `.env.test.local` and `tests/fixtures/auth.ts` via:
 
-# Organization Owner — organization management
-TEST_OO_USERNAME=
-TEST_OO_PASSWORD=
-
-# Project Manager — project-level management
-TEST_PM_USERNAME=
-TEST_PM_PASSWORD=
-
-# Engineer (RD) — development tasks
-TEST_RD_USERNAME=
-TEST_RD_PASSWORD=
-
-# QA — testing and quality assurance
-TEST_QA_USERNAME=
-TEST_QA_PASSWORD=
+```bash
+echo '{"targetDir":"app","templates":["env.test.local","auth"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
-## Loading Credentials — `tests/fixtures/auth.ts`
-
-```typescript
-import dotenv from 'dotenv'
-import path from 'path'
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env.test.local') })
-
-export const accounts = {
-  sysadmin: {
-    username: process.env.TEST_AD_USERNAME!,
-    password: process.env.TEST_AD_PASSWORD!,
-  },
-  orgOwner: {
-    username: process.env.TEST_OO_USERNAME!,
-    password: process.env.TEST_OO_PASSWORD!,
-  },
-  projectManager: {
-    username: process.env.TEST_PM_USERNAME!,
-    password: process.env.TEST_PM_PASSWORD!,
-  },
-  engineer: {
-    username: process.env.TEST_RD_USERNAME!,
-    password: process.env.TEST_RD_PASSWORD!,
-  },
-  qa: {
-    username: process.env.TEST_QA_USERNAME!,
-    password: process.env.TEST_QA_PASSWORD!,
-  },
-} as const
-
-export type AccountRole = keyof typeof accounts
-```
+This creates:
+- `.env.test.local` — env vars for each role: `TEST_AD_USERNAME/PASSWORD` (sysadmin), `TEST_OO_*` (org owner), `TEST_PM_*` (project manager), `TEST_RD_*` (engineer), `TEST_QA_*` (QA)
+- `tests/fixtures/auth.ts` — loads credentials via `dotenv`, exports `accounts` object with typed `AccountRole`
 
 ## Auth State Storage — Skip Login via `storageState`
 
@@ -83,18 +37,13 @@ projects: [
 
 ### Auth Setup File — `tests/e2e/auth/auth.setup.ts`
 
-```typescript
-import { test as setup } from "@playwright/test";
-import { accounts } from "../../fixtures/auth";
-import { LoginPage } from "../pages/LoginPage";
+Scaffold via:
 
-setup("authenticate as sysadmin", async ({ page }) => {
-  const loginPage = new LoginPage(page);
-  await loginPage.loginAs(accounts.sysadmin);
-  await page.waitForURL((url) => !url.pathname.includes("/login"));
-  await page.context().storageState({ path: ".auth/sysadmin.json" });
-});
+```bash
+echo '{"targetDir":"app","templates":["auth.setup"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
+
+This creates a setup file that authenticates as sysadmin via `LoginPage`, saves `storageState` to `.auth/sysadmin.json`.
 
 ### Multi-Role Auth Setup
 

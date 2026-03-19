@@ -196,7 +196,7 @@ CLICK (trigger button, e.g., "新增", "Add")
   → FILL (one or more fields)
   → SELECT (optional dropdowns)
   → CLICK (submit button, e.g., "確認", "Submit", "儲存")
-  → ASSERTION (toast visible / list updated)
+  → ASSERTION (feedback visible / list updated)
 ```
 
 When detected:
@@ -211,7 +211,7 @@ Pattern: row action → form prefilled → modify → submit
 CLICK (row edit button or row itself)
   → FILL (modify existing values)
   → CLICK (submit/save)
-  → ASSERTION (success toast)
+  → ASSERTION (success feedback)
 ```
 
 When detected:
@@ -225,7 +225,7 @@ Pattern: row action → confirm dialog → success
 ```
 CLICK (delete button on row)
   → CLICK (confirm in dialog, e.g., "確認刪除", "Delete")
-  → ASSERTION (item removed / toast)
+  → ASSERTION (item removed / feedback)
 ```
 
 When detected:
@@ -267,8 +267,8 @@ test('should perform recorded action description', async ({ page }) => {
 
   // Wait for API + assert
   await somePage.waitForApi('/api/endpoint');
-  const toast = await somePage.getSuccessToast();
-  expect(toast).toContain('成功');
+  const feedback = await somePage.getSuccessFeedback();
+  expect(feedback).toContain('成功');
 });
 ```
 
