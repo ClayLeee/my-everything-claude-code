@@ -165,11 +165,11 @@ Global rules installed to `~/.claude/rules/` for automatic enforcement:
 - `/notify:config` — Interactive notification settings (sound, toast, sound file)
 - `/e2e:analyze` — Analyze page structure and build Semantic Element Table
 - `/e2e:plan` — Generate coverage plan from analysis artifact
-- `/e2e:create` — Create POM + spec, run tests, generate dual reports (HTML + MD)
-- `/e2e:maintain` — Incrementally update tests from code changes, run tests, generate reports
-- `/e2e:run` — Run existing tests with error classification and dual reports
-- `/e2e:remote` — Scaffold Playwright project, explore remote URL via MCP, create and run tests
-- `/e2e:record` — Record browser actions with Playwright codegen, convert to POM + spec
+- `/e2e:create` — Create POM + spec, MCP pre-validation, run tests, MCP debug loop on failure, generate dual reports
+- `/e2e:maintain` — Incrementally update tests from code changes, run tests, MCP debug loop on failure, generate reports
+- `/e2e:run` — Run existing tests with error classification, failure-type summary, and next-step suggestions
+- `/e2e:remote` — Scaffold Playwright project, explore remote URL via MCP, create and run tests, MCP debug loop on failure
+- `/e2e:record` — Record browser actions with Playwright codegen, convert to POM + spec, MCP debug loop on failure
 - `/cl:status` — Show learned instincts with confidence scores
 - `/cl:analyze` — Manually trigger observation analysis
 - `/cl:log` — Show recent observer log entries
@@ -186,11 +186,29 @@ Global rules installed to `~/.claude/rules/` for automatic enforcement:
 
 | Trigger | Mode | Pipeline |
 |---------|------|----------|
-| New page needs tests / deep test | **Create** | analyze → plan → create (includes test run + dual reports) |
-| Code changed, update existing tests | **Maintain** | maintain (includes test run + dual reports) |
-| Run existing tests | **Run** | run (includes dual reports) |
-| Test a remote URL | **Remote** | remote (includes test run + dual reports) |
-| Record browser actions | **Record** | record (codegen → POM + spec) |
+| New page needs tests / deep test | **Create** | analyze → plan → create (MCP pre-validation + test run + MCP debug loop) |
+| Code changed, update existing tests | **Maintain** | maintain (test run + MCP debug loop) |
+| Run existing tests | **Run** | run (classify + suggest next command) |
+| Test a remote URL | **Remote** | remote (MCP explore + test run + MCP debug loop) |
+| Record browser actions | **Record** | record (codegen → POM + spec + MCP debug loop) |
+
+### Error Handling — MCP Debug Loop
+
+When tests fail with element interaction errors (not found, timeout), commands with code-modification scope use Playwright MCP to diagnose:
+
+```
+Test fails → browser_navigate → browser_snapshot → compare locator vs ARIA tree → fix POM/source → retry (max 1)
+```
+
+| Error Type | Action | Commands |
+|------------|--------|----------|
+| LOCATOR_MISMATCH | MCP snapshot → fix data-testid or POM locator → retry | create, maintain, record, remote |
+| TIMING | MCP snapshot → add waitFor → retry | create, maintain, record, remote |
+| ENVIRONMENT | MCP UI → fix entity state → retry | all (including run) |
+| RECOVERABLE | Fix test data → retry | all |
+| NON-RECOVERABLE | Report FAIL | all |
+
+`/e2e:run` only classifies and reports — it suggests `/e2e:maintain` for LOCATOR_MISMATCH/TIMING fixes.
 
 ### Create Mode — Build New Tests
 

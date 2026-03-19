@@ -135,11 +135,11 @@ Continuous Learning (`commands/cl/`):
 E2E Testing (`commands/e2e/`):
 - `/e2e:analyze` — analyze page structure and build Semantic Element Table
 - `/e2e:plan` — generate coverage plan from analysis artifact
-- `/e2e:create` — create POM + spec, run tests, generate dual reports (HTML + MD)
-- `/e2e:maintain` — incrementally update tests from code changes, run tests, generate reports
-- `/e2e:run` — run existing tests with error classification and dual reports
-- `/e2e:remote` — scaffold Playwright project, explore remote URL via MCP, create and run tests
-- `/e2e:record` — record browser actions with Playwright codegen, convert to POM + spec test code
+- `/e2e:create` — create POM + spec, MCP pre-validation, run tests, MCP debug loop on failure, dual reports
+- `/e2e:maintain` — incrementally update tests, run tests, MCP debug loop on failure, dual reports
+- `/e2e:run` — run existing tests, classify failures by type (LOCATOR_MISMATCH/TIMING/ENVIRONMENT/NON-RECOVERABLE), suggest next command
+- `/e2e:remote` — scaffold Playwright project, MCP explore + auth, run tests, MCP debug loop on failure, dual reports
+- `/e2e:record` — record browser actions via codegen, convert to POM + spec, MCP debug loop on failure
 
 Workflow (`commands/`):
 - `/before-commit` — run `pnpm before-commit` (type check + lint), then invoke `git-commit` skill to generate commit message

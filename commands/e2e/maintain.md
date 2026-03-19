@@ -19,6 +19,7 @@ All output must be in **繁體中文**.
 - `error-discrimination.md` — error classification framework
 - `code-patterns.md` — POM and spec patterns for updates
 - `coverage-checklist.md` — interaction depth checklist and coverage requirements
+- `mcp-discovery.md` — MCP tool reference (for debug loop)
 
 Do NOT proceed without reading. If resolution fails, report the error and stop.
 
@@ -78,14 +79,20 @@ E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}
 **After execution, apply Error Discrimination:**
 
 IF any test fails:
-├── Classify each failure using error-discrimination.md:
-│   ├── FORM SUBMISSION error?
-│   │   ├── Environment keyword (disabled/archived/locked/suspended)? → ENVIRONMENT: **do NOT modify test code**, fix environment state through UI (MCP), then retry
-│   │   ├── Recoverable keyword (重複/duplicate/invalid format)? → Fix per strategy table → Retry (max 2)
+├── Classify each failure:
+│   ├── FORM SUBMISSION error (API returned 4xx/5xx)?
+│   │   ├── ENVIRONMENT (disabled/archived/locked)? → Fix entity state via MCP UI, retry
+│   │   ├── RECOVERABLE (duplicate/invalid format)? → Fix test data per strategy table → Retry (max 2)
 │   │   └── Other → Report FAIL with classification
-│   ├── PAGE LOADING error → Report FAIL
-│   └── ELEMENT INTERACTION error → Report FAIL
-└── Generate report with per-failure classification
+│   ├── ELEMENT INTERACTION error (not found / timeout / not interactable)?
+│   │   └── **MCP Debug Loop** (see error-discrimination.md § MCP Debug Loop):
+│   │       ├── `browser_navigate` → failing page
+│   │       ├── `browser_snapshot` → get ARIA tree
+│   │       ├── Diagnose: query failed locator in DOM, find actual testid or confirm missing
+│   │       ├── Fix: inject data-testid / fix POM locator / add waitFor
+│   │       └── Retry failing test(s) (max 1 MCP-debug retry)
+│   └── PAGE LOADING error → Report FAIL
+└── Generate report with per-failure classification + MCP diagnostic info
 
 ## Step 7: Generate Dual Reports
 

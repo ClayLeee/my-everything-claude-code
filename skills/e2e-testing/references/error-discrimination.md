@@ -75,10 +75,19 @@ FORM SUBMITTED
     └── No match ──▶ FAIL
 
 NON-FORM ERRORS (no API call involved):
-    ├── Playwright timeout ──▶ FAIL
-    ├── Element not found / disappeared ──▶ FAIL
-    ├── Empty table on initial load ──▶ FAIL
-    └── Redirect to login ──▶ FAIL (session expired)
+    ├── Redirect to login ──▶ FAIL (session expired)
+    ├── Empty table on initial load ──▶ FAIL (data issue)
+    └── Element not found / timeout / disappeared ──▶ [6]
+
+[6] MCP DEBUG (if MCP available AND command has code-modification scope)
+    ├── browser_navigate → failing page URL
+    ├── browser_snapshot → get ARIA tree
+    ├── Compare failed locator vs actual DOM:
+    │   ├── data-testid missing in DOM → LOCATOR_MISMATCH: inject data-testid, update POM, retry
+    │   ├── data-testid exists but wrong value → LOCATOR_MISMATCH: fix POM locator, retry
+    │   ├── Element exists but not visible/interactable → TIMING: add waitFor, retry
+    │   └── Element genuinely absent → FAIL (page structure differs from analysis)
+    └── Max 1 MCP-debug retry per test
 ```
 
 ## Error Classification Table
@@ -96,6 +105,8 @@ NON-FORM ERRORS (no API call involved):
 | Playwright timeout | N/A | FAIL | Report failure |
 | Empty table (initial load) | 200 | FAIL | Report failure (data issue) |
 | Dialog did not open | N/A | FAIL | Report failure |
+| Element not found (`data-testid`) | N/A | LOCATOR_MISMATCH | MCP snapshot → fix data-testid or POM locator → retry |
+| Element not interactable / timeout | N/A | TIMING | MCP snapshot → add explicit waitFor → retry |
 
 ## ENVIRONMENT Errors — Fix Environment, NOT Test Code
 
@@ -113,6 +124,34 @@ NON-FORM ERRORS (no API call involved):
 2. Find and click the "enable" / "activate" button
 3. Confirm the project is re-enabled
 4. Re-run the test
+
+## MCP Debug Loop — Fix Locators via Browser Verification
+
+When element interaction errors occur (not found, timeout, not interactable) and MCP Playwright tools are available, use browser verification to diagnose and fix before reporting FAIL. This applies only to commands with code-modification scope (create, maintain, record) — NOT run.
+
+**Prerequisites:**
+- Dev server is running (or remote URL is accessible)
+- MCP Playwright tools are available in the session
+
+**Procedure:**
+
+1. **Navigate** — `browser_navigate` to the page URL where the test failed
+2. **Snapshot** — `browser_snapshot` to get the full ARIA tree
+3. **Diagnose** — For each failed locator:
+   - `browser_run_code` to query: `await page.locator('[data-testid="failing-testid"]').count()` → 0 means missing
+   - If missing: `browser_run_code` to scan nearby elements: `await page.locator('[data-testid]').evaluateAll(els => els.map(e => ({ testid: e.getAttribute('data-testid'), tag: e.tagName, text: e.textContent?.trim().slice(0, 30) })))` → find the actual testid or confirm injection needed
+   - If present but test still fails: check visibility with `browser_run_code`: `await page.locator('[data-testid="..."]').isVisible()`
+4. **Fix** — Apply the minimal fix:
+   - **LOCATOR_MISMATCH**: inject missing `data-testid` in source component, or fix the POM locator value
+   - **TIMING**: add `waitFor({ state: 'visible' })` or `waitForLoadState('networkidle')` before the interaction
+5. **Retry** — Re-run only the failing test(s), max 1 MCP-debug retry
+6. **Report** — If still failing after retry, report as FAIL with MCP diagnostic info (what the snapshot showed vs what the test expected)
+
+**Scope guard:** Do NOT enter MCP debug loop for:
+- Permission errors (401/403) — not a locator issue
+- Server errors (500+) — not a UI issue
+- API response classification errors — handled by the existing retry strategy
+- `/e2e:run` command — run has no code-modification scope
 
 ## Error Classification Config
 

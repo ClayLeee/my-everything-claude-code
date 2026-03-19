@@ -45,13 +45,15 @@ E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}
 
 IF any test fails:
 ├── Classify each failure using error-discrimination.md:
-│   ├── FORM SUBMISSION error?
-│   │   ├── Environment keyword (disabled/archived/locked/suspended)? → ENVIRONMENT: report data state issue, suggest UI fix
-│   │   ├── Recoverable keyword (重複/duplicate/invalid format)? → Log as RECOVERABLE
+│   ├── FORM SUBMISSION error (API returned 4xx/5xx)?
+│   │   ├── ENVIRONMENT (disabled/archived/locked)? → Report data state issue, suggest UI fix
+│   │   ├── RECOVERABLE (duplicate/invalid format)? → Log as RECOVERABLE
 │   │   └── Other → Log as NON-RECOVERABLE
-│   ├── PAGE LOADING error → NON-RECOVERABLE
-│   └── ELEMENT INTERACTION error → NON-RECOVERABLE
-└── Do NOT auto-fix — only classify and report
+│   ├── ELEMENT INTERACTION error (not found / timeout / not interactable)?
+│   │   └── Classify as LOCATOR_MISMATCH or TIMING per error-discrimination.md
+│   └── PAGE LOADING error → NON-RECOVERABLE
+├── Do NOT auto-fix — only classify and report
+└── Count failures by type for the next-step suggestion
 
 ## Step 6: Generate Dual Reports
 
@@ -75,7 +77,18 @@ Tell the user:
    - MD: playwright/reports/{page-name}/test-report.md
 ```
 
-If there are failures:
+If there are failures, summarize by type and suggest next command:
+
 ```
-⚠️ 失敗項目已分類為可恢復/不可恢復，詳見報告。
+⚠️ {N} 個測試失敗：
+   - {X} 個 LOCATOR_MISMATCH（data-testid 找不到或不匹配）
+   - {Y} 個 TIMING（元素未出現或 timeout）
+   - {Z} 個 ENVIRONMENT（實體狀態異常）
+   - {W} 個 NON-RECOVERABLE（伺服器錯誤/權限問題）
+👉 執行 /e2e:maintain 自動修復（含 MCP debug loop）
 ```
+
+Omit categories with 0 count. Adjust the suggestion based on failure types:
+- LOCATOR_MISMATCH / TIMING dominant → suggest `/e2e:maintain`
+- ENVIRONMENT dominant → suggest fixing entity state via UI, then `/e2e:run` again
+- NON-RECOVERABLE dominant → suggest checking server logs or test assumptions

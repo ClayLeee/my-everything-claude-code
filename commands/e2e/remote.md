@@ -85,14 +85,20 @@ E2E_REPORT_NAME={page-name} pnpm exec playwright test {spec-path}
 **After execution, apply Error Discrimination:**
 
 IF any test fails:
-├── Classify each failure using error-discrimination.md:
-│   ├── FORM SUBMISSION error?
-│   │   ├── Environment keyword (disabled/archived/locked/suspended)? → ENVIRONMENT: **do NOT modify test code**, fix environment state through UI (MCP), then retry
-│   │   ├── Recoverable keyword (重複/duplicate/invalid format)? → Fix per strategy table → Retry (max 2)
+├── Classify each failure:
+│   ├── FORM SUBMISSION error (API returned 4xx/5xx)?
+│   │   ├── ENVIRONMENT (disabled/archived/locked)? → Fix entity state via MCP UI, retry
+│   │   ├── RECOVERABLE (duplicate/invalid format)? → Fix test data per strategy table → Retry (max 2)
 │   │   └── Other → Report FAIL with classification
-│   ├── PAGE LOADING error → Report FAIL
-│   └── ELEMENT INTERACTION error → Report FAIL
-└── Generate report with per-failure classification
+│   ├── ELEMENT INTERACTION error (not found / timeout / not interactable)?
+│   │   └── **MCP Debug Loop** (see error-discrimination.md § MCP Debug Loop):
+│   │       ├── `browser_navigate` → failing page
+│   │       ├── `browser_snapshot` → get ARIA tree
+│   │       ├── Diagnose: compare failed locator vs ARIA tree (remote uses getByRole/getByText, not data-testid)
+│   │       ├── Fix: update POM locator to match actual ARIA roles/text
+│   │       └── Retry failing test(s) (max 1 MCP-debug retry)
+│   └── PAGE LOADING error → Report FAIL
+└── Generate report with per-failure classification + MCP diagnostic info
 
 ## Step 8: Generate Dual Reports
 

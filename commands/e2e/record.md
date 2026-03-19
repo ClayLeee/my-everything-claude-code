@@ -151,6 +151,7 @@ The subagent should load these references from `$SKILL_DIR/references/`:
 - `ui-patterns-extended.md` — only if recording involves: sortable columns, tabs, accordion, date picker, rich text, file upload, or drag-and-drop
 - `test-data-policy.md` — UI-only data policy, CRUD lifecycle
 - `error-discrimination.md` — error classification framework
+- `mcp-discovery.md` — MCP tool reference (for debug loop)
 
 ### Step 7: Auto-Assignment — Resolve Target Files
 
@@ -232,14 +233,20 @@ cd app && E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}
 **After execution, apply Error Discrimination:**
 
 IF any test fails:
-├── Classify each failure using error-discrimination.md:
-│   ├── FORM SUBMISSION error?
-│   │   ├── Environment keyword (disabled/archived/locked/suspended)? → ENVIRONMENT: **do NOT modify test code**, fix environment state through UI (MCP), then retry
-│   │   ├── Recoverable keyword (重複/duplicate/invalid format)? → Fix per strategy table → Retry (max 2)
+├── Classify each failure:
+│   ├── FORM SUBMISSION error (API returned 4xx/5xx)?
+│   │   ├── ENVIRONMENT (disabled/archived/locked)? → Fix entity state via MCP UI, retry
+│   │   ├── RECOVERABLE (duplicate/invalid format)? → Fix test data per strategy table → Retry (max 2)
 │   │   └── Other → Report FAIL with classification
-│   ├── PAGE LOADING error → Report FAIL
-│   └── ELEMENT INTERACTION error → Report FAIL
-└── Generate report with per-failure classification
+│   ├── ELEMENT INTERACTION error (not found / timeout / not interactable)?
+│   │   └── **MCP Debug Loop** (see error-discrimination.md § MCP Debug Loop):
+│   │       ├── `browser_navigate` → failing page
+│   │       ├── `browser_snapshot` → get ARIA tree
+│   │       ├── Diagnose: query failed locator in DOM, find actual testid or confirm missing
+│   │       ├── Fix: inject data-testid / fix POM locator / add waitFor
+│   │       └── Retry failing test(s) (max 1 MCP-debug retry)
+│   └── PAGE LOADING error → Report FAIL
+└── Generate report with per-failure classification + MCP diagnostic info
 
 ### Step 13: Dual Reports + Completion
 
