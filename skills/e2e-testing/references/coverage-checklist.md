@@ -1,4 +1,4 @@
-# Coverage Plan & Interaction Depth Checklist
+# Coverage Plan & Coverage Self-Check
 
 ## Coverage Plan Rules
 
@@ -19,38 +19,24 @@ Apply before writing any test code:
 5. **Every CRUD button inside a tab MUST have its own test scenario**
 6. **Count check**: `number of Coverage Plan rows` ≥ `number of non-leaf components in tree`. Fewer rows = missed components
 
-## Interaction Depth Checklist
+## Coverage Self-Check Questions
 
-Apply to every container (dialog, tab panel, form) found in the Coverage Plan. All applicable items are required.
+After planning scenarios using the 3 questions (purpose → errors → confirmation), use these to verify you haven't missed anything:
 
-### Container Patterns
+- [ ] Has every tab panel and dialog been treated as a sub-page with its own scenario analysis?
+- [ ] Does every form have both a success path test (fill + submit + verify feedback) and a failure path test (required field empty or invalid → error)?
+- [ ] Does every table verify that data exists (row count > 0) and that each column displays the right type of content?
+- [ ] Does every data-modifying operation verify that the data actually changed (not just that feedback appeared)?
+- [ ] Has every `[E2E]` test record been cleaned up after the test?
 
-- **Dialog** — open → verify content visible → close (cancel or X). For AlertDialog, verify confirm action works.
-- **Tabs** — switch to each tab → **treat each tab panel as a sub-page**: recursively apply this entire checklist to its content. List each tab's inner components explicitly in the Coverage Plan.
-- **Popover / Filter panel** — open → interact with inner controls → verify effect on parent (e.g. table row count changes) → close.
-- **Accordion / Collapsible** — expand → verify content → collapse.
+### Implementation Notes
 
-### Data Display Patterns
+These are specific constraints that commonly cause missed coverage or flaky tests if not handled explicitly:
 
-- **Table** — assert row count > 0. For each column, apply assertion matching its type (see `references/semantic-analysis.md` § Table Column Assertion Rules). If sortable: click header, verify order. If expandable: expand row, verify children.
-- **Pagination** — verify page info text, click next page, assert content changes. If table above: verify rows update.
-- **Empty state** — when no data exists, verify empty state message visible.
-- **Skeleton / Loading** — do NOT assert on loading states; wait for them to disappear before asserting content.
+- **Table is empty on arrival**: Do NOT skip or mark `test.skip`. Use the page's create UI to add at least one `[E2E]` record before running display assertions. Chain with `test.describe.serial` and clean up after.
+- **Pagination**: Only testable when total records exceed the page size. Create records via `beforeAll` if needed; if no create UI exists, mark `test.skip` with reason: `// No create UI — cannot guarantee enough data for pagination`.
+- **Select / Dropdown**: Click trigger → wait for content visible → select → verify displayed value. Many UI libraries (shadcn, Radix, Headless UI, MUI, etc.) portal dropdown content outside the parent container.
+- **Rich text editor**: Click editor → type → verify content appears. Do NOT test toolbar formatting unless requested.
+- **Form submit success is mandatory**: Extend timeout for slow operations instead of skipping.
 
-### Form Patterns
-
-- **Form fields** — verify all expected fields are present. Fill all required fields with valid data.
-- **Required field validation** — submit empty or clear a required field, expect error message or disabled submit.
-- **Form submit success** — **MANDATORY.** Fill valid data → submit → verify success feedback + data update. Extend timeout for slow operations instead of skipping.
-- **Form submit failure** — invalid input that triggers real API error → verify error feedback or inline error.
-- **Select / Dropdown** — click trigger → wait for content visible → select option → verify trigger displays selected value. Note: many UI libraries (shadcn, Radix, Headless UI, MUI, etc.) portal dropdown content outside the parent container.
-- **Rich text editor** — click editor → type text → verify content appears. Do NOT test toolbar formatting unless requested.
-
-### Action Patterns
-
-- **Toggle / Switch** — click → verify state change → restore original state.
-- **Delete confirmation** — open AlertDialog → fill confirmation input if required → submit → verify item removed.
-- **Drag and drop** — use `dragTo()` → verify order changes.
-- **Multi-role behavior** — test different roles if applicable.
-
-Cover every applicable item. If an item cannot be tested without mocking, document with `test.skip` and state the reason.
+If an item cannot be tested without mocking, document with `test.skip` and state the reason.
