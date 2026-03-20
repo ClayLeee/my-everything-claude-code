@@ -35,6 +35,16 @@ Look for `playwright/{page-name}/coverage-plan.md` (relative to `package.json` d
 
 Do NOT proceed without reading. If resolution fails, report the error and stop.
 
+## Step 2b: Load Project-Local Patterns (if present)
+
+Check for project-local patterns — zero additional cost when absent:
+- Check if `playwright/e2e-patterns.md` exists (in the `package.json` directory)
+- If exists: Read it and apply its patterns throughout Steps 4–8:
+  - `## Locators` — prefer these selectors over default `[data-testid]` when building POM
+  - `## Timing` — add these wait conditions to relevant POM action methods
+  - `## Feedback` — use this confirmed selector in `super(page, {...})` constructor
+- If absent: skip — do not create it yet
+
 ## Step 3: Scaffold Shared Files
 
 Run the scaffold script from the **`package.json` directory** (not the repo root). Use `"targetDir":"."`.
@@ -45,15 +55,78 @@ Run the scaffold script from the **`package.json` directory** (not the repo root
 echo '{"targetDir":".","templates":["BasePage","playwright.config.local","error-utils"],"variables":{"BASE_URL":"http://localhost:5173","WEB_SERVER_COMMAND":"pnpm dev"}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
-**Conditionally scaffold auth** — only if the coverage plan indicates the page requires authentication (e.g., tests start from authenticated state, scenarios involve roles or permissions, page redirects to login when unauthenticated):
+Adjust `BASE_URL` and `WEB_SERVER_COMMAND` based on the project's actual dev server.
+
+If auth is **not** required, skip the rest of this step and proceed to Step 4.
+
+---
+
+**Conditionally: Auth Setup** — only if the coverage plan indicates the page requires authentication (e.g., tests start from authenticated state, scenarios involve roles or permissions, page redirects to login when unauthenticated).
+
+**Pass 1 — Check `.env.test.local`:**
+
+If `.env.test.local` does not exist or is empty (no credentials filled in):
 
 ```bash
-echo '{"targetDir":".","templates":["auth","auth.setup","env.test.local"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
+echo '{"targetDir":".","templates":["env.test.local"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
-If auth is scaffolded, also create `tests/e2e/pages/LoginPage.ts` — read the project's login page source first, then implement `goto()` and `loginAs(account)`. See `references/auth-patterns.md` § LoginPage POM.
+Stop here. Tell the user:
 
-Adjust `BASE_URL` and `WEB_SERVER_COMMAND` based on the project's actual dev server.
+```
+📝 .env.test.local 已建立，請填入各角色的測試帳號密碼，完成後再繼續執行 /e2e:create。
+```
+
+Do NOT proceed to Steps 4–10.
+
+---
+
+**Pass 2 — Generate Auth Files** (`.env.test.local` exists with credentials filled in):
+
+**1. Parse roles** from `.env.test.local`:
+- Each `TEST_{ABBREV}_USERNAME` block defines one role
+- Use the `# Comment` above the block as the role key, camelCased (e.g., `# System Admin` → `systemAdmin`)
+- If no comment, lowercase the abbreviation (e.g., `TEST_AD_USERNAME` → `ad`)
+- `FIRST_ROLE` = the first role parsed
+
+**2. Dynamically generate `tests/fixtures/auth.ts`** (do NOT scaffold from template) — see `references/auth-patterns.md` § Generating auth.ts for the full convention.
+
+**3. Dynamically generate `tests/e2e/auth/auth.setup.ts`** (do NOT scaffold from template) — one `setup()` block per role, each saving `.auth/{role}.json`:
+
+```typescript
+import { test as setup } from "@playwright/test";
+import { accounts } from "../../fixtures/auth";
+import { LoginPage } from "../pages/LoginPage";
+
+setup("authenticate as {role}", async ({ page }) => {
+  const loginPage = new LoginPage(page);
+  await loginPage.loginAs(accounts.{role});
+  await page.waitForURL((url) => !url.pathname.includes("/login"));
+  await page.context().storageState({ path: ".auth/{role}.json" });
+});
+// ... one block per parsed role
+```
+
+**4. Generate `tests/e2e/pages/LoginPage.ts`** — read the project's login page source first, then implement `goto()` and `loginAs(account)`. See `references/auth-patterns.md` § LoginPage POM.
+
+**5. Scaffold `playwright.config.ts` with auth config** (overwrite: true, replaces the no-auth version):
+
+```bash
+echo '{"targetDir":".","templates":["playwright.config.local.auth"],"variables":{"FIRST_ROLE":"{firstRole}","BASE_URL":"{baseUrl}","WEB_SERVER_COMMAND":"{webServerCommand}"},"overwrite":true}' | node $SKILL_DIR/scripts/scaffold.js
+```
+
+**6. Run auth setup** to create `.auth/*.json` for all roles:
+
+```bash
+pnpm exec playwright test tests/e2e/auth/auth.setup.ts
+```
+
+- **Success** → `.auth/{role}.json` created for all roles — proceed to Step 4
+- **Failure** → Stop. Tell the user:
+  ```
+  ❌ Auth setup 失敗，請確認 .env.test.local 中的帳號密碼是否正確，完成後再繼續執行 /e2e:create。
+  ```
+  Do NOT proceed to Steps 4–10.
 
 ## Step 4: Inject `data-testid`
 
@@ -68,6 +141,34 @@ Create `tests/e2e/pages/{PageName}Page.ts`:
 - Use `data-testid` locators from the coverage plan
 - Nested object structure for dialogs, tabs, sub-components
 - Include action methods for each user flow
+
+After writing the POM constructor with feedback config:
+- If `super(page, {})` (no feedback selectors) → skip
+- If `super(page, { success: ..., error: ... })` → check `playwright/e2e-patterns.md`:
+  - `## Feedback` section empty or file absent → create file skeleton if needed, write entry
+  - `## Feedback` already has an entry → skip (trust existing confirmed selector)
+
+The file skeleton when creating from scratch:
+```markdown
+# E2E Patterns — {project-name}
+<!-- Hard cap: 50 lines total. When full, replace similar entries, do NOT add. -->
+
+## Locators
+<!-- Quirks where UI library wrappers change the actual DOM element to target -->
+<!-- Format: - {component}: use {selector} not {default} -->
+
+## Timing
+<!-- Wait conditions this app needs beyond SKILL.md defaults -->
+<!-- Format: - {operation}: needs {waitCondition} because {reason} -->
+
+## Feedback
+<!-- The ONE confirmed feedback selector for this project -->
+<!-- Format: - library: {name} | success: {selector} | error: {selector} -->
+
+## API
+<!-- Base URL and auth pattern (only if non-standard) -->
+<!-- Format: - baseUrl: {pattern} | auth: {method} -->
+```
 
 ## Step 6: Build Spec File
 
@@ -128,6 +229,15 @@ IF any test fails:
 │   │       └── Retry failing test(s) (max 1 MCP-debug retry)
 │   └── PAGE LOADING error → Report FAIL
 └── Generate report with per-failure classification + MCP diagnostic info
+
+**After all tests pass** (whether initially, after MCP debug loop, or after user-guided fixes):
+→ If any POM or spec file was modified in this session AND tests now pass:
+  1. Read `playwright/e2e-patterns.md` (create with skeleton from Step 5 if absent)
+  2. Classify each fix made in this session:
+     - Selector / locator change → `## Locators` entry: `- {component}: use {actual-selector} not {attempted-selector}`
+     - Wait / timing change → `## Timing` entry: `- {operation}: needs {waitCondition} because {reason}`
+  3. Skip if same pattern already present (substring match)
+  4. If total file lines < 50 → append; if ≥ 50 → replace most similar entry in same section
 
 ## Step 9: Generate Dual Reports
 

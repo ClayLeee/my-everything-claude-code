@@ -28,12 +28,38 @@ After injecting `data-testid` and before writing POM/spec, use Playwright MCP br
 
 ## MCP Session Authentication
 
-MCP browser and `@playwright/test` storageState are separate — MCP needs its own login:
+MCP browser and `@playwright/test` storageState are separate sessions. When the target page requires authentication, use the following strategy:
 
-1. `browser_navigate` → login page
-2. `browser_fill_form` → fill test account credentials
-3. `browser_click` → submit login
-4. `browser_wait_for` → wait for navigation to complete
+**Priority: inject storageState** (if `.auth/{role}.json` exists):
+
+```javascript
+// browser_run_code
+const state = JSON.parse(require('fs').readFileSync('.auth/{role}.json', 'utf8'));
+
+// Inject localStorage tokens
+if (state.origins?.[0]?.localStorage?.length) {
+  await page.goto(state.origins[0].origin);
+  await page.evaluate(
+    items => items.forEach(i => localStorage.setItem(i.name, i.value)),
+    state.origins[0].localStorage
+  );
+}
+
+// Inject cookies
+if (state.cookies?.length) {
+  await page.context().addCookies(state.cookies);
+}
+```
+
+Then `browser_navigate` → target page (already authenticated).
+
+**Fallback: fill credentials** (`.auth/` does not exist yet):
+
+1. Read `.env.test.local` — use first role's `TEST_{ABBREV}_USERNAME` / `TEST_{ABBREV}_PASSWORD`
+2. `browser_navigate` → login page
+3. `browser_fill_form` → fill credentials
+4. `browser_click` → submit login
+5. `browser_wait_for` → wait for navigation to complete
 
 ## Interactive Exploration
 

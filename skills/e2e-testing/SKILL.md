@@ -24,7 +24,7 @@ Playwright patterns for building stable, fast, and maintainable E2E test suites.
 
 Test accounts stored in `.env.test.local` (gitignored). Define roles matching your project's permission model (e.g., admin, manager, member, viewer).
 
-Use `storageState` to skip login — the auth setup project runs once, saves JWT to `.auth/{role}.json`, and all subsequent tests start authenticated. No `beforeEach` login needed.
+Use `storageState` to skip login — the auth setup project runs once, saves session state (cookies + localStorage) to `.auth/{role}.json`, and all subsequent tests start authenticated. No `beforeEach` login needed.
 
 - `.auth/` and `.env.test.local` must be in `.gitignore`
 - For full credential format, auth.setup.ts, and multi-role config, see **`references/auth-patterns.md`**
@@ -287,10 +287,11 @@ All commands need the skill directory path to access references, scripts, and te
 
 - **`templates/BasePage.ts`** — Full BasePage class with FeedbackConfig, FeedbackSelector interfaces; no hardcoded presets — feedback selectors are derived per project and passed inline
 - **`templates/RemoteBasePage.ts`** — Minimal remote testing base class (no FeedbackConfig)
-- **`templates/playwright.config.local.ts`** — Local config with `{{BASE_URL}}`, `{{WEB_SERVER_COMMAND}}` placeholders
+- **`templates/playwright.config.local.ts`** — Local no-auth config with `{{BASE_URL}}`, `{{WEB_SERVER_COMMAND}}` placeholders; no setup project, no storageState
+- **`templates/playwright.config.local.auth.ts`** — Local auth config with setup project + `{{FIRST_ROLE}}` storageState placeholder; overwrites the no-auth version once auth is confirmed
 - **`templates/playwright.config.remote.ts`** — Remote config with `{{BASE_URL}}` placeholder, no webServer
-- **`templates/auth.ts`** — Credential loader (dotenv → accounts object)
-- **`templates/auth.setup.ts`** — Auth setup project (sysadmin login → storageState)
+- **`templates/auth.example.ts`** — Reference example of credential loader (dotenv → accounts object); not scaffolded — dynamically generated from `.env.test.local` roles
+- **`templates/auth.setup.ts`** — Reference example of auth setup project; not scaffolded — dynamically generated with one `setup()` block per parsed role
 - **`templates/env.test.local`** — .env.test.local template with role-based credential vars
 - **`templates/error-utils.ts`** — ErrorClassificationConfig interface, classifyApiError function, submitAndIntercept helper
 
