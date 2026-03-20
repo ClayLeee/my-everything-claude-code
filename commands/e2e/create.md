@@ -37,13 +37,23 @@ Do NOT proceed without reading. If resolution fails, report the error and stop.
 
 ## Step 3: Scaffold Shared Files
 
-Run the scaffold script to create shared files that don't yet exist (skips existing files by default):
+Run the scaffold script from the **`package.json` directory** (not the repo root). Use `"targetDir":"."`.
+
+**Always scaffold** — shared infrastructure required by all tests:
 
 ```bash
-echo '{"targetDir":"app","templates":["BasePage","playwright.config.local","auth","auth.setup","env.test.local","error-utils"],"variables":{"BASE_URL":"http://localhost:5173","WEB_SERVER_COMMAND":"pnpm dev"}}' | node $SKILL_DIR/scripts/scaffold.js
+echo '{"targetDir":".","templates":["BasePage","playwright.config.local","error-utils"],"variables":{"BASE_URL":"http://localhost:5173","WEB_SERVER_COMMAND":"pnpm dev"}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
-Adjust `BASE_URL` and `WEB_SERVER_COMMAND` based on the project's actual dev server. Verify `auth.setup.ts` and `.auth/` config exist after scaffolding.
+**Conditionally scaffold auth** — only if the coverage plan indicates the page requires authentication (e.g., tests start from authenticated state, scenarios involve roles or permissions, page redirects to login when unauthenticated):
+
+```bash
+echo '{"targetDir":".","templates":["auth","auth.setup","env.test.local"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
+```
+
+If auth is scaffolded, also create `tests/e2e/pages/LoginPage.ts` — read the project's login page source first, then implement `goto()` and `loginAs(account)`. See `references/auth-patterns.md` § LoginPage POM.
+
+Adjust `BASE_URL` and `WEB_SERVER_COMMAND` based on the project's actual dev server.
 
 ## Step 4: Inject `data-testid`
 
@@ -91,7 +101,12 @@ IF dev server NOT running OR MCP NOT available:
 
 ## Step 8: Execute Tests
 
-Run tests from the `app/` directory:
+Run tests from the `package.json` directory. **Never use `npx playwright test`** — always go through the project's package manager.
+
+First, check `package.json` for the E2E script name (commonly `test:e2e`, `e2e`, or `playwright`):
+- If a dedicated script exists: `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}`
+- If no dedicated script: `E2E_REPORT_NAME={page-name} pnpm exec playwright test {spec-path}`
+
 ```bash
 E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}
 ```

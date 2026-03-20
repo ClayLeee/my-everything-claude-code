@@ -17,7 +17,7 @@
 All POM classes extend `BasePage` to share common functionality. The full implementation is in the **scaffold template** — use `scaffold.js` to create it:
 
 ```bash
-echo '{"targetDir":"app","templates":["BasePage"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
+echo '{"targetDir":".","templates":["BasePage"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
 **Key API surface:**
@@ -30,28 +30,35 @@ echo '{"targetDir":"app","templates":["BasePage"],"variables":{}}' | node $SKILL
 
 ### Usage per project
 
+Before writing any POM, identify the project's feedback mechanism:
+1. Check `package.json` for toast/notification libraries
+2. Find where success/error messages render — usually a layout component or global notification handler
+3. Inspect the rendered DOM selector (DevTools or MCP `browser_snapshot`)
+
+Then pass the selector inline — no shared preset object needed:
+
 ```typescript
-// Sonner project (default)
-class MyPage extends BasePage {
-  constructor(page: Page) { super(page); }
-}
-
-// MUI project
-class MyPage extends BasePage {
-  constructor(page: Page) { super(page, FEEDBACK_PRESETS.mui); }
-}
-
-// Custom selectors
+// Project uses vue-sonner
 class MyPage extends BasePage {
   constructor(page: Page) {
     super(page, {
-      success: { selector: ".toast-success", textSelector: ".toast-body" },
-      error: { selector: ".toast-error", textSelector: ".toast-body" },
+      success: { selector: '[data-sonner-toast][data-type="success"]', textSelector: '[data-content]' },
+      error: { selector: '[data-sonner-toast][data-type="error"]', textSelector: '[data-content]' },
     });
   }
 }
 
-// No UI feedback (API-only verification)
+// Project uses a custom data-testid on the toast container
+class MyPage extends BasePage {
+  constructor(page: Page) {
+    super(page, {
+      success: { selector: '[data-testid="toast-success"]' },
+      error: { selector: '[data-testid="toast-error"]' },
+    });
+  }
+}
+
+// No visible feedback — use interceptApi() for result verification
 class MyPage extends BasePage {
   constructor(page: Page) { super(page, {}); }
 }
@@ -276,7 +283,7 @@ After recording:
 Use `scaffold.js` to create the config with project-specific values:
 
 ```bash
-echo '{"targetDir":"app","templates":["playwright.config.local"],"variables":{"BASE_URL":"http://localhost:5173","WEB_SERVER_COMMAND":"pnpm dev"}}' | node $SKILL_DIR/scripts/scaffold.js
+echo '{"targetDir":".","templates":["playwright.config.local"],"variables":{"BASE_URL":"http://localhost:5173","WEB_SERVER_COMMAND":"pnpm dev"}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
 For remote testing, use `playwright.config.remote` template instead. See `templates/` for the full source.

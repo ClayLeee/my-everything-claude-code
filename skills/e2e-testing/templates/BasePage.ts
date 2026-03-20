@@ -16,35 +16,6 @@ export interface FeedbackConfig {
   error?: FeedbackSelector;
 }
 
-// Common presets — pick one or define your own
-export const FEEDBACK_PRESETS = {
-  /** Sonner (react-sonner / vue-sonner) */
-  sonner: {
-    success: { selector: '[data-sonner-toast][data-type="success"]', textSelector: "[data-content]" },
-    error: { selector: '[data-sonner-toast][data-type="error"]', textSelector: "[data-content]" },
-  },
-  /** MUI Snackbar / Alert */
-  mui: {
-    success: { selector: ".MuiAlert-standardSuccess", textSelector: ".MuiAlert-message" },
-    error: { selector: ".MuiAlert-standardError", textSelector: ".MuiAlert-message" },
-  },
-  /** Ant Design Message */
-  antd: {
-    success: { selector: ".ant-message-success", textSelector: "span:last-child" },
-    error: { selector: ".ant-message-error", textSelector: "span:last-child" },
-  },
-  /** React Hot Toast */
-  reactHotToast: {
-    success: { selector: '[role="status"]' },
-    error: { selector: '[role="status"]' },
-  },
-  /** Generic data-testid (works with any library if you add testids) */
-  dataTestId: {
-    success: { selector: '[data-testid="feedback-success"]' },
-    error: { selector: '[data-testid="feedback-error"]' },
-  },
-} satisfies Record<string, FeedbackConfig>;
-
 // ── BasePage ───────────────────────────────────────────────────
 
 export abstract class BasePage {
@@ -53,7 +24,7 @@ export abstract class BasePage {
   readonly feedbackError: Locator | null;
   private readonly feedbackConfig: FeedbackConfig;
 
-  constructor(page: Page, feedback: FeedbackConfig = FEEDBACK_PRESETS.sonner) {
+  constructor(page: Page, feedback: FeedbackConfig = {}) {
     this.page = page;
     this.feedbackConfig = feedback;
     this.feedbackSuccess = feedback.success

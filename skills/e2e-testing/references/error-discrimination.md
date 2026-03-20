@@ -158,7 +158,7 @@ When element interaction errors occur (not found, timeout, not interactable) and
 Projects define how their API's error codes and messages map to classifications via `ErrorClassificationConfig`. The interface, `classifyApiError()` function, and `submitAndIntercept()` helper are in the **error-utils template** — use `scaffold.js` to create it:
 
 ```bash
-echo '{"targetDir":"app","templates":["error-utils"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
+echo '{"targetDir":".","templates":["error-utils"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
 This creates `tests/fixtures/error-utils.ts` with:

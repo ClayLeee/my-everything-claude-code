@@ -33,7 +33,7 @@ Use `storageState` to skip login — the auth setup project runs once, saves JWT
 
 All POM classes extend `BasePage` (`tests/e2e/pages/BasePage.ts`) which provides:
 
-- Shared `page`, configurable `feedbackSuccess` / `feedbackError` locators via `FeedbackConfig` (presets: Sonner, MUI, Ant Design, React Hot Toast, or custom selectors)
+- Shared `page`, configurable `feedbackSuccess` / `feedbackError` locators via `FeedbackConfig` (inline selectors derived from the project's actual feedback library — see `references/code-patterns.md` § Usage per project)
 - `interceptApi(urlPattern, action)` — intercept API response, return `{ ok, status, body }` for error classification (primary error detection)
 - `waitForApi(urlPattern)` — fire-and-forget wait for API response
 - `waitForNavigation(urlPattern)` — wait for SPA route change
@@ -246,7 +246,7 @@ Most commands run in a forked subagent (`context: fork`) with their own referenc
 
 ## Running Tests
 
-Use the project's package manager scripts (not `npx` directly). Set `E2E_REPORT_NAME` to organize reports per page:
+**Never use `npx playwright test`** — always go through the project's package manager. Check `package.json` for the E2E script name first (commonly `test:e2e`, `e2e`, or `playwright`). If no dedicated script exists, use `pnpm exec playwright test` as fallback. Set `E2E_REPORT_NAME` to organize reports per page:
 
 ```bash
 # Run specific spec with named report
@@ -285,7 +285,7 @@ All commands need the skill directory path to access references, scripts, and te
 
 ### Templates
 
-- **`templates/BasePage.ts`** — Full BasePage class with FeedbackConfig, FeedbackSelector, FEEDBACK_PRESETS (sonner, mui, antd, reactHotToast, dataTestId)
+- **`templates/BasePage.ts`** — Full BasePage class with FeedbackConfig, FeedbackSelector interfaces; no hardcoded presets — feedback selectors are derived per project and passed inline
 - **`templates/RemoteBasePage.ts`** — Minimal remote testing base class (no FeedbackConfig)
 - **`templates/playwright.config.local.ts`** — Local config with `{{BASE_URL}}`, `{{WEB_SERVER_COMMAND}}` placeholders
 - **`templates/playwright.config.remote.ts`** — Remote config with `{{BASE_URL}}` placeholder, no webServer

@@ -5,7 +5,7 @@
 Scaffold `.env.test.local` and `tests/fixtures/auth.ts` via:
 
 ```bash
-echo '{"targetDir":"app","templates":["env.test.local","auth"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
+echo '{"targetDir":".","templates":["env.test.local","auth"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
 This creates:
@@ -40,7 +40,7 @@ projects: [
 Scaffold via:
 
 ```bash
-echo '{"targetDir":"app","templates":["auth.setup"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
+echo '{"targetDir":".","templates":["auth.setup"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
 This creates a setup file that authenticates as sysadmin via `LoginPage`, saves `storageState` to `.auth/sysadmin.json`.
@@ -87,3 +87,12 @@ test.describe('Sysadmin features', () => {
 - `.env.test.local` and `.auth/` must be in `.gitignore` — never commit credentials or auth state
 - For new roles, add `TEST_<ROLE>_USERNAME` / `TEST_<ROLE>_PASSWORD` entries
 - For CI, inject credentials via CI environment variables or secrets
+
+## LoginPage POM — Required for `auth.setup.ts`
+
+`auth.setup.ts` calls `loginPage.loginAs(account)`. Before writing the POM, read the project's login page source to understand its structure. Then create `tests/e2e/pages/LoginPage.ts` with:
+
+- `goto()` — navigate to the login route and wait for page load
+- `loginAs(account: { username: string; password: string })` — fill credentials and submit via real UI interactions (no `page.route()` mocks)
+
+Derive all locators from the actual source. Inject `data-testid` attributes if missing. Login pages vary (password-only, SSO, multi-step) — always read the source before writing the POM.

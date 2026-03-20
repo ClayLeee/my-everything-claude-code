@@ -71,7 +71,12 @@ Add `data-testid` to new elements only. **Only add attributes — change nothing
 
 ## Step 6: Execute Tests
 
-Run from the `app/` directory:
+Run from the `package.json` directory. **Never use `npx playwright test`** — always go through the project's package manager.
+
+Check `package.json` for the E2E script name, then run:
+- If a dedicated script exists: `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}`
+- If no dedicated script: `E2E_REPORT_NAME={page-name} pnpm exec playwright test {spec-path}`
+
 ```bash
 E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}
 ```
