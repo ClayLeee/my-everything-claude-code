@@ -25,7 +25,6 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 │   ├── instinct-export.md         # Export instincts for sharing
 │   ├── instinct-import.md         # Import instincts from others
 │   ├── before-commit.md            # Run checks then generate commit message
-│   ├── notify-config.md           # Interactive notification settings
 │   ├── learn-eval.md              # Extract patterns with quality evaluation
 │   └── skill-create.md            # Generate SKILL.md from git history
 ├── skills/
@@ -47,8 +46,8 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 ├── hooks/
 │   └── hooks.json                 # All hook definitions
 └── scripts/
-    ├── hooks/                     # Hook scripts (observe, notify, block-docs, etc.)
-    └── lib/                       # Shared utilities (utils, notifier, session-manager, etc.)
+    ├── hooks/                     # Hook scripts (observe, block-docs, etc.)
+    └── lib/                       # Shared utilities (utils, session-manager, etc.)
 ```
 
 ## Development Workflow
@@ -134,7 +133,6 @@ flowchart TD
 | PreCompact | auto-analyze | Extract instincts from observations |
 | SessionStart | load context | Load previous session summary |
 | Stop | global console.log check | Scan all git-changed files |
-| Notification | desktop notify | Play sound + show Toast when Claude needs attention |
 | SessionEnd | session record | Save session metadata |
 | SessionEnd | evaluate session | Log session length |
 | SessionEnd | auto-analyze | Extract instincts from observations |
@@ -162,7 +160,6 @@ Global rules installed to `~/.claude/rules/` for automatic enforcement:
 ### Commands
 
 - `/before-commit` — Run project checks (`pnpm before-commit`), then generate conventional commit message
-- `/notify:config` — Interactive notification settings (sound, toast, sound file)
 - `/e2e:analyze` — Analyze page structure and build Semantic Element Table
 - `/e2e:plan` — Generate coverage plan from analysis artifact
 - `/e2e:create` — Create POM + spec, MCP pre-validation, run tests, MCP debug loop on failure, generate dual reports

@@ -50,10 +50,8 @@ All under `scripts/hooks/`, written in Node.js (pure stdlib, no npm dependencies
 - **evaluate-session.js** — session quality scoring
 - **check-console-log.js** — scans all git-changed files for console.log (Stop event)
 - **detect-console-log.js** — warns about console.log in just-edited files (PostToolUse event)
-- **suggest-compact.js** — reminds `/compact` after 50+ edits
 - **warn-git-push.js** — reminder before git push
 - **block-docs.js** — blocks creation of unnecessary .md/.txt files
-- **notify.js** — plays sound + shows Toast on Notification event (permission prompts, idle, etc.)
 
 ### Shared Utilities
 
@@ -62,7 +60,6 @@ All under `scripts/hooks/`, written in Node.js (pure stdlib, no npm dependencies
 - **session-manager.js** — session CRUD and stats
 - **package-manager.js** — auto-detects npm/pnpm/yarn/bun
 - **session-aliases.js** — session aliasing system
-- **notifier.js** — cross-platform sound + Toast notification (Windows/macOS/Linux), config via `~/.claude/homunculus/notify-config.json`
 
 ### E2E Testing Scripts
 
@@ -143,8 +140,6 @@ E2E Testing (`commands/e2e/`):
 
 Workflow (`commands/`):
 - `/before-commit` — run `pnpm before-commit` (type check + lint), then invoke `git-commit` skill to generate commit message
-- `/notify:config` — interactive notification settings (sound, toast, sound file path)
-
 Instinct Management (`commands/`):
 - `/evolve` — cluster related instincts into commands/skills/agents (default: preview, use `--execute` to create)
 - `/instinct-export` — export instincts to shareable YAML (strips sensitive data)
