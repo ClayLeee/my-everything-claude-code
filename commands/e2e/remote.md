@@ -18,6 +18,17 @@ All output must be in **繁體中文**.
 - If no argument, ask the user for:
   - Target URL (required)
   - Whether login is needed
+    - If yes: check if `.env.test.local` exists in the current directory
+      - **Exists** → read credentials from the first role block (same format as local testing)
+      - **Does not exist** → scaffold `.env.test.local` skeleton:
+        ```bash
+        echo '{"targetDir":".","templates":["env.test.local"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
+        ```
+        Stop here. Tell the user:
+        ```
+        📝 .env.test.local 已建立，請填入測試帳號密碼，完成後再繼續執行 /e2e:remote。
+        ```
+        Do NOT proceed to Steps 2–9.
   - Test depth (single page / multi-page flow)
 
 ## Step 2: Locate Skill Directory & Load References (MANDATORY)

@@ -18,26 +18,26 @@ const path = require('path');
 
 // ── Target path mapping ────────────────────────────────────────
 const TARGET_MAP = {
-  'BasePage':                   'tests/e2e/pages/BasePage.ts',
-  'RemoteBasePage':             'tests/e2e/pages/RemoteBasePage.ts',
-  'playwright.config.local':    'playwright.config.ts',
-  'playwright.config.remote':   'playwright.config.ts',
-  'auth':                       'tests/fixtures/auth.ts',
-  'auth.setup':                 'tests/e2e/auth/auth.setup.ts',
-  'env.test.local':             '.env.test.local',
-  'error-utils':                'tests/fixtures/error-utils.ts',
+  'BasePage':                        'tests/e2e/pages/BasePage.ts',
+  'RemoteBasePage':                  'tests/e2e/pages/RemoteBasePage.ts',
+  'playwright.config.local':         'playwright.config.ts',
+  'playwright.config.local.auth':    'playwright.config.ts',
+  'playwright.config.remote':        'playwright.config.ts',
+  'auth.setup':                      'tests/e2e/auth/auth.setup.ts',
+  'env.test.local':                  '.env.test.local',
+  'error-utils':                     'tests/fixtures/error-utils.ts',
 };
 
 // ── Template file extension mapping ────────────────────────────
 const EXTENSION_MAP = {
-  'BasePage':                   '.ts',
-  'RemoteBasePage':             '.ts',
-  'playwright.config.local':    '.ts',
-  'playwright.config.remote':   '.ts',
-  'auth':                       '.ts',
-  'auth.setup':                 '.ts',
-  'env.test.local':             '',       // no extension change
-  'error-utils':                '.ts',
+  'BasePage':                        '.ts',
+  'RemoteBasePage':                  '.ts',
+  'playwright.config.local':         '.ts',
+  'playwright.config.local.auth':    '.ts',
+  'playwright.config.remote':        '.ts',
+  'auth.setup':                      '.ts',
+  'env.test.local':                  '',       // no extension change
+  'error-utils':                     '.ts',
 };
 
 const TEMPLATES_DIR = path.join(__dirname, '..', 'templates');

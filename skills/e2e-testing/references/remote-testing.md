@@ -122,13 +122,17 @@ When the remote site requires login, use MCP browser to authenticate and export 
 
 ### MCP Login Flow
 
+**Before starting**: credentials must come from `.env.test.local` in the current directory (first `TEST_{ABBREV}_USERNAME` / `TEST_{ABBREV}_PASSWORD` block). If the file does not exist, `/e2e:remote` Step 1 will scaffold it and stop — do not proceed until the user fills it in.
+
+Do NOT ask for credentials inline in the conversation (they would be stored in conversation history). Do NOT attempt `browser_fill_form` without reading confirmed credentials from `.env.test.local`.
+
 ```
 1. browser_navigate → login page URL
-2. browser_snapshot → identify form fields
-3. browser_fill_form → fill credentials (username, password)
+2. browser_snapshot → identify form fields (email/username input, password input, submit button)
+3. browser_fill_form → fill credentials (from .env.test.local or user-provided)
 4. browser_click → click login/submit button
 5. browser_wait_for → wait for redirect or dashboard element
-6. browser_snapshot → verify logged-in state
+6. browser_snapshot → verify logged-in state (confirm URL changed, no error message visible)
 ```
 
 ### Export Auth State

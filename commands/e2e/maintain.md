@@ -23,6 +23,16 @@ All output must be in **繁體中文**.
 
 Do NOT proceed without reading. If resolution fails, report the error and stop.
 
+## Step 1b: Load Project-Local Patterns (if present)
+
+Check for project-local patterns — zero additional cost when absent:
+- Check if `playwright/e2e-patterns.md` exists (in the `package.json` directory)
+- If exists: Read it and apply its patterns throughout Steps 4–6:
+  - `## Locators` — prefer these selectors over default `[data-testid]` when updating POM
+  - `## Timing` — add these wait conditions to relevant POM action methods
+  - `## Feedback` — use this confirmed selector if updating feedback-related code
+- If absent: skip — do not create it yet
+
 ## Step 2: Determine Change Scope
 
 Determine the change scope using one or both input sources:
@@ -98,6 +108,15 @@ IF any test fails:
 │   │       └── Retry failing test(s) (max 1 MCP-debug retry)
 │   └── PAGE LOADING error → Report FAIL
 └── Generate report with per-failure classification + MCP diagnostic info
+
+**After all tests pass** (whether initially, after MCP debug loop, or after user-guided fixes):
+→ If any POM or spec file was modified in this session AND tests now pass:
+  1. Read `playwright/e2e-patterns.md` (create with skeleton if absent — see `/e2e:create` Step 5 for skeleton format)
+  2. Classify each fix made in this session:
+     - Selector / locator change → `## Locators` entry: `- {component}: use {actual-selector} not {attempted-selector}`
+     - Wait / timing change → `## Timing` entry: `- {operation}: needs {waitCondition} because {reason}`
+  3. Skip if same pattern already present (substring match)
+  4. If total file lines < 50 → append; if ≥ 50 → replace most similar entry in same section
 
 ## Step 7: Generate Dual Reports
 

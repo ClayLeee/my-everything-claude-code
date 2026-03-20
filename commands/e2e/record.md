@@ -105,12 +105,21 @@ Present the recording summary to the user:
    - 「拖曳第一個項目到第三個位置」
    - 「上傳一個 PDF 檔案到附件欄位」
    輸入「無」或「跳過」繼續。
+
+🎯 是否要指定這段錄製的目標？（選填，留空則自動根據 URL 判斷）
+   - 新增測試：「加到 {頁面名稱} 的測試中」
+   - 修正測試：「修正 {頁面名稱} 裡的 {測試名稱}」
+   - 新增特定流程：「把新增使用者的流程加到 user-list 的測試」
 ```
 
 If user describes supplementary interactions:
 1. Generate corresponding Playwright API code (`page.hover()`, `page.dragAndDrop()`, `setInputFiles()`, etc.)
 2. Mark as `// [supplementary] described by user` and append to the action list
 3. Include in the recording artifact for Phase 2
+
+If user specifies a target (page name, test name, or flow description):
+- Record as `user_target` in the recording artifact
+- Phase 2 Step 7 will use this to override URL-based auto-assignment
 
 If user says "無", "跳過", "skip", or similar → proceed to Step 6.
 
@@ -155,7 +164,12 @@ The subagent should load these references from `$SKILL_DIR/references/`:
 
 ### Step 7: Auto-Assignment — Resolve Target Files
 
-Based on `page.goto()` URLs from the recording, locate existing test files:
+**If `user_target` was specified in Step 5**, use it to resolve the target directly:
+- Parse the page name and test name from the user's description
+- `Glob` for matching spec/POM files using the specified page name
+- If a specific test name was given (「修正 X 測試」), locate that `test()` block within the spec for targeted replacement
+
+**If no `user_target`**, fall back to URL-based auto-detection:
 
 1. Extract URL path → domain + page-name + PageName
 2. `Glob("tests/e2e/{domain}/*{page-name}*.spec.ts")` → find existing spec
