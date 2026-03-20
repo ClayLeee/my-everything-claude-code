@@ -109,7 +109,15 @@ For full lifecycle examples and code patterns, see **`references/test-data-polic
 
 If no delete UI exists, accept data persistence — use unique identifiers per run (timestamp suffix) to avoid collisions. Do NOT fall back to API cleanup.
 
-## Test Scenario Guidelines
+## Coverage Goals
+
+Before generating test scenarios for any component, answer these 3 questions:
+
+1. **What does the user accomplish with this component?** (functional purpose)
+2. **What can go wrong?** (error paths: missing required fields, format errors, API failures)
+3. **How does the user know it worked?** (assertion basis: UI feedback, data update, URL change)
+
+Use these answers to derive test scenarios — not by looking up a behavior type in a table.
 
 Not every feature requires all scenario types. Use judgement:
 
@@ -216,13 +224,11 @@ For the full semantic extraction procedure (recursive analysis, SET table, behav
 
 One page = one spec file. Use nested `test.describe` mirroring the component hierarchy (Page > Dialog > Tab > Form).
 
-### Interaction Depth Checklist
+### Coverage Self-Check
 
-Apply to every container (dialog, tab panel, form) found in the Coverage Plan. Covers four categories: **Container Patterns** (dialog, tabs, popover, accordion), **Data Display** (table, pagination, empty state), **Form Patterns** (fields, validation, submit, select, rich text), and **Action Patterns** (toggle, delete confirm, drag-and-drop, multi-role).
+After deriving scenarios using the 3 questions from § Coverage Goals, verify completeness using the self-check questions in **`references/coverage-checklist.md`**. For runnable code examples of each pattern, see **`references/ui-patterns.md`**.
 
-Key mandatory items: every form needs a "fill + submit + verify feedback" test (this catches broken submissions that silent-fail); every table needs row count + per-column-type assertions (catches data binding and rendering bugs); every tab panel is treated as a sub-page with its own recursive checklist (tabs often have independent data loading that needs separate coverage).
-
-For the complete checklist with all items and rules, see **`references/coverage-checklist.md`** § Interaction Depth Checklist. For runnable code examples of each pattern, see **`references/ui-patterns.md`**.
+Key mandatory items: every form needs a "fill + submit + verify feedback" test (this catches broken submissions that silent-fail); every table needs row count + per-column-type assertions (catches data binding and rendering bugs); every tab panel is treated as a sub-page with its own coverage analysis.
 
 ## No Manual Screenshots
 
@@ -299,7 +305,7 @@ All commands need the skill directory path to access references, scripts, and te
 
 - **`references/auth-patterns.md`** — storageState concept, multi-role auth guidance, scaffold pointers
 - **`references/code-patterns.md`** — BasePage API surface, POM examples (including tab-internal locators), test structure, flaky patterns, artifact config, codegen workflow
-- **`references/coverage-checklist.md`** — Coverage Plan decomposition rules, validation rules, Interaction Depth Checklist details
+- **`references/coverage-checklist.md`** — Coverage Plan decomposition rules, validation rules, coverage self-check questions
 - **`references/error-discrimination.md`** — Error Discrimination Framework: error classification decision flow, recoverable vs non-recoverable determination, retry strategy, code examples (with import from error-utils)
 - **`references/mcp-discovery.md`** — MCP-Driven Test Discovery: session auth, page exploration, form dry-run, MCP→Spec translation
 - **`references/report-template.md`** — Report generation via generate-report.js, key rules

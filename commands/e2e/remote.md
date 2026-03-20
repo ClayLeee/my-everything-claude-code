@@ -40,6 +40,7 @@ All output must be in **繁體中文**.
 - `mcp-discovery.md` — MCP exploration workflow
 - `error-discrimination.md` — error classification framework
 - `auth-patterns.md` — authentication patterns (if login needed)
+- `coverage-checklist.md` — Interaction Depth Checklist（套用於 Remote Coverage Plan）
 
 Do NOT proceed without reading. If resolution fails, report the error and stop.
 
@@ -68,24 +69,72 @@ Per `references/remote-testing.md` § MCP Authentication:
 4. Write `.auth/remote.json` storageState file
 5. Update `playwright.config.ts` to use storageState
 
-## Step 5: MCP Exploration
+## Step 5: Structured MCP Exploration
 
-Per `references/remote-testing.md` § MCP Exploration Workflow:
-1. `browser_navigate` → target page
-2. `browser_snapshot` → get ARIA tree, build page structure map
-3. Explore interactive elements: click tabs/dialogs → snapshot → record
-4. Form dry-run: fill → submit → verify result → clean up
-5. Produce Discovery Report (elements, forms, tables, tabs)
+Per `references/remote-testing.md` § MCP Exploration Workflow, execute five passes then synthesize into artifacts.
+
+### Step 5A: Multi-Pass MCP Exploration
+
+**Pass 1 — Top-Level Structure:**
+- `browser_navigate` → target page
+- `browser_snapshot` → identify top-level structure: header, nav, main content, tabs, tables, forms, dialog triggers
+
+**Pass 2 — Recursive Tabs (max 2 levels deep):**
+- For each tab found in Pass 1: `browser_click` → `browser_snapshot` → record panel content
+- For each sub-tab inside a panel: repeat click → snapshot (stop at depth 2)
+
+**Pass 3 — Recursive Dialogs (1 level deep):**
+- For each dialog trigger: `browser_click` → `browser_snapshot` → record dialog content
+- Press `Escape` (or click close) to dismiss before moving to next trigger
+- If a dialog contains another dialog trigger: record it but do NOT expand it
+
+**Pass 4 — Form Dry-Run + Network Capture:**
+- For each form: fill with valid test data → submit → `browser_network_requests` → record API endpoint / method / response status
+- Clean up created data via UI after each form submission
+
+**Pass 5 — Error Boundary Discovery (run after Pass 4, API structure known):**
+- For each form: clear all required fields → submit → `browser_snapshot` → record inline error selectors + text
+- Re-try with invalid format values (e.g. "not-an-email" in email field) → record error selectors + text
+- Record submit button state on validation failure (disabled / still enabled)
+
+### Step 5B: Generate Remote Semantic Element Table (SET)
+
+From Pass 1–5 results, produce the ARIA → Behavior Classification table per `references/remote-testing.md` § ARIA → Behavior Taxonomy Mapping:
+
+| Element | ARIA Locator | Behavior Type | Tab/Dialog Context | Scenarios Required |
+|---------|-------------|---------------|-------------------|--------------------|
+| ...     | `getByRole(...)` | `open-dialog` / `form-submit` / `delete-action` / ... | top-level / {tab} / {dialog} | ... |
+
+### Step 5C: Generate Remote Coverage Plan
+
+Apply `references/coverage-checklist.md` § Interaction Depth Checklist to the Remote SET:
+
+1. Verify every form has a fill+submit+verify scenario
+2. Verify every tab panel is treated as a sub-page with its own test rows
+3. Verify every table has row count + column type assertions
+4. Verify every CRUD operation has an error boundary scenario
+
+**If checklist has unchecked items:**
+- Run targeted `browser_snapshot` to gather missing info
+- If still unconfirmable (e.g. requires specific data state): mark as `test.skip` with reason
+
+Output the plan to `playwright/{page-name}/remote-coverage-plan.md` per `references/remote-testing.md` § Remote Coverage Plan Format.
+
+**Do NOT proceed to Step 6 until all applicable checklist items are checked.**
 
 ## Step 6: Generate Test Files
 
-1. `tests/e2e/pages/{PageName}Page.ts` — POM extending `RemoteBasePage`, using remote locator strategy (`getByRole` > `getByText` > CSS)
-2. `tests/e2e/{domain}/{page-name}.spec.ts` — Test scenarios based on exploration results (domain inferred from URL path, e.g. `/projects/` → `tests/e2e/projects/`)
+Generate from `playwright/{page-name}/remote-coverage-plan.md` (NOT directly from exploration results).
 
-**Remote mode differences:**
-- No `data-testid` injection (no source code access)
-- Locator priority: `getByRole` > `getByText` > CSS > `data-testid` (only if site already has them)
+1. `tests/e2e/pages/{PageName}Page.ts` — POM extending `RemoteBasePage`
+2. `tests/e2e/{domain}/{page-name}.spec.ts` — scenarios from Coverage Plan (domain inferred from URL path, e.g. `/projects/` → `tests/e2e/projects/`)
+
+**Remote mode rules:**
+- No `data-testid` injection (no source code access) — **do NOT use `data-testid` unless the remote site already has them**
+- Locator priority: `getByRole` > `getByText` > `getByPlaceholder` > CSS
 - POM extends `RemoteBasePage` (not local `BasePage`)
+- Table column assertions: use type-matching rules from `references/remote-testing.md` § Remote Table Column Assertion Rules
+- Each Behavior Type from Remote SET maps to Minimum Test Steps per § ARIA → Behavior Taxonomy Mapping
 
 ## Step 7: Execute Tests
 

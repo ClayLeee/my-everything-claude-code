@@ -1,6 +1,6 @@
 # UI Pattern Testing Examples
 
-Core code patterns for common UI interactions. Each section corresponds to a behavior from the Behavior Taxonomy in `semantic-analysis.md` or the Interaction Depth Checklist in `coverage-checklist.md`.
+Core code patterns for common UI interactions. Each section corresponds to a behavior from the Behavior Taxonomy in `semantic-analysis.md` or a coverage self-check item in `coverage-checklist.md`.
 
 For specialized patterns (sortable columns, tabs, accordion, popover, date picker, rich text editor, file upload, drag and drop), see **`ui-patterns-extended.md`**.
 
@@ -236,8 +236,55 @@ test.describe('Edit Item', () => {
 
 ## Pagination
 
+Pagination requires total records to exceed the page size. Before writing the test, check if the next-page button is enabled. If not, create enough `[E2E]` records in `beforeAll` and clean up in `afterAll`.
+
 ```typescript
 test.describe('Pagination', () => {
+  // Track [E2E] records created for pagination — clean up in afterAll
+  const PAGINATION_PREFIX = `[E2E] Pagination ${Date.now().toString(36)}`
+  let createdCount = 0
+
+  test.beforeAll(async ({ browser }) => {
+    // Check if next-page button is already enabled
+    const page = await browser.newPage()
+    const listPage = new ProjectListPage(page)
+    await listPage.goto()
+
+    const nextBtn = page.locator('[data-testid="pagination-next"]')
+    const isEnabled = await nextBtn.isEnabled().catch(() => false)
+
+    if (!isEnabled) {
+      // Create records until pagination is possible (page size is typically visible from page info)
+      // Keep adding until next button becomes enabled (max 25 to avoid infinite loop)
+      while (!(await nextBtn.isEnabled()) && createdCount < 25) {
+        await listPage.addButton.click()
+        await listPage.createDialog.nameInput.fill(`${PAGINATION_PREFIX} ${createdCount + 1}`)
+        const apiPromise = listPage.waitForApi('/v3/items')
+        await listPage.createDialog.submitBtn.click()
+        await apiPromise
+        createdCount++
+      }
+    }
+    await page.close()
+  })
+
+  test.afterAll(async ({ browser }) => {
+    if (createdCount === 0) return
+    const page = await browser.newPage()
+    const listPage = new ProjectListPage(page)
+    await listPage.goto()
+    // Search and delete all [E2E] Pagination records
+    await listPage.searchInput.fill(PAGINATION_PREFIX)
+    await page.waitForResponse(resp => resp.url().includes('/v3/items'))
+    while (await listPage.tableRows.count() > 0) {
+      const deleteBtn = listPage.tableRows.first().locator('[data-testid="item-delete-btn"]')
+      await deleteBtn.click()
+      await listPage.deleteDialog.submitBtn.click()
+      await page.waitForResponse(resp => resp.url().includes('/v3/items'))
+    }
+    await page.close()
+  })
+
   test('should display page info', async () => {
     const pageInfo = page.locator('[data-testid="pagination-info"]')
     await expect(pageInfo).toHaveText(/\d+/)

@@ -6,7 +6,7 @@
 - [Recursive Procedure](#recursive-procedure) (component tree discovery, split points, analysis depth, per-component extraction)
 - [Semantic Element Table (SET)](#semantic-element-table-set) (row structure with Container column for depth tracking)
 - [Extraction Rules](#extraction-rules) (source clue to extraction mapping for handlers, icons, i18n, API calls)
-- [Behavior Taxonomy](#behavior-taxonomy) (minimum test steps and required error/boundary scenarios per behavior)
+- [Behavior Taxonomy](#behavior-taxonomy) (semantic labels for classifying element purpose; error/boundary scenarios per behavior)
 - [Table Column Assertion Rules](#table-column-assertion-rules) (per-column-type assertion patterns)
 - [Worked Examples](#worked-examples) (Members Page simple example, Project Settings nested tabs + dialog example)
 
@@ -156,33 +156,37 @@ Each interactive element = one row. Include a `Container` column to track depth:
 
 ## Behavior Taxonomy
 
-| Behavior | Minimum Test Steps |
-|----------|-------------------|
-| **form-submit** | open → fill ALL required fields via UI → submit → `waitForResponse` → assert feedback → assert data update |
-| **delete-confirm** | click trigger → assert AlertDialog → fill confirm input → confirm → `waitForResponse` → assert removal |
-| **toggle** | record state → click → `waitForResponse` → assert state flipped → restore |
-| **inline-edit** | click to enter edit → change value → save → assert API + display |
-| **navigation** | click → `waitForURL` → assert destination loaded |
-| **sort** | record first row → click header → `waitForResponse` → assert order changed |
-| **filter** | type/select value → `waitForResponse` → assert rows match |
-| **pagination** | assert info text → click next → `waitForResponse` → assert content changed |
-| **drag-reorder** | record order → `dragTo` → `waitForResponse` → assert order changed |
-| **bulk-action** | select checkbox(es) → assert toolbar/action bar visible → click action → `waitForResponse` → assert action applied to all selected |
-| **copy-to-clipboard** | click copy trigger → assert success feedback (checkmark icon, "Copied!" text, or toast) |
-| **upload** | click input or drag file to drop zone → assert preview/progress → `waitForResponse` → assert upload complete |
-| **expand-collapse** | click trigger → assert content visible → click again → assert content hidden |
-| **autocomplete** | type query → `waitForResponse` → assert suggestion dropdown → select item → assert input populated + dropdown closed |
-| **multi-step-form** | fill step 1 → next → fill step 2 → ... → submit → `waitForResponse` → assert completion |
-| **dropdown-menu** | click menu trigger → assert menu visible → click menu item → assert action executed → menu closed |
-| **infinite-scroll** | scroll to bottom / click "Load more" → `waitForResponse` → assert new items appended + count increased |
-| **download/export** | click trigger → `waitForEvent('download')` → assert file downloaded (filename, non-empty) |
-| **keyboard-shortcut** | `page.keyboard.press('Control+K')` → assert expected action (palette open, save, etc.) |
-| **static-display** | per column type assertions (see below) |
+Behavior labels classify the semantic purpose of an interactive element — they are vocabulary for analysis, not lookup keys for prescribed steps. Once you identify an element's behavior type, think about its business purpose, then derive: what makes it succeed? what makes it fail? how does the user confirm the outcome?
 
-### Required Error/Boundary Scenarios
+| Behavior | Semantic Meaning |
+|----------|-----------------|
+| **form-submit** | User submits structured input to create or update data |
+| **delete-confirm** | User permanently removes an item, typically with a confirmation step |
+| **toggle** | User switches a binary state on/off |
+| **inline-edit** | User edits a value directly in context without opening a full dialog |
+| **navigation** | User moves to a different view or triggers a state transition |
+| **sort** | User reorders table data by a column criterion |
+| **filter** | User narrows displayed data by a criterion |
+| **pagination** | User navigates between pages of a data set |
+| **drag-reorder** | User reorders items by dragging |
+| **bulk-action** | User applies an action to multiple selected items simultaneously |
+| **copy-to-clipboard** | User copies text or data to the clipboard |
+| **upload** | User uploads a file to the system |
+| **expand-collapse** | User shows or hides a section of content |
+| **autocomplete** | User searches and selects from a live suggestion list |
+| **multi-step-form** | User completes a multi-page or multi-step input flow |
+| **dropdown-menu** | User opens a menu and selects an action |
+| **infinite-scroll** | User loads more items by scrolling or clicking "load more" |
+| **download/export** | User triggers a file download or data export |
+| **keyboard-shortcut** | User triggers an action via keyboard combination |
+| **static-display** | Element displays read-only data (use column assertion rules below) |
 
-| Behavior | Error Scenarios |
-|----------|----------------|
+### Error & Boundary Scenarios by Behavior
+
+For each behavior type, consider which of these failure modes apply to the specific component you're testing. Use them as a checklist of "what can go wrong?" — not every row applies to every component.
+
+| Behavior | Typical Failure Modes |
+|----------|-----------------------|
 | **form-submit** | (1) Empty required field → inline error (2) Invalid value → error feedback (3) Submit disabled during submission |
 | **delete-confirm** | (1) Confirm mismatch → button disabled (2) Cancel → dialog close + data unchanged |
 | **toggle** | (1) Disabled state → not clickable |

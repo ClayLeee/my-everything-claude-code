@@ -9,6 +9,11 @@ Patterns for E2E testing remote URLs without a local project.
 - [Remote Locator Strategy](#remote-locator-strategy) (Priority, MCP ARIA Mapping, Translation Rules)
 - [MCP Authentication & Auth Bridging](#mcp-authentication--auth-bridging) (Login Flow, Export State, Config)
 - [MCP Exploration Workflow](#mcp-exploration-workflow) (Auth, Page Exploration, Form Dry-Run, Discovery Report)
+- [ARIA → Behavior Taxonomy Mapping](#aria--behavior-taxonomy-mapping)
+- [Recursive Exploration Protocol](#recursive-exploration-protocol)
+- [Error Boundary Discovery Protocol](#error-boundary-discovery-protocol)
+- [Remote Table Column Assertion Rules](#remote-table-column-assertion-rules)
+- [Remote Coverage Plan Format](#remote-coverage-plan-format)
 - [RemoteBasePage Pattern](#remotebasepage-pattern)
 - [Test Scenario Generation Rules](#test-scenario-generation-rules)
 - [Report Adaptation](#report-adaptation)
@@ -213,56 +218,145 @@ use: {
 
 Follow the MCP Login Flow above.
 
-### Phase 2: Page Exploration
+### Phase 2: Five-Pass Structured Exploration
 
+**Pass 1 — Top-Level Structure:**
 1. `browser_navigate` → target page
-2. `browser_snapshot` → get ARIA tree, build page structure map
-3. Identify interactive elements: buttons, links, tabs, forms, tables
-4. For each tab: `browser_click` → `browser_snapshot` → record panel content
-5. For each dialog trigger: `browser_click` → `browser_snapshot` → record dialog content → close
-6. For pagination: `browser_click` next → `browser_snapshot` → record changes
+2. `browser_snapshot` → identify: header, nav, main content, tabs, tables, forms, dialog triggers
 
-### Phase 3: Form Dry-Run
+**Pass 2 — Recursive Tabs (max 2 levels deep):**
+1. For each tab: `browser_click` → `browser_snapshot` → record panel content
+2. For sub-tabs inside a panel: repeat (stop at depth 2)
 
-1. `browser_fill_form` → fill with test data
-2. `browser_click` → submit
-3. `browser_snapshot` → verify result (success message, error messages, validation)
-4. Clean up: undo changes if possible (delete created data, restore edited data)
+**Pass 3 — Recursive Dialogs (1 level deep):**
+1. For each dialog trigger: `browser_click` → `browser_snapshot` → record dialog content
+2. Press `Escape` (or click close) to dismiss
+3. Record any nested dialog triggers found inside, but do NOT expand them
 
-### Discovery Report Structure
+**Pass 4 — Form Dry-Run + Network Capture:**
+1. For each form: fill with valid test data → submit → `browser_network_requests`
+2. Record: API endpoint, method, success response status
+3. Clean up created data via UI after each submission
 
-After exploration, produce a Discovery Report documenting:
+**Pass 5 — Error Boundary Discovery (run after Pass 4):**
+1. For each form: clear all required fields → submit → `browser_snapshot` → record inline error selectors + text
+2. Fill invalid format values (e.g. `"not-an-email"` in email field) → submit → record error selectors
+3. Record submit button state on validation failure (disabled / still enabled)
+
+### Phase 3: Synthesize Artifacts
+
+After all five passes, produce in order:
+1. **Remote SET** — ARIA → Behavior Classification table (see § ARIA → Behavior Taxonomy Mapping)
+2. **Remote Coverage Plan** — apply coverage self-check questions and output `playwright/{page-name}/remote-coverage-plan.md` (see § Remote Coverage Plan Format)
+
+Do NOT generate test files until Coverage Plan is complete and checklist is fully verified.
+
+## ARIA → Behavior Taxonomy Mapping
+
+Map MCP snapshot elements to behavior types using both ARIA role and context. Context disambiguates same-name buttons with different functions.
+
+| ARIA Pattern | Context | Behavior Type |
+|---|---|---|
+| `button` | Top-level or toolbar, not inside a form | `open-dialog` |
+| `button "確認" / "儲存" / "送出"` | Inside a form or dialog | `form-submit` |
+| `button "刪除" / "移除"` | Any location | `delete-action` |
+| `button "編輯"` | Inside table row or list item | `open-edit-dialog` |
+| `tab` | Inside `tablist` | `tab-switch` |
+| `checkbox` / `switch` | Standalone toggle | `toggle` |
+| `combobox` | Any location | `select-option` |
+| `textbox` | Inside search bar or filter area | `search-filter` |
+| `table` | Any location | `data-display` |
+| pagination controls | Below a table | `pagination` |
+
+Once you identify a behavior type, think about the element's business purpose — what the user is trying to accomplish, what can go wrong, and how success is confirmed. Use these questions to derive test scenarios rather than mapping to prescribed steps.
+
+**Disambiguation rule:** When two buttons share the same label (e.g. two `button "編輯"` in different rows), use a parent container to scope the locator:
+```typescript
+page.getByRole('row', { name: 'Item Name' }).getByRole('button', { name: '編輯' })
+```
+
+## Recursive Exploration Protocol
+
+- **Depth tracking:** Tabs explore up to **2 levels** deep. Dialogs explore **1 level** deep.
+- **Stop condition:** Stop when you encounter a UI library primitive with no custom behavior (e.g. a plain icon button with tooltip).
+- **Shared components:** When the same pattern appears in multiple tabs, record it once and annotate as `shared` in the Tab/Dialog Context column.
+- **Nested dialog triggers:** If a dialog contains another dialog trigger, record the trigger in the Remote SET with context `{parent-dialog} > trigger`, but mark it for Pass 3 exploration and do NOT recursively open it during the parent's Pass 3.
+
+## Error Boundary Discovery Protocol
+
+Execute after Pass 4 (API structure is known). For each `form-submit` element in the Remote SET:
+
+1. Clear all required fields → click submit → `browser_snapshot`
+   - Record: inline error selector(s), error text content
+2. Fill invalid format values (e.g. `"not-an-email"` for email, `"abc"` for number) → click submit → `browser_snapshot`
+   - Record: error selector(s), error message text
+3. Observe submit button state during validation failure:
+   - `disabled` → note `submitDisabledOnError: true`
+   - `still enabled` → note `submitDisabledOnError: false`
+4. Write results into the Remote SET's `Scenarios Required` column for that element:
+   - `fill+submit → success; empty required → {inline-error-selector}; invalid format → {error-selector}`
+
+**Do not skip this protocol.** Error boundary tests are required for every `form-submit` behavior type.
+
+## Remote Table Column Assertion Rules
+
+Infer column type from MCP snapshot cell content, then apply the matching assertion pattern:
+
+| Inferred Column Type | Identification (snapshot content) | Playwright Assertion |
+|---|---|---|
+| Plain text | Any text, no special pattern | `.not.toHaveText('')` |
+| Badge / Status | Fixed set of values (e.g. Active/Inactive/啟用/停用) | `.toHaveText(/Active\|Inactive/i)` |
+| Date | Matches `YYYY-MM-DD` or `YYYY/MM/DD` | `.toHaveText(/\d{4}[-\/]\d{2}[-\/]\d{2}/)` |
+| Progress fraction | `x/y` pattern | `.toHaveText(/\d+\/\d+/)` |
+| Percentage | `x%` pattern | `.toHaveText(/\d+%/)` |
+| Action button column | Cell contains `button` or `link` | `firstRow.getByRole('button', { name: '編輯' })` — always include `name` to avoid ambiguity when a row has multiple buttons |
+| Empty / N/A | Confirmed no data or non-required field | `.toBeVisible()` or skip assertion with comment |
+
+Apply one assertion per data column. Do not assert on action columns beyond button visibility.
+
+## Remote Coverage Plan Format
+
+Output to `playwright/{page-name}/remote-coverage-plan.md`:
 
 ```markdown
-## Discovery Report: {Page Name}
+# Remote Coverage Plan: {Page Name}
 
 **URL**: {url}
-**認證**: 需要 / 不需要
+**探索日期**: {date}
 
-### 頁面結構
-- Header: {description}
-- Navigation: {links found}
-- Main content: {description}
+## Remote Semantic Element Table
 
-### 互動元素
-| 元素 | 類型 | Locator | 備註 |
-|------|------|---------|------|
-| ... | button/link/tab/... | getByRole(...) | ... |
+| Element | ARIA Locator | Behavior Type | Tab/Dialog Context | Scenarios Required |
+|---------|-------------|---------------|-------------------|--------------------|
+| 新增按鈕 | `getByRole('button', {name: '新增'})` | `open-dialog` | top-level | open → content visible → close |
+| 確認送出 | `getByRole('button', {name: '確認'})` | `form-submit` | 新增 dialog | fill+submit → success; empty required → error |
+| 刪除 | `getByRole('button', {name: '刪除'})` | `delete-action` | top-level | click → removal（需先探索是否有 confirm dialog）|
 
-### 表單
-| 欄位 | 類型 | 必填 | Locator |
-|------|------|------|---------|
-| ... | text/select/checkbox/... | 是/否 | ... |
+## Test Scenarios
 
-### 表格
-- 欄位: {column names}
-- 資料筆數: {count}
-- 分頁: 有/無
+| # | Scenario | Elements Involved | Assertions | Priority |
+|---|----------|------------------|------------|----------|
+| 1 | 頁面載入 — 顯示資料 | table | row count > 0 | P0 |
+| 2 | 新增流程 — 成功 | 新增按鈕, form, 確認送出 | success feedback + row added | P0 |
+| 3 | 新增流程 — 必填驗證 | form, 確認送出 | inline error visible | P1 |
+| 4 | 刪除流程 | 刪除, confirm dialog | row removed | P1 |
 
-### Tabs
-| Tab 名稱 | 內容摘要 |
-|-----------|----------|
-| ... | ... |
+## Coverage Self-Check
+
+- [ ] 每個 Tab 作為 sub-page 處理了嗎？（Tab names: {list}）
+- [ ] 每個 form 有測試「成功送出」和「送出失敗（必填/格式錯誤）」嗎？
+- [ ] 每個 table 有驗證「資料存在（row count > 0）」和「每欄的型別正確」嗎？
+- [ ] 每個 delete action 有驗證實際移除嗎？（依探索結果：confirm dialog / inline confirm / 直接刪除）
+- [ ] 每個建立的測試資料都有清理機制嗎？
+
+Verify all applicable items before generating tests.
+
+## API Documentation
+
+| Operation | Endpoint | Method | Success Status | Error Status |
+|-----------|----------|--------|----------------|-------------|
+| 新增       | /api/... | POST   | 201            | 422         |
+| 刪除       | /api/... | DELETE | 204            | 404         |
 ```
 
 ## RemoteBasePage Pattern
@@ -279,18 +373,32 @@ This creates `tests/e2e/pages/RemoteBasePage.ts` — an independent minimal base
 
 ## Test Scenario Generation Rules
 
-| Exploration Finding | Generated Test |
-|---|---|
-| Navigation links | Click → verify URL change |
-| Table with data | Row count > 0, column content assertions |
-| Search / filter | Enter keyword → verify result change |
-| Form | Fill → submit → verify feedback (toast/redirect/message) |
-| Tabs | Switch → verify panel content change |
-| Pagination | Click next → verify content change |
-| Dialog trigger | Click → verify dialog opens → interact → close |
-| Toggle / switch | Click → verify state change |
-| Dropdown / select | Open → select option → verify selection |
-| File upload | Upload → verify preview / success message |
+Generate tests from the Remote Coverage Plan — **not** directly from exploration findings.
+
+For each element in the Remote SET, identify its business purpose and derive scenarios by answering:
+
+1. **What does the user accomplish?** → success path test
+2. **What can go wrong?** → error path tests (validation failures, API errors, empty states)
+3. **How is success confirmed?** → assertion design (feedback message, data update, URL change)
+
+Use the ARIA → Behavior Taxonomy Mapping to classify elements — the behavior type is a semantic label that tells you the element's purpose, not a recipe for prescribed steps. Every `form-submit` element must also include the error boundary scenarios recorded during Pass 5.
+
+Additional rules:
+- Navigation links: verify URL change after click
+- File upload: verify preview or success message appears
+- Any scenario requiring specific data state that cannot be reliably reproduced: mark `test.skip` with reason comment
+
+### Table Data Preconditions
+
+**Empty table on arrival:**
+Do NOT assert `row count > 0` against an empty table. If the page has a create UI (discovered in Pass 3), generate a `beforeAll` that creates one `[E2E]` record via UI before the display assertions run, and an `afterAll` that deletes it. If there is no create UI, mark table display tests as `test.skip` with reason.
+
+**Pagination with insufficient data:**
+Check during Pass 1 whether the next-page button is enabled (ARIA: `button "Next"` or equivalent, `aria-disabled` attribute). If disabled:
+- If the page has a create UI: generate a `beforeAll` that creates `[E2E]` records in a loop (`browser_click` add button → fill → submit) until the next-page button becomes enabled (max 25 iterations), then `afterAll` to clean up.
+- If no create UI exists: mark pagination test as `test.skip` with reason: `// No create UI — cannot guarantee enough data for pagination`.
+
+Record the observed next-button selector and aria-disabled state in the Remote SET for use in the generated `beforeAll` condition check.
 
 ## Report Adaptation
 
