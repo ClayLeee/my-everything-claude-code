@@ -22,16 +22,6 @@
         ]
       },
       {
-        "matcher": "tool == \"Edit\" || tool == \"Write\"",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/suggest-compact.js",
-            "timeout": 10
-          }
-        ]
-      },
-      {
         "matcher": "*",
         "hooks": [
           {
@@ -107,19 +97,6 @@
             "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/check-console-log.js",
             "timeout": 30
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/hooks/notify.js",
-            "timeout": 15,
-            "async": true
           }
         ]
       }
