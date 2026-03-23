@@ -21,7 +21,7 @@ Before launching codegen, verify Playwright is a local dependency:
 
 ```bash
 # Check if @playwright/test is in devDependencies
-cd app && node -e "const pkg = require('./package.json'); if (!pkg.devDependencies?.['@playwright/test']) process.exit(1)"
+cd app && node -e "process.exit(require('./package.json').devDependencies?.['@playwright/test'] ? 0 : 1)"
 ```
 
 If not installed:
