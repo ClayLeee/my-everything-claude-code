@@ -287,7 +287,7 @@ All commands need the skill directory path to access references, scripts, and te
 ### Scripts
 
 - **`scripts/scaffold.js`** — Template scaffolder: reads templates, replaces `{{VAR}}` placeholders, writes to target paths. stdin JSON: `{ targetDir, templates[], variables{}, overwrite }` → stdout JSON: `{ created[], skipped[], errors[] }`
-- **`scripts/generate-report.js`** — Report generator: calculates summary stats, generates 繁體中文 markdown report. stdin JSON: `{ pageName, pageNameZh, testDate, testUrl, testAccount, describeGroups[], outputDir }` → stdout JSON: `{ outputPath, summary }`
+- **`scripts/generate-report.js`** — Report generator: calculates summary stats, generates 繁體中文 markdown report. stdin JSON: `{ pageName, pageNameZh, testDate, testUrl, testAccount, describeGroups[] (ALL tests — pass/fail/skip; failed tests include error.classification + error.suggestion), outputDir }` → stdout JSON: `{ outputPath, summary }`
 
 ### Templates
 
