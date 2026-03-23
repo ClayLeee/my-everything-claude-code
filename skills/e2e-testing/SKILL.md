@@ -2,18 +2,8 @@
 name: e2e-testing
 description: |
   Playwright E2E testing patterns, Page Object Model, configuration, artifact management, and flaky test strategies.
-  Use this skill whenever the user mentions E2E tests, Playwright, test automation, or page testing — even if they
-  don't explicitly say "E2E". Trigger phrases include: "write tests", "add Playwright tests", "create page tests",
-  "update tests", "deep test a page", "add data-testid", "fix flaky tests", "generate test report",
-  "handle test errors", "retry failed form submission", "classify test failures",
-  "test a remote URL", "remote test", "test this URL", "遠端測試", "測試網址",
-  "record test", "錄製測試", "錄製", "codegen", "record browser actions", "錄製瀏覽器操作",
-  "測試這個頁面", "幫我測這個功能", "這個功能怎麼驗證", "跑測試", "run tests",
-  "build POM", "create POM", "Page Object Model", "建 POM", "更新 POM", "POM class",
-  "分析頁面", "page analysis", "analyze page", "分析元件", "semantic analysis",
-  "coverage plan", "覆蓋計畫", "測試計畫", "產生計畫", "generate plan",
-  "更新 analysis", "update analysis", "補 analysis", "重新分析".
-  Also trigger when the user discusses test maintenance, recording, locators, test reports, or test coverage gaps.
+  Use when writing, updating, running, or recording E2E tests — including POM classes, page analysis, coverage plans,
+  data-testid injection, and error classification. Also triggers on: 遠端測試, 測試網址, 錄製, 跑測試, 深度測試, 分析頁面.
 ---
 
 # E2E Testing Patterns
