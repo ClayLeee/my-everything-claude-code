@@ -43,7 +43,7 @@ Do NOT proceed without reading. If resolution fails, report the error and stop.
 
 Confirm `@playwright/test` is in `package.json` devDependencies:
 ```bash
-cd app && node -e "const pkg = require('./package.json'); if (!pkg.devDependencies?.['@playwright/test']) process.exit(1)"
+cd app && node -e "process.exit(require('./package.json').devDependencies?.['@playwright/test'] ? 0 : 1)"
 ```
 
 If not installed:
