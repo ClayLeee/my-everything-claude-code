@@ -138,8 +138,6 @@ E2E Testing (`commands/e2e/`):
 - `/e2e:remote` — scaffold Playwright project, MCP explore + auth, run tests, MCP debug loop on failure, dual reports
 - `/e2e:record` — record browser actions via codegen, convert to POM + spec, MCP debug loop on failure
 
-Workflow (`commands/`):
-- `/before-commit` — run `pnpm before-commit` (type check + lint), then invoke `git-commit` skill to generate commit message
 Instinct Management (`commands/`):
 - `/evolve` — cluster related instincts into commands/skills/agents (default: preview, use `--execute` to create)
 - `/instinct-export` — export instincts to shareable YAML (strips sensitive data)
