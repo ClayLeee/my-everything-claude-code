@@ -24,7 +24,6 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 │   ├── evolve.md                  # Cluster instincts into skills/commands/agents
 │   ├── instinct-export.md         # Export instincts for sharing
 │   ├── instinct-import.md         # Import instincts from others
-│   ├── before-commit.md            # Run checks then generate commit message
 │   ├── learn-eval.md              # Extract patterns with quality evaluation
 │   └── skill-create.md            # Generate SKILL.md from git history
 ├── skills/
@@ -79,11 +78,8 @@ flowchart TD
     CLEAN --> DEV
     E2E --> DEV
 
-    %% ── Before Commit ──
-    DEV --> |"/before-commit"| BC["pnpm before-commit<br><i>type check + lint</i>"]
-    BC --> |pass| MSG["git-commit skill<br><i>generate conventional commit message</i>"]
-    BC --> |fail| DEV
-    MSG --> COMMIT["git commit + push"]
+    %% ── Commit ──
+    DEV --> COMMIT["git commit + push"]
     COMMIT --> PUSH[/"git push reminder hook<br><i>review before pushing</i>"/]
 
     %% ── Session End ──
@@ -110,7 +106,6 @@ flowchart TD
 
     class LOAD,OBSERVE,CONSOLE,COMPACT,BLOCK,PUSH,RECORD,ANALYZE,SUMMARIZE hook
     class REVIEW,BUILD,SEC,CLEAN,E2E agent
-    class BC,MSG command
     class START,END phase
     class INSTINCTS,EVOLVED,SHARE store
 ```
@@ -159,7 +154,6 @@ Global rules installed to `~/.claude/rules/` for automatic enforcement:
 - **refactor-cleaner** — Dead code detection, unused dependency removal, duplicate consolidation
 ### Commands
 
-- `/before-commit` — Run project checks (`pnpm before-commit`), then generate conventional commit message
 - `/e2e:analyze` — Analyze page structure and build Semantic Element Table
 - `/e2e:plan` — Generate coverage plan from analysis artifact
 - `/e2e:create` — Create POM + spec, MCP pre-validation, run tests, MCP debug loop on failure, generate dual reports
