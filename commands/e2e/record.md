@@ -162,6 +162,13 @@ The subagent should load these references from `$SKILL_DIR/references/`:
 - `error-discrimination.md` — error classification framework
 - `mcp-discovery.md` — MCP tool reference (for debug loop)
 
+**Load project-local patterns (if present):**
+- Check if `playwright/e2e-patterns.md` exists
+- If exists: Read and apply throughout Steps 8–12:
+  - `## Locators` — prefer these selectors when transforming locators in Step 8
+  - `## Timing` — add these wait conditions to relevant POM action methods
+- If absent: skip
+
 ### Step 7: Auto-Assignment — Resolve Target Files
 
 **If `user_target` was specified in Step 5**, use it to resolve the target directly:
@@ -261,6 +268,37 @@ IF any test fails:
 │   │       └── Retry failing test(s) (max 1 MCP-debug retry)
 │   └── PAGE LOADING error → Report FAIL
 └── Generate report with per-failure classification + MCP diagnostic info
+
+**After all tests pass** (whether initially, after MCP debug loop, or after user-guided fixes):
+→ If any POM or spec file was modified in this session AND tests now pass:
+  1. Read `playwright/e2e-patterns.md` (create with skeleton below if absent)
+  2. Classify each fix made in this session:
+     - Selector / locator change → `## Locators` entry: `- {component}: use {actual-selector} not {attempted-selector}`
+     - Wait / timing change → `## Timing` entry: `- {operation}: needs {waitCondition} because {reason}`
+  3. Skip if same pattern already present (substring match)
+  4. If total file lines < 50 → append; if ≥ 50 → replace most similar entry in same section
+
+Skeleton when creating from scratch:
+```markdown
+# E2E Patterns — {project-name}
+<!-- Hard cap: 50 lines total. When full, replace similar entries, do NOT add. -->
+
+## Locators
+<!-- Quirks where UI library wrappers change the actual DOM element to target -->
+<!-- Format: - {component}: use {selector} not {default} -->
+
+## Timing
+<!-- Wait conditions this app needs beyond SKILL.md defaults -->
+<!-- Format: - {operation}: needs {waitCondition} because {reason} -->
+
+## Feedback
+<!-- The ONE confirmed feedback selector for this project -->
+<!-- Format: - library: {name} | success: {selector} | error: {selector} -->
+
+## API
+<!-- Base URL and auth pattern (only if non-standard) -->
+<!-- Format: - baseUrl: {pattern} | auth: {method} -->
+```
 
 ### Step 13: Dual Reports + Completion
 
