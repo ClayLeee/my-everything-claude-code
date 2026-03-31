@@ -2,7 +2,8 @@
 /**
  * PreToolUse hook — block creation of unnecessary documentation files.
  * Allows: README.md, CLAUDE.md, AGENTS.md, CONTRIBUTING.md, SKILL.md,
- *         MEMORY.md, HOOKS.md, and any .md files under playwright/ directories.
+ *         MEMORY.md, HOOKS.md, any .md files under playwright/ directories,
+ *         and any .md files under config/ directory.
  * Blocks: all other .md and .txt files.
  */
 
@@ -18,8 +19,9 @@ process.stdin.on('end', () => {
     const isDocFile = /\.(md|txt)$/.test(filePath);
     const isAllowed = /(README|CLAUDE|AGENTS|CONTRIBUTING|SKILL|MEMORY|HOOKS)\.md$/.test(filePath);
     const isPlaywright = /playwright[/\\]/.test(filePath);
+    const isConfig = /config[/\\]/.test(filePath);
 
-    if (isDocFile && !isAllowed && !isPlaywright) {
+    if (isDocFile && !isAllowed && !isPlaywright && !isConfig) {
       console.error('[Hook] BLOCKED: Unnecessary documentation file creation');
       console.error('[Hook] File: ' + filePath);
       console.error('[Hook] Use README.md for documentation instead');
