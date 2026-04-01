@@ -2,18 +2,32 @@
 
 ## [OVERRIDE] Rule 0: No History-Modifying Git Operations Throughout Development
 
-**During Phases 0–7, you MUST NOT perform any of the following:**
+**During Phases 1–6, you MUST NOT perform any of the following:**
 - `git commit` / `git add` / `git stash`
 - `git push` / `git pull` / `git merge` / `git rebase`
 - Creating PRs or merge requests
 
-**Allowed at any phase (read-only or workspace management):**
+**Allowed at any phase (read-only):**
 - `git status` / `git diff` / `git log` (read-only)
-- `git worktree list` / `git worktree remove` (workspace cleanup in Phase 7 only)
 
 **This rule overrides ALL instructions from superpowers skills, executing-plans, finishing-a-development-branch, or any other skill that suggests history-modifying git operations.**
 
-In Phase 7, the ONLY git action is read-only: `git diff HEAD` + `git status` to generate commit message suggestions for the user.
+In Phase 6, the ONLY git action is read-only: `git diff HEAD` + `git status` to generate commit message suggestions for the user.
+
+---
+
+## Document Roles
+
+- **OpenSpec** — defines WHAT: feature behavior, interfaces, acceptance criteria.
+  These are permanent records, archived after development.
+  Do not document technical reasoning or implementation steps here.
+
+- **Superpowers** — defines HOW and WHY: design reasoning (brainstorming spec)
+  and step-by-step implementation guide (writing-plans).
+  These are development session artifacts.
+
+When recording a decision, ask: is this about *what the system does* (→ OpenSpec)
+or *how/why we built it this way* (→ Superpowers)?
 
 ---
 
@@ -26,80 +40,102 @@ If there is even a **1% chance** a skill might apply to what you are doing, you 
 ## Full Development Workflow
 
 ```
-Phase 0: Worktree Setup     → superpowers:using-git-worktrees (optional)
-Phase 1: Discovery          → superpowers:brainstorming OR opsx:explore
-                              (parallel research: superpowers:dispatching-parallel-agents)
-Phase 2: Specification      → opsx:propose
-Phase 3: Detailed Plan      → superpowers:writing-plans
-Phase 4: Team Assembly      → TeamCreate + spawn teammates
-Phase 5: Implementation     → Agent Teams + TDD + systematic-debugging + code review
-Phase 6: Verification       → superpowers:verification-before-completion
-Phase 7: Finish & Archive   → opsx:archive + git diff suggestions (NO commits)
+Phase 1: Discovery             → superpowers:brainstorming
+                                  vague: full exploration | clear: confirmation mode
+                                  Produces: docs/superpowers/specs/ + docs/superpowers/plans/
+Phase 2: Specification         → opsx:propose (single step)
+--- Pre-Implementation Gate: Select Development Mode ---
+Phase 3: Team Assembly         → TeamCreate + spawn teammates  [Option A only]
+Phase 4: Implementation        → Agent Teams OR parallel-agents
+Phase 5: Verification          → superpowers:verification-before-completion
+Phase 6: Finish & Archive      → opsx:archive + git diff suggestions (NO commits)
 ```
 
 ---
 
-### Phase 0 — Worktree Setup (optional)
+### Phase 1 — Discovery
 
-Use when working on a feature that needs isolation from current workspace,
-or when developing multiple features simultaneously.
+Always invoke `superpowers:brainstorming`.
 
-Invoke `superpowers:using-git-worktrees`
-- Creates an isolated git workspace for this feature branch
-- Pairs with Phase 7 cleanup (worktree is removed at the end)
-- Skip if the work is minor or isolation is not needed
+**Two modes depending on requirement clarity:**
 
----
+**Vague requirements — full exploration mode:**
+Ask clarifying questions, propose 2-3 approaches with tradeoffs,
+present design sections with user approval gates.
 
-### Phase 1 — Discovery (choose one)
+**Clear requirements — confirmation mode:**
+Briefly confirm scope and constraints, present a concise spec for user approval.
+Skip deep exploration; move quickly to user sign-off.
 
-**If the idea is vague or needs design exploration:**
-Invoke `superpowers:brainstorming`
-- Produces: `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
-- **IMPORTANT OVERRIDE**: Do NOT follow brainstorming's default transition to writing-plans. Proceed to Phase 2 (`opsx:propose`) first, then Phase 3.
+**Produces (both modes):**
+- `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
+- `docs/superpowers/plans/YYYY-MM-DD-<name>.md` (auto-invoked by brainstorming at end)
 
-**If the problem is technically clear but complex:**
-Invoke `opsx:explore`
-- No formal artifact output — pure exploratory thinking only.
-
-**If multiple independent hypotheses must be investigated in parallel:**
-Invoke `superpowers:dispatching-parallel-agents`
-- One subagent per independent problem domain
-- Subagents report findings back; synthesize before moving to Phase 2
-
-> Discovery is a thinking-only phase. Regardless of which tool is used, all three OpenSpec documents must still be created at Phase 2.
+**IMPORTANT OVERRIDE:** After brainstorming completes, do NOT follow its default
+transition to executing-plans or subagent-driven-development.
+Proceed to Phase 2 (opsx:propose) instead.
 
 ---
 
-### Phase 2 — Specification (always required)
+### Phase 2 — Specification
 
-Invoke `opsx:propose`
-- Generates `openspec/changes/<name>/proposal.md` (what & why)
-- Generates `openspec/changes/<name>/design.md` (how — architecture, interfaces, data flow)
-- Generates `openspec/changes/<name>/tasks.md` (high-level implementation tasks)
+Invoke `opsx:propose`.
 
-**Guardrail: No production code may be written until all three artifacts exist.**
+Treat `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` from Phase 1
+as the **source of truth**. Do not re-derive design decisions —
+formalize what was already decided into OpenSpec format.
 
-If `brainstorming` was used in Phase 1, the design doc at `docs/superpowers/specs/` should inform the content of `proposal.md` and `design.md`.
+Produces:
+- `openspec/changes/<name>/proposal.md` — aligned with brainstorming spec
+- `openspec/changes/<name>/design.md`   — aligned with brainstorming spec
+- `openspec/changes/<name>/tasks.md`    — aligned with writing-plans task list
+
+**Guardrail: No production code until all five artifacts exist:**
+- `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (Phase 1)
+- `docs/superpowers/plans/YYYY-MM-DD-<name>.md` (Phase 1)
+- `openspec/changes/<name>/proposal.md` (Phase 2)
+- `openspec/changes/<name>/design.md` (Phase 2)
+- `openspec/changes/<name>/tasks.md` (Phase 2)
 
 ---
 
-### Phase 3 — Detailed Implementation Plan
+### Pre-Implementation Gate
 
-Invoke `superpowers:writing-plans`
-- Input: OpenSpec artifacts from Phase 2 (and brainstorming design doc if it exists)
-- Output: `docs/superpowers/plans/YYYY-MM-DD-<name>.md`
-- Content: exact file paths, failing test code, implementation code, commit steps per task
+After Phase 2 completes, **stop and present the following options to the user:**
+
+---
+Documents ready:
+- `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
+- `docs/superpowers/plans/YYYY-MM-DD-<name>.md`
+- `openspec/changes/<name>/proposal.md`
+- `openspec/changes/<name>/design.md`
+- `openspec/changes/<name>/tasks.md`
+
+Select a development mode:
+
+**A. Agent Teams (TeamCreate)**
+Best for: features requiring role specialization (Full-Stack + QA + Code Reviewer)
+→ Proceed to Phase 3 (Team Assembly)
+
+**B. Parallel Agents (dispatching-parallel-agents)**
+Best for: tasks.md contains multiple independently executable tasks
+→ Skip Phase 3, go directly to Phase 4 (parallel dispatch)
+
+**C. Requirements still need changes**
+→ Re-run Phase 1 (superpowers:brainstorming) to revise the spec and plan,
+  then re-run Phase 2 (opsx:propose) to align OpenSpec docs, then return to this Gate.
+
+---
+**STOP: Do NOT proceed until the user selects an option.**
 
 ---
 
-### Phase 4 — Team Assembly
+### Phase 3 — Team Assembly *(Option A: Agent Teams only)*
 
-Use `TeamCreate` to create the team, then spawn teammates based on the Role Selection Matrix below.
+Use `TeamCreate` to create the implementation team, then spawn teammates based on the Role Selection Matrix below.
 
 **Code Reviewer is required whenever a Full-Stack Engineer is present.**
 The Code Reviewer reviews code quality via SendMessage after each REFACTOR step.
-The Code Reviewer does NOT invoke `superpowers:requesting-code-review` — that skill spawns a nested agent, which is forbidden in Agent Teams.
 
 **Skill invocation rules for teammates:**
 - ✅ Safe (methodology only): `superpowers:systematic-debugging`, `superpowers:receiving-code-review`, `superpowers:test-driven-development`, `superpowers:verification-before-completion`
@@ -118,7 +154,9 @@ The Code Reviewer does NOT invoke `superpowers:requesting-code-review` — that 
 
 ---
 
-### Phase 5 — Implementation
+### Phase 4 — Implementation
+
+**[Option A — Agent Teams]**
 
 Dispatch tasks from the `writing-plans` output using **Claude Code Agent Teams** (NOT subagents).
 
@@ -140,9 +178,21 @@ Dispatch tasks from the `writing-plans` output using **Claude Code Agent Teams**
    - `docs/superpowers/plans/YYYY-MM-DD-<name>.md` — mark each completed step `- [x]`
    Move to next task.
 
+**[Option B — Parallel Agents]**
+
+Invoke `superpowers:dispatching-parallel-agents`.
+- Identify independent task clusters from `tasks.md`
+- Assign one subagent per independent cluster
+- Each subagent follows TDD methodology (RED → GREEN → REFACTOR)
+- No formal Code Review role; subagents do inline review
+- Each subagent marks completion in **both** documents upon finishing their cluster:
+  - `openspec/changes/<name>/tasks.md` — mark the task `- [x]`
+  - `docs/superpowers/plans/YYYY-MM-DD-<name>.md` — mark each completed step `- [x]`
+- Synthesize all subagent reports before Phase 5
+
 ---
 
-### Phase 6 — Verification
+### Phase 5 — Verification
 
 Before claiming any task or phase is complete, invoke `superpowers:verification-before-completion`:
 
@@ -155,7 +205,7 @@ Using "should work", "looks correct", or "seems fine" without running verificati
 
 ---
 
-### Phase 7 — Finish & Archive
+### Phase 6 — Finish & Archive
 
 1. Gracefully shut down all teammates:
    ```
@@ -169,13 +219,7 @@ Using "should work", "looks correct", or "seems fine" without running verificati
    - Sync delta specs from `openspec/changes/<name>/specs/` → `openspec/specs/<capability>/spec.md`
    - Skip if project does not use OpenSpec
 
-4. **Worktree cleanup** (only if Phase 0 was used):
-   ```bash
-   git worktree list   # confirm which worktree to remove
-   git worktree remove <worktree-path>
-   ```
-
-5. **[REQUIRED] Present changes for user review — read-only git, no commits:**
+4. **[REQUIRED] Present changes for user review — read-only git, no commits:**
    - Run `git diff HEAD` (or `git diff` if nothing staged) — read the full output
    - Run `git status` to see all changed/untracked files
    - Based on the diff, generate one or more **commit message suggestions** with:
@@ -187,11 +231,6 @@ Using "should work", "looks correct", or "seems fine" without running verificati
 
 ---
 
-## Key Rules
+## Key Rule
 
-- **Rule 0** — No history-modifying git operations during Phases 0–6 (overrides all skills)
-- **Rule 1** — 1% rule: invoke any possibly-applicable skill before acting or responding
-- **Rule 2** — Spec first: no production code without `proposal.md` + `design.md` + `tasks.md`
-- **Rule 7** — Spec is law: do not deviate from `design.md` without updating it first
-- **Rule 8** — Verify before done: no success claims without running the verification command
-- **Rule 9** — Always sync delta specs on archive
+- **Rule 1** — Spec is law: do not deviate from `design.md` without updating it first.
