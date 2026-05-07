@@ -7,8 +7,9 @@
  *   - openspec/changes/<name>/ directories exist (active changes in Phase 2+)
  *   - tool target is production code (not tests/docs/specs/configs)
  *
- * For each active change, verifies all 5 artifacts exist:
+ * For each active change, verifies all 6 artifacts exist:
  *   - openspec/changes/<name>/{proposal,design,tasks}.md
+ *   - openspec/changes/<name>/specs/<capability>/spec.md (at least one capability)
  *   - docs/superpowers/specs/ has any *.md
  *   - docs/superpowers/plans/ has any *.md
  *
@@ -70,6 +71,9 @@ function findIncompleteChanges(projectRoot) {
     if (!fs.existsSync(path.join(changesDir, name, 'tasks.md'))) {
       missing.push(`openspec/changes/${name}/tasks.md`);
     }
+    if (!hasCapabilitySpec(changesDir, name)) {
+      missing.push(`openspec/changes/${name}/specs/<capability>/spec.md`);
+    }
     if (!hasSpecs) missing.push('docs/superpowers/specs/*.md (any)');
     if (!hasPlans) missing.push('docs/superpowers/plans/*.md (any)');
 
@@ -78,6 +82,18 @@ function findIncompleteChanges(projectRoot) {
     }
   }
   return incomplete;
+}
+
+function hasCapabilitySpec(changesDir, changeName) {
+  const specsRoot = path.join(changesDir, changeName, 'specs');
+  if (!fs.existsSync(specsRoot)) return false;
+  try {
+    const capDirs = fs.readdirSync(specsRoot, { withFileTypes: true })
+      .filter(d => d.isDirectory());
+    return capDirs.some(d => fs.existsSync(path.join(specsRoot, d.name, 'spec.md')));
+  } catch (_e) {
+    return false;
+  }
 }
 
 let data = '';
