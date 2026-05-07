@@ -250,23 +250,29 @@ Before claiming any task or phase complete, invoke `superpowers:verification-bef
 
 **Level 1: Code-level (continuous, during Phase 4) — applies to all paths**
 
-- Tests: run the suite, read full output, confirm 0 failures
-- Build: confirm exit 0
-- Lint / type-check: confirm clean (if project enforces them)
-- (new-feature / spec-rewrite only) All `plans/...md` steps marked `- [x]`
+| Check | Pass criteria | Path scope |
+|-------|---------------|------------|
+| Tests | Run the suite, read full output, confirm 0 failures | all |
+| Build | Confirm exit 0 | all |
+| Lint / type-check | Confirm clean (if project enforces them) | all |
+| `plans/...md` step marks | All steps marked `- [x]` | new-feature / spec-rewrite only |
 
 **Level 2: Acceptance-level (gate before Phase 6) — applies to new-feature / spec-patch / spec-rewrite**
 
 For each acceptance unit (new-feature/spec-rewrite: every `tasks.md` milestone; spec-patch: every behavior changed in the spec patch), run the actual user-facing scenario:
 
-- **UI features**: open browser, perform the user action, observe outcome with your own eyes (or via E2E tooling). For this plugin, prefer `e2e:run` if specs exist, or `e2e:create` to scaffold them.
-- **Backend / API features**: hit the actual endpoint with realistic inputs (curl / httpie / postman / integration test against running service)
-- **Library / utility features**: invoke the function from a fresh REPL or scratch script with the exact inputs a user would use
+| Feature kind | Scenario action |
+|--------------|-----------------|
+| **UI** | Open browser, perform the user action, observe outcome with your own eyes (or via E2E tooling). For this plugin, prefer `e2e:run` if specs exist, or `e2e:create` to scaffold them. |
+| **Backend / API** | Hit the actual endpoint with realistic inputs (curl / httpie / postman / integration test against running service) |
+| **Library / utility** | Invoke the function from a fresh REPL or scratch script with the exact inputs a user would use |
 
 **Mark + trace (path-specific):**
 
-- *new-feature / C2*: mark `tasks.md` milestone `- [x]` only after the scenario passes. Then re-read `openspec/changes/<name>/specs/<capability>/spec.md` § Requirements line by line — every requirement must trace to a verified milestone. Any orphan requirement = Phase 5 not done.
-- *spec-patch*: re-read the patched section of `openspec/specs/<cap>/spec.md` § Requirements — every patched line must trace to a verified scenario.
+| Path | Mark | Trace |
+|------|------|-------|
+| *new-feature / C2* | `tasks.md` milestone `- [x]` only after the scenario passes | Re-read `openspec/changes/<name>/specs/<capability>/spec.md` § Requirements line by line — every requirement must trace to a verified milestone. Any orphan requirement = Phase 5 not done. |
+| *spec-patch* | (no `tasks.md` to mark) | Re-read the patched section of `openspec/specs/<cap>/spec.md` § Requirements — every patched line must trace to a verified scenario. |
 
 **Hard rule:** Avoid hand-waving language ("should work", "looks correct", "tests passed so it works") for Level 2 — unit tests prove code does what the test says, not what the user needs. Phase 5 is the only place to catch that gap before Phase 6 archives the spec.
 
@@ -308,12 +314,14 @@ Triggered when code is already written/merged without going through Phases 1–2
 
 **Critical difference from other paths:** the Iron Law (failing test before code) is **inverted** — code exists, so tests serve to *characterize* and *lock down* existing behavior, not to drive implementation. The discipline floor remains: every Requirement must trace to a passing test.
 
-### Halt rule (read first)
+### Trace & halt invariant (read first)
 
-If at any point during D-4 you discover the existing code is buggy (test fails because the code behaves incorrectly, not because the spec inference was wrong), **STOP retro-doc**. Do not write a spec that codifies a bug. Either:
+Every Requirement in `specs/<cap>/spec.md` must trace to (a) a code path that produces the behavior AND (b) at least one passing test that exercises it. Two halt conditions enforce this invariant — read both before D-2 and D-4:
 
-- Restart with **code-only** to fix the bug, then re-enter retro-doc against the fixed code, OR
-- Confirm with user that the buggy behavior is actually intended; if so, document it explicitly in `proposal.md § Why` with rationale before continuing
+- **Code-anchor halt (during D-2):** Requirement inferred without an identifiable code anchor → halt and confirm with user before proceeding.
+- **Buggy-code halt (during D-4):** A characterization test fails because the code behaves incorrectly, not because the spec inference was wrong → **STOP retro-doc**. Do not write a spec that codifies a bug. Either:
+  - Restart with **code-only** to fix the bug, then re-enter retro-doc against the fixed code, OR
+  - Confirm with user that the buggy behavior is actually intended; if so, document it explicitly in `proposal.md § Why` with rationale before continuing.
 
 ### Phase D-0 — Scan & Classify
 
@@ -355,7 +363,7 @@ Read code behavior + tests to infer domain-layer:
 - `specs/<cap>/spec.md` — Requirements inferred from observed behavior + tests
 - `tasks.md` — milestones inferred from user-visible outcomes
 
-**Rule D-2-1:** Every Requirement in `specs/<cap>/spec.md` must trace to (a) a code path that produces that behavior AND (b) at least one test (existing or to-be-written in D-4) that exercises it. Inferences without a code anchor → halt and confirm with user before proceeding.
+**Rule D-2-1:** See *Trace & halt invariant* — Requirements without a code anchor invoke **Code-anchor halt** at this phase. Requirements must also bind to at least one test (existing or to-be-written in D-4); the binding is verified end-to-end in D-4.
 
 ### Phase D-4 — Test backfill (replaces standard Phase 4)
 
@@ -368,7 +376,7 @@ For each Requirement in `specs/<cap>/spec.md`:
 3. Run the test. Three outcomes:
    - **Passes** → ✓ test now locks down behavior; mark `[x]`
    - **Fails because spec inference was wrong** → return to Phase D-2; revise Requirement to match actual code; re-derive test
-   - **Fails because code is buggy** → trigger **Halt rule** (see top of retro-doc section)
+   - **Fails because code is buggy** → trigger **Buggy-code halt** (see *Trace & halt invariant*)
 4. After all Requirements have passing tests, run full test suite — must be all green.
 
 ### Phase 5 (standard) — Verification
@@ -388,7 +396,7 @@ Proceed as new-feature (for retro-as-new-feature) or spec-rewrite (for retro-as-
 The 6-artifact guardrail in `check-artifacts.js` blocks production code edits when `openspec/changes/<name>/` is incomplete. For retro-doc this naturally fits:
 - D-1 + D-2 are doc-only (hook permits)
 - D-4 only edits test files (hook permits — tests aren't on the blocked extension list)
-- Production code edits during D-4 should never happen if Halt rule is followed; a real bug requires switching to code-only first (delete the in-progress `openspec/changes/<name>/` to unblock the hook before starting code-only)
+- Production code edits during D-4 should never happen if **Buggy-code halt** is followed; a real bug requires switching to code-only first (delete the in-progress `openspec/changes/<name>/` to unblock the hook before starting code-only)
 
 ---
 
