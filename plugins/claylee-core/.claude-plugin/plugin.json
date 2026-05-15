@@ -1,0 +1,12 @@
+{
+  "name": "claylee-core",
+  "version": "0.1.0",
+  "description": "Behavioral contract rule + general code-quality protection hooks (git push warning, doc-creation blocker, console.log detection, build artifact check)",
+  "author": {
+    "name": "ClayLeee",
+    "url": "https://github.com/ClayLeee"
+  },
+  "repository": "https://github.com/ClayLeee/my-everything-claude-code",
+  "license": "MIT",
+  "keywords": ["hooks", "code-quality", "behavioral-contract"]
+}

@@ -1,20 +1,20 @@
 ---
-name: skill-create
+name: "cl:skill-create"
 description: Analyze local git history to extract coding patterns and generate SKILL.md files. Local version of the Skill Creator GitHub App.
 allowed_tools: ["Bash", "Read", "Write", "Grep", "Glob"]
 ---
 
-# /skill-create - Local Skill Generation
+# /cl:skill-create - Local Skill Generation
 
 Analyze your repository's git history to extract coding patterns and generate SKILL.md files that teach Claude your team's practices.
 
 ## Usage
 
 ```bash
-/skill-create                    # Analyze current repo
-/skill-create --commits 100      # Analyze last 100 commits
-/skill-create --output ./skills  # Custom output directory
-/skill-create --instincts        # Also generate instincts for continuous-learning-v2
+/cl:skill-create                    # Analyze current repo
+/cl:skill-create --commits 100      # Analyze last 100 commits
+/cl:skill-create --output ./skills  # Custom output directory
+/cl:skill-create --instincts        # Also generate instincts for continuous-learning-v2
 ```
 
 ## What It Does
@@ -104,7 +104,7 @@ Prefix commits with: feat:, fix:, chore:, docs:, test:, refactor:
 
 ## Example Output
 
-Running `/skill-create` on a TypeScript project might produce:
+Running `/cl:skill-create` on a TypeScript project might produce:
 
 ```markdown
 ---
@@ -151,6 +151,6 @@ src/
 
 ## Related Commands
 
-- `/instinct-import` - Import generated instincts
+- `/cl:instinct-import` - Import generated instincts
 - `/cl:status` - View learned instincts
-- `/evolve` - Cluster instincts into skills/agents
+- `/cl:evolve` - Cluster instincts into skills/agents

@@ -1,0 +1,12 @@
+{
+  "name": "claylee-code-quality-agents",
+  "version": "0.1.0",
+  "description": "Four sub-agents for on-demand code work: code-review (4-pillar quality audit), build-error-resolver (minimal-diff type/build fixes), security-reviewer (frontend XSS/auth/secrets audit), refactor-cleaner (dead code + duplicate consolidation).",
+  "author": {
+    "name": "ClayLeee",
+    "url": "https://github.com/ClayLeee"
+  },
+  "repository": "https://github.com/ClayLeee/my-everything-claude-code",
+  "license": "MIT",
+  "keywords": ["agents", "code-review", "build-fixes", "security", "refactoring"]
+}

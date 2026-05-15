@@ -52,7 +52,7 @@ Session Activity
       v
   instincts/personal/
       |
-      | /evolve clusters
+      | /cl:evolve clusters
       v
   evolved/ (commands, skills, agents)
 ```

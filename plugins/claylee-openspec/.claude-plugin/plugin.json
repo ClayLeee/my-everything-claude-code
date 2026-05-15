@@ -1,0 +1,12 @@
+{
+  "name": "claylee-openspec",
+  "version": "0.1.0",
+  "description": "OpenSpec + Superpowers workflow injection. Conditionally injects the full 26.6KB workflow doc at SessionStart and a compressed reminder per UserPromptSubmit (deduped per session) when project has openspec/ directory or .claude/openspec-enabled marker.",
+  "author": {
+    "name": "ClayLeee",
+    "url": "https://github.com/ClayLeee"
+  },
+  "repository": "https://github.com/ClayLeee/my-everything-claude-code",
+  "license": "MIT",
+  "keywords": ["openspec", "workflow-injection", "context-management"]
+}

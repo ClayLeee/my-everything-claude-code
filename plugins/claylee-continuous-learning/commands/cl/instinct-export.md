@@ -1,5 +1,5 @@
 ---
-name: instinct-export
+name: "cl:instinct-export"
 description: Export instincts for sharing with teammates or other projects
 command: true
 ---
@@ -14,10 +14,10 @@ Exports instincts to a shareable format. Perfect for:
 ## Usage
 
 ```
-/instinct-export                           # Export all personal instincts
-/instinct-export --domain testing          # Export only testing instincts
-/instinct-export --min-confidence 0.7      # Only export high-confidence instincts
-/instinct-export --output team-instincts.yaml
+/cl:instinct-export                           # Export all personal instincts
+/cl:instinct-export --domain testing          # Export only testing instincts
+/cl:instinct-export --min-confidence 0.7      # Only export high-confidence instincts
+/cl:instinct-export --output team-instincts.yaml
 ```
 
 ## What to Do

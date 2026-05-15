@@ -1,5 +1,5 @@
 ---
-name: instinct-import
+name: "cl:instinct-import"
 description: Import instincts from teammates, Skill Creator, or other sources
 command: true
 ---
@@ -15,9 +15,9 @@ Import instincts from:
 ## Usage
 
 ```
-/instinct-import team-instincts.yaml
-/instinct-import https://github.com/org/repo/instincts.yaml
-/instinct-import --from-skill-creator acme/webapp
+/cl:instinct-import team-instincts.yaml
+/cl:instinct-import https://github.com/org/repo/instincts.yaml
+/cl:instinct-import --from-skill-creator acme/webapp
 ```
 
 ## What to Do
