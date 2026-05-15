@@ -1,0 +1,12 @@
+{
+  "name": "claylee-e2e-testing",
+  "version": "0.1.0",
+  "description": "Playwright E2E testing skill with Page Object Model patterns, configuration templates, and 7 /e2e:* commands (analyze, plan, create, maintain, run, remote, record).",
+  "author": {
+    "name": "ClayLeee",
+    "url": "https://github.com/ClayLeee"
+  },
+  "repository": "https://github.com/ClayLeee/my-everything-claude-code",
+  "license": "MIT",
+  "keywords": ["e2e-testing", "playwright", "page-object-model"]
+}

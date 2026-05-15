@@ -1,9 +1,9 @@
 ---
-name: learn-eval
+name: "cl:learn-eval"
 description: Extract reusable patterns from the session, self-evaluate quality before saving, and determine the right save location (Global vs Project).
 ---
 
-# /learn-eval - Extract, Evaluate, then Save
+# /cl:learn-eval - Extract, Evaluate, then Save
 
 Extends `/learn` with a quality gate and save-location decision before writing any skill file.
 

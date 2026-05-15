@@ -6,10 +6,34 @@
   },
   "plugins": [
     {
-      "name": "my-everything-claude-code",
-      "source": "./",
-      "description": "Shared Claude Code configs: hooks, skills, commands, and agents for all projects",
-      "version": "1.0.1-beta.39"
+      "name": "claylee-core",
+      "source": "./plugins/claylee-core",
+      "description": "Behavioral contract rule + general code-quality protection hooks (git push warning, doc-creation blocker, console.log detection, build artifact check)",
+      "version": "0.1.0"
+    },
+    {
+      "name": "claylee-continuous-learning",
+      "source": "./plugins/claylee-continuous-learning",
+      "description": "Instinct-based session learning system: observes tool usage, extracts atomic instincts via background Haiku observer, evolves them into skills/commands/agents. Includes /cl:* commands.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "claylee-e2e-testing",
+      "source": "./plugins/claylee-e2e-testing",
+      "description": "Playwright E2E testing skill with Page Object Model patterns, configuration templates, and 7 /e2e:* commands (analyze, plan, create, maintain, run, remote, record).",
+      "version": "0.1.0"
+    },
+    {
+      "name": "claylee-code-quality-agents",
+      "source": "./plugins/claylee-code-quality-agents",
+      "description": "Four sub-agents for on-demand code work: code-review, build-error-resolver, security-reviewer, refactor-cleaner.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "claylee-openspec",
+      "source": "./plugins/claylee-openspec",
+      "description": "OpenSpec + Superpowers workflow injection. Conditionally injects workflow docs when project has openspec/ directory or .claude/openspec-enabled marker.",
+      "version": "0.1.0"
     }
   ]
 }

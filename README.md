@@ -4,49 +4,61 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 
 ## Install
 
+This repo is a **Claude Code marketplace** with 5 plugins. Install only the ones you need.
+
 ```bash
 # Add marketplace
 /plugin marketplace add ClayLeee/my-everything-claude-code
 
-# Install plugin
-/plugin install my-everything-claude-code@ClayLeee-my-everything-claude-code
+# Install plugins individually (pick any subset)
+/plugin install claylee-core@ClayLeee-my-everything-claude-code
+/plugin install claylee-continuous-learning@ClayLeee-my-everything-claude-code
+/plugin install claylee-e2e-testing@ClayLeee-my-everything-claude-code
+/plugin install claylee-code-quality-agents@ClayLeee-my-everything-claude-code
+/plugin install claylee-openspec@ClayLeee-my-everything-claude-code
 ```
+
+## Plugins
+
+| Plugin | What it provides | When to install |
+|---|---|---|
+| **claylee-core** | Behavioral contract rule + 5 protection hooks (git push warning, doc blocker, console.log detection, build artifact check) | Always — basic quality safety net |
+| **claylee-continuous-learning** | Instinct-based learning skill + 9 `/cl:*` commands + 7 observation/session hooks | Want session-to-session learning system |
+| **claylee-e2e-testing** | Playwright E2E skill + 7 `/e2e:*` commands (no hooks, on-demand only) | Writing Playwright E2E tests |
+| **claylee-code-quality-agents** | 4 sub-agents (code-review, build-error-resolver, security-reviewer, refactor-cleaner) | Want specialist agents for code review/cleanup |
+| **claylee-openspec** | OpenSpec workflow injection (conditional — only fires when project has `openspec/` dir or `.claude/openspec-enabled` marker) | Working with OpenSpec-style projects |
 
 ## Structure
 
 ```
-├── .claude-plugin/
-│   ├── marketplace.json
-│   └── plugin.json
-├── commands/
-│   ├── cl/                        # Continuous Learning (status, analyze, log, sync)
-│   ├── e2e/                       # E2E Testing workflow (analyze, plan, create, run, maintain, remote, record)
-│   ├── evolve.md                  # Cluster instincts into skills/commands/agents
-│   ├── instinct-export.md         # Export instincts for sharing
-│   ├── instinct-import.md         # Import instincts from others
-│   ├── learn-eval.md              # Extract patterns with quality evaluation
-│   └── skill-create.md            # Generate SKILL.md from git history
-├── skills/
-│   ├── continuous-learning-v2/    # Instinct-based learning system
-│   └── e2e-testing/               # Playwright E2E testing patterns and POM examples
-│       ├── SKILL.md               # Core conventions and workflow orchestration
-│       ├── references/            # Judgment-based guidance (12 files)
-│       ├── templates/             # Deterministic code templates (8 files)
-│       └── scripts/               # scaffold.js, generate-report.js
-├── agents/
-│   ├── build-error-resolver.md    # Fix build/type errors with minimal changes
-│   ├── code-review.md             # Code review agent
-│   ├── refactor-cleaner.md        # Dead code cleanup and duplicate consolidation
-│   └── security-reviewer.md       # Frontend security vulnerability detection
-├── rules/
-│   ├── coding-style.md            # Immutability, size limits, Vue/TS conventions
-│   ├── performance.md             # Model selection, context window management
-│   └── security.md                # XSS prevention, input validation, secrets
-├── hooks/
-│   └── hooks.json                 # All hook definitions
-└── scripts/
-    ├── hooks/                     # Hook scripts (observe, block-docs, etc.)
-    └── lib/                       # Shared utilities (utils, session-manager, etc.)
+.claude-plugin/
+└── marketplace.json              # Lists all 5 plugins
+plugins/
+├── claylee-core/
+│   ├── .claude-plugin/plugin.json
+│   ├── hooks/hooks.json
+│   ├── rules/behavioral-contract.md
+│   └── scripts/hooks/            # 5 protection hooks
+├── claylee-continuous-learning/
+│   ├── .claude-plugin/plugin.json
+│   ├── hooks/hooks.json
+│   ├── commands/cl/              # 9 /cl:* commands
+│   ├── skills/continuous-learning-v2/
+│   └── scripts/
+│       ├── hooks/                # 7 observation/session hooks
+│       └── lib/                  # 4 shared utilities
+├── claylee-e2e-testing/
+│   ├── .claude-plugin/plugin.json
+│   ├── commands/e2e/             # 7 /e2e:* commands
+│   └── skills/e2e-testing/
+├── claylee-code-quality-agents/
+│   ├── .claude-plugin/plugin.json
+│   └── agents/                   # 4 agents
+└── claylee-openspec/
+    ├── .claude-plugin/plugin.json
+    ├── hooks/hooks.json
+    ├── config/                   # OpenSpec workflow docs
+    └── scripts/hooks/            # 2 OpenSpec hooks
 ```
 
 ## Development Workflow
@@ -92,9 +104,9 @@ flowchart TD
     ANALYZE --> INSTINCTS[("instincts/<br>personal")]
     subgraph LEARNING ["Learning Cycle  (async)"]
         direction LR
-        INSTINCTS --> |"/evolve"| EVOLVED["evolved<br>commands · skills · agents"]
-        INSTINCTS --> |"/instinct-export"| SHARE["share with<br>teammates"]
-        SHARE --> |"/instinct-import"| INSTINCTS
+        INSTINCTS --> |"/cl:evolve"| EVOLVED["evolved<br>commands · skills · agents"]
+        INSTINCTS --> |"/cl:instinct-export"| SHARE["share with<br>teammates"]
+        SHARE --> |"/cl:instinct-import"| INSTINCTS
     end
 
     %% ── Styles ──
@@ -135,11 +147,9 @@ flowchart TD
 
 ### Rules
 
-Global rules installed to `~/.claude/rules/` for automatic enforcement:
+Global rule installed to `~/.claude/rules/` for automatic enforcement (provided by **claylee-core**):
 
-- **coding-style** — Immutability, file/function size limits, Vue/TS conventions
-- **performance** — Model selection strategy, context window management
-- **security** — XSS prevention, input validation, secret management for frontend
+- **behavioral-contract** — 8 universal behavioral norms (Simplicity First, Surgical Changes, Read before Write, Fail Loud, etc.) adapted from Karpathy's CLAUDE.md template
 
 ### Skills
 
@@ -165,11 +175,11 @@ Global rules installed to `~/.claude/rules/` for automatic enforcement:
 - `/cl:analyze` — Manually trigger observation analysis
 - `/cl:log` — Show recent observer log entries
 - `/cl:sync` — Update instincts.md from current instincts
-- `/evolve` — Cluster related instincts into commands/skills/agents
-- `/instinct-export` — Export instincts to shareable YAML format
-- `/instinct-import` — Import instincts with conflict detection
-- `/learn-eval` — Extract session patterns with quality self-evaluation
-- `/skill-create` — Analyze git history to generate SKILL.md files
+- `/cl:evolve` — Cluster related instincts into commands/skills/agents
+- `/cl:instinct-export` — Export instincts to shareable YAML format
+- `/cl:instinct-import` — Import instincts with conflict detection
+- `/cl:learn-eval` — Extract session patterns with quality self-evaluation
+- `/cl:skill-create` — Analyze git history to generate SKILL.md files
 
 ## E2E Testing Workflow
 

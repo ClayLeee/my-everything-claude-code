@@ -1,0 +1,12 @@
+{
+  "name": "claylee-continuous-learning",
+  "version": "0.1.0",
+  "description": "Instinct-based session learning system: observes tool usage, extracts atomic instincts via background Haiku observer, evolves them into skills/commands/agents. Includes /cl:* commands.",
+  "author": {
+    "name": "ClayLeee",
+    "url": "https://github.com/ClayLeee"
+  },
+  "repository": "https://github.com/ClayLeee/my-everything-claude-code",
+  "license": "MIT",
+  "keywords": ["continuous-learning", "instincts", "session-observer", "haiku"]
+}

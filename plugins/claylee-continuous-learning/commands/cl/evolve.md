@@ -1,5 +1,5 @@
 ---
-name: evolve
+name: "cl:evolve"
 description: Cluster related instincts into skills, commands, or agents
 command: true
 ---
@@ -14,10 +14,10 @@ Analyzes instincts and clusters related ones into higher-level structures:
 ## Usage
 
 ```
-/evolve                    # Analyze all instincts and suggest evolutions
-/evolve --domain testing   # Only evolve instincts in testing domain
-/evolve --dry-run          # Show what would be created without creating
-/evolve --threshold 5      # Require 5+ related instincts to cluster
+/cl:evolve                    # Analyze all instincts and suggest evolutions
+/cl:evolve --domain testing   # Only evolve instincts in testing domain
+/cl:evolve --dry-run          # Show what would be created without creating
+/cl:evolve --threshold 5      # Require 5+ related instincts to cluster
 ```
 
 ## Evolution Rules
@@ -93,7 +93,7 @@ Files:
   - ~/.claude/homunculus/evolved/{type}/{filename}.md
 
 ---
-Run `/evolve --execute` to create these files.
+Run `/cl:evolve --execute` to create these files.
 ```
 
 ## Flags
