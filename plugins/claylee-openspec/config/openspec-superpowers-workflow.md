@@ -185,13 +185,13 @@ Treat the Phase 1 `design.md` as **source of truth**. Do not re-derive design de
 
 ### Pre-Implementation Gate
 
-After Phase 2 completes, **STOP and present three options to the user:**
+After Phase 2 completes, **default to Option B (Parallel Agents) and proceed to Phase 4.** Briefly present the mode to the user:
 
-- **A. Agent Teams** (`TeamCreate`) — features needing role specialization (Full-Stack + QA + Code Reviewer) → Phase 3
-- **B. Parallel Agents** (`superpowers:dispatching-parallel-agents`) — Phase 1 `plans/...md` Tasks are mostly independent (no shared state, no sequential dependencies between Tasks) → skip Phase 3, go to Phase 4. Note: independence is judged at the `plans/` Task level, NOT the `tasks.md` milestone level (one milestone may require multiple plan Tasks).
-- **C. Revise** — re-run Phase 1, then Phase 2, then return here
+- **A. Agent Teams** (`TeamCreate`) — role specialization (Full-Stack + QA + Code Reviewer); user must explicitly request this → Phase 3
+- **B. Parallel Agents** (`superpowers:dispatching-parallel-agents`) — **default**; Tasks in `plans/...md` must be mostly independent (no shared state, no sequential dependencies). Note: independence is judged at the `plans/` Task level, NOT the `tasks.md` milestone level (one milestone may require multiple plan Tasks).
+- **C. Revise** — user can request to re-run Phase 1 and Phase 2
 
-**STOP: Do NOT proceed until the user selects an option.**
+Proceed with B immediately unless the user explicitly requests A or C.
 
 ---
 
@@ -249,6 +249,8 @@ Before claiming any task or phase complete, invoke `superpowers:verification-bef
 | **retro-doc** | Already satisfied by D-4 (all Requirements have passing tests) | Follow new-feature rules (retro-as-new-feature) or spec-rewrite rules (retro-as-spec-rewrite) per Phase D-0 sub-classification |
 
 **Level 1: Code-level (continuous, during Phase 4) — applies to all paths**
+
+> **Note:** Level 1 is satisfied by the final suite run at Phase 4 completion — the last TDD REFACTOR step already runs the full suite. If Phase 4 ended with 0 failures and a clean build, Level 1 is done; proceed directly to Level 2 (or Phase 6 for code-only).
 
 | Check | Pass criteria | Path scope |
 |-------|---------------|------------|
