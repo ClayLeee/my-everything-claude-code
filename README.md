@@ -63,66 +63,80 @@ plugins/
 
 ## Development Workflow
 
-```mermaid
-flowchart TD
-    %% ── Session Start ──
-    START([Session Start]) --> LOAD[/"load context hook<br><i>restore previous session summary</i>"/]
-    LOAD --> DEV
-
-    %% ── Development Loop ──
-    subgraph DEV ["Development Loop"]
-        direction TB
-        CODE["Write / Edit Code"] --> OBSERVE[/"observe hook<br><i>capture tool usage</i>"/]
-        CODE --> CONSOLE[/"console.log warning<br><i>flag debug statements</i>"/]
-        CODE --> COMPACT[/"suggest /compact<br><i>after 50+ edits</i>"/]
-        CODE --> BLOCK[/"block random .md<br><i>prevent unnecessary docs</i>"/]
-    end
-
-    %% ── On-Demand Agents ──
-    DEV --> |"need quality check"| REVIEW["code-review agent<br><i>duplicates · optimization · standards · i18n</i>"]
-    DEV --> |"build broken"| BUILD["build-error-resolver agent<br><i>minimal fix · no refactoring</i>"]
-    DEV --> |"security concern"| SEC["security-reviewer agent<br><i>XSS · auth · input · deps · secrets</i>"]
-    DEV --> |"cleanup time"| CLEAN["refactor-cleaner agent<br><i>dead code · unused deps · duplicates</i>"]
-    DEV --> |"need E2E tests"| E2E["/e2e:* commands<br><i>Playwright · POM · flaky test · artifacts</i>"]
-    REVIEW --> DEV
-    BUILD --> DEV
-    SEC --> DEV
-    CLEAN --> DEV
-    E2E --> DEV
-
-    %% ── Commit ──
-    DEV --> COMMIT["git commit + push"]
-    COMMIT --> PUSH[/"git push reminder hook<br><i>review before pushing</i>"/]
-
-    %% ── Session End ──
-    PUSH --> END([Session End])
-    END --> RECORD[/"session record + evaluate"/]
-    END --> ANALYZE[/"auto-analyze<br><i>extract instincts from observations</i>"/]
-    END --> SUMMARIZE[/"auto-summarize<br><i>generate session summary</i>"/]
-
-    %% ── Learning Cycle ──
-    ANALYZE --> INSTINCTS[("instincts/<br>personal")]
-    subgraph LEARNING ["Learning Cycle  (async)"]
-        direction LR
-        INSTINCTS --> |"/cl:evolve"| EVOLVED["evolved<br>commands · skills · agents"]
-        INSTINCTS --> |"/cl:instinct-export"| SHARE["share with<br>teammates"]
-        SHARE --> |"/cl:instinct-import"| INSTINCTS
-    end
-
-    %% ── Styles ──
-    classDef hook fill:#f3e8ff,stroke:#7c3aed,color:#1e1e1e
-    classDef agent fill:#dbeafe,stroke:#2563eb,color:#1e1e1e
-    classDef command fill:#dcfce7,stroke:#16a34a,color:#1e1e1e
-    classDef phase fill:#fef3c7,stroke:#d97706,color:#1e1e1e
-    classDef store fill:#e0e7ff,stroke:#4f46e5,color:#1e1e1e
-
-    class LOAD,OBSERVE,CONSOLE,COMPACT,BLOCK,PUSH,RECORD,ANALYZE,SUMMARIZE hook
-    class REVIEW,BUILD,SEC,CLEAN,E2E agent
-    class START,END phase
-    class INSTINCTS,EVOLVED,SHARE store
 ```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            Development Workflow                              │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-> **Legend:** <span style="color:#7c3aed">Purple</span> = auto hooks · <span style="color:#2563eb">Blue</span> = on-demand agents · <span style="color:#16a34a">Green</span> = commands · <span style="color:#d97706">Yellow</span> = session lifecycle
+                           ┌──────────────────────┐
+                           │    Session Start      │
+                           └──────────┬───────────┘
+                                      │
+                                      ▼
+                           ┌───────────────────────────────────────┐
+                           │  load context hook                    │
+                           │  restore previous session summary     │
+                           └──────────────┬────────────────────────┘
+                                          │
+                                          ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Development Loop                                                            │
+│                                                                              │
+│  ┌──────────────────────┐    ┌──────────────────────────────────────────┐   │
+│  │    Write / Edit      │───▶│  ● observe hook        capture tool usage│   │
+│  │        Code          │───▶│  ● console.log warning  flag debug stmts │   │
+│  │                      │───▶│  ● suggest /compact     after 50+ edits  │   │
+│  └──────────────────────┘───▶│  ● block random .md     prevent extra docs│  │
+│                               └──────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │              │              │              │             │
+    need quality    build broken  security concern  cleanup     need E2E
+         ▼              ▼              ▼              ▼             ▼
+   ┌──────────┐  ┌────────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
+   │  code-   │  │  build-    │  │security- │  │ refactor-│  │  /e2e:*  │
+   │  review  │  │  error-    │  │ reviewer │  │  cleaner │  │ commands │
+   │  agent   │  │  resolver  │  │  agent   │  │  agent   │  │          │
+   └────┬─────┘  └─────┬──────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘
+        └───────────────┴──────────────┴─────────────┴─────────────┘
+                                       │ (back to Development Loop)
+                                       ▼
+                           ┌──────────────────────┐
+                           │  git commit + push   │
+                           └──────────┬───────────┘
+                                      │
+                                      ▼
+                           ┌───────────────────────────────────────┐
+                           │  git push reminder hook               │
+                           │  review before pushing                │
+                           └──────────────┬────────────────────────┘
+                                          │
+                                          ▼
+                           ┌──────────────────────┐
+                           │    Session End        │
+                           └──────────┬───────────┘
+                                      │
+            ┌─────────────────────────┼─────────────────────────┐
+            ▼                         ▼                         ▼
+  ┌──────────────────┐     ┌────────────────────┐     ┌──────────────────┐
+  │  session record  │     │   auto-analyze     │     │  auto-summarize  │
+  │  + evaluate      │     │  extract instincts │     │  session summary │
+  └──────────────────┘     └────────┬───────────┘     └──────────────────┘
+                                    │
+                                    ▼
+                           ┌────────────────────┐
+                           │  instincts/personal │
+                           └────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Learning Cycle  (async)                                                     │
+│                                                                              │
+│  instincts/personal ──/cl:evolve──────────▶  evolved commands               │
+│                                              skills · agents                │
+│                                                                              │
+│  instincts/personal ──/cl:instinct-export──▶  share with teammates          │
+│                       ◀──/cl:instinct-import──                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ## What's Included
 
