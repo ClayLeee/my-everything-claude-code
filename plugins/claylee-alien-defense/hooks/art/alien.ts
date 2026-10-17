@@ -56,32 +56,37 @@ function standing(antenna: readonly string[], eyes: readonly string[]): string[]
   ];
 }
 
-const FLEX_ROWS = [
-  ".......a.......",
-  ".......A.......",
-  "oLo..ooooo..oLo",
-  "oGGooLLGGGooGGo",
-  ".oToLGGGGGGoTo.",
-  "..ooGwwGwwGoo..",
-  "...oGwkGwkGo...",
-  "...oDGGGGGDo...",
-  "....oDDDDDo....",
-  "...oTTSSSTo....",
-  "...oTSSSSSo....",
-  "....osSSso.....",
-  "....os.os......",
-  "...obb.obb.....",
+const FLEX_RIGHT_ROWS = [
+  "....a..........",
+  "....A..........",
+  "...ooooo.......",
+  "..oLLGGGo...ooo",
+  ".oLGGGGGGo.oLGo",
+  ".oGGGGwwGo.oGGo",
+  ".oGGGGwkGo.oGGo",
+  ".oDGGGGGDo.oGGo",
+  "..oDDDDDooGGGGo",
+  "...oTTSSSooooo.",
+  "...oTSSSSo.....",
+  "...osSSso......",
+  "...os.os.......",
+  "..obb.obb......",
 ];
 
-const FLEX_PUMP_ROWS = replaceRows({
-  rows: FLEX_ROWS,
+const FLEX_RIGHT_PUMP_ROWS = replaceRows({
+  rows: FLEX_RIGHT_ROWS,
   replacements: {
-    "oLo..ooooo..oLo": "oLLo.ooooo.oLLo",
-    oGGooLLGGGooGGo: "oGGGoLLGGGoGGGo",
-    "..ooGwwGwwGoo..": "..ooGGGGGGGoo..",
-    "...oGwkGwkGo...": "...oGooGooGo...",
+    ".oGGGGwwGo.oGGo": ".oGGGGGGGo.oLLo",
+    ".oGGGGwkGo.oGGo": ".oGGGGooGooLoGo",
+    ".oDGGGGGDo.oGGo": ".oDGGGwwDoLLLGo",
+    "..oDDDDDooGGGGo": "..oDDDDDoLGGGGo",
   },
 });
+
+const mirror = (rows: readonly string[]): string[] =>
+  rows.map((row) => Array.from(row).reverse().join(""));
+
+export const FLEX_SHIFT_X = { right: 1, left: -2 } as const;
 
 const SLEEP_ROWS = [
   "..ooooo...............",
@@ -142,8 +147,10 @@ export const ALIEN = {
   stand: parse(standing(ANTENNA_UP, EYES_OPEN)),
   sway: parse(standing(ANTENNA_SWAY, EYES_OPEN)),
   blink: parse(standing(ANTENNA_UP, EYES_SHUT)),
-  flex: parse(FLEX_ROWS),
-  flexPump: parse(FLEX_PUMP_ROWS),
+  flexRight: parse(FLEX_RIGHT_ROWS),
+  flexRightPump: parse(FLEX_RIGHT_PUMP_ROWS),
+  flexLeft: parse(mirror(FLEX_RIGHT_ROWS)),
+  flexLeftPump: parse(mirror(FLEX_RIGHT_PUMP_ROWS)),
   sleep: parse(SLEEP_ROWS),
   sleepBreath: parse(SLEEP_BREATH_ROWS),
   liftUp: parse(LIFT_UP_ROWS),

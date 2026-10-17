@@ -26,6 +26,7 @@ export type StageOptions = {
 };
 
 const POLL_MS = 1000;
+const REMOUNT_MS = 250;
 const PANE_COLUMNS = 62;
 const ACTIVE_FILE = ".claude/mods/active-game";
 
@@ -37,6 +38,7 @@ let isRasterMounted = false;
 let lastCells = "";
 let lastSummary = "";
 let sincePollMs = 0;
+let sinceRemountMs = 0;
 
 export function configureStage(options: StageOptions): void {
   stage = options;
@@ -107,7 +109,15 @@ export function installStage(on: On): void {
           )
           .catch(noop);
       }
-      if (!isPaneOpen || !isRasterMounted) {
+      if (!isPaneOpen) {
+        return;
+      }
+      if (!isRasterMounted) {
+        sinceRemountMs += options.frameMs;
+        if (sinceRemountMs >= REMOUNT_MS) {
+          sinceRemountMs = 0;
+          $.ui.invalidate("ui.render");
+        }
         return;
       }
       const cells = encodeCells(options.scene.frame());
@@ -120,6 +130,7 @@ export function installStage(on: On): void {
         .then((result) => {
           if (result.deny !== undefined) {
             isRasterMounted = false;
+            lastCells = "";
           }
         })
         .catch(noop);
