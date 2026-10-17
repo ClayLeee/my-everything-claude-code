@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from "claude-code";
 import { MONSTER_NAMES } from "./art/monsters";
 import { readMode } from "./openspec";
 import { configureStage, installStage } from "./shared/pixel/stage";
-import { FRAME_MS, MAX_COLUMNS, MIN_COLUMNS, STAGE_ROWS } from "./sim/constants";
+import { FRAME_MS, MAX_COLUMNS, MIN_COLUMNS, STAGE_ROWS, TALL_ROWS } from "./sim/constants";
 import type { MonsterKind } from "./sim/types";
 import { createWorld } from "./sim/world";
 
@@ -46,12 +46,13 @@ export const register: Register = (on) => {
       report,
     },
     rows: STAGE_ROWS,
+    tallRows: TALL_ROWS,
     minColumns: MIN_COLUMNS,
     maxColumns: MAX_COLUMNS,
     frameMs: FRAME_MS,
     scene: {
       begin: () => undefined,
-      resize: (columns) => world.resize(columns),
+      resize: (columns, rows) => world.resize(columns, rows),
       tick: (dtMs) => world.tick(dtMs),
       frame: () => world.frame(),
       summary: () => world.summary(),
