@@ -84,7 +84,7 @@ export const register: Register = (on) => {
   });
 
   on("tool.call", async ($, e, next) => {
-    const id = world.spawn();
+    const id = world.spawn(e.tool);
     try {
       const ran = await next(e);
       world.defeat({ id, isFailure: ran.deny !== undefined || ran.isError === true });

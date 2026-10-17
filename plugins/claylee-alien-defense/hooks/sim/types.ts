@@ -9,6 +9,7 @@ export type Mode =
 export type Monster = {
   id: number;
   kind: MonsterKind;
+  tool: string;
   label: string;
   x: number;
   hitsRemaining: number;

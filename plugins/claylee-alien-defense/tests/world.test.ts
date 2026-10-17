@@ -109,3 +109,22 @@ test("every mode draws at the narrowest and widest pane, short and docked", asyn
     }
   }
 });
+
+test("the line under the scene names what the alien is doing right now", async () => {
+  const world = createWorld();
+  world.setMode({ kind: "free" });
+  expect(world.summary().startsWith("睡覺中")).toBe(true);
+  expect(world.log()[0]).toContain("睡袋");
+  const id = world.spawn("Bash");
+  run(world, 200);
+  expect(world.summary().startsWith("迎戰 1 隻異形")).toBe(true);
+  expect(world.log()[0]).toContain("起身迎戰");
+  world.defeat({ id, isFailure: false });
+  run(world, 6000);
+  expect(world.log().some((line) => line === "擊倒黏液獸（Bash）")).toBe(true);
+  expect(world.summary().startsWith("迎戰")).toBe(false);
+  world.setMode(openspec("dawn"));
+  world.setMode(openspec("noon"));
+  run(world, 3000);
+  expect(world.summary().startsWith("BOSS 戰：規格吞噬者")).toBe(true);
+});
