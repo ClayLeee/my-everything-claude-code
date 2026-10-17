@@ -39,7 +39,7 @@ export const register: Register = (on) => {
 
   configureStage({
     game: "alien-defense",
-    title: "外星防衛",
+    title: "Alien",
     command: {
       name: "alien",
       description: "顯示或隱藏外星防衛畫面（on、off、stats）",
