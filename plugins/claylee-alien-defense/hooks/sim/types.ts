@@ -45,8 +45,16 @@ export type Alien = {
   isCheerRequested: boolean;
 };
 
-export type EffectKind = "hit" | "muzzle" | "blast" | "sparkle" | "sweat" | "zee";
+export type EffectKind =
+  | "hit"
+  | "muzzle"
+  | "blast"
+  | "sparkle"
+  | "sweat"
+  | "zee"
+  | "bubble"
+  | "debris";
 
-export type Effect = { kind: EffectKind; x: number; y: number; ageMs: number };
+export type Effect = { kind: EffectKind; x: number; y: number; ageMs: number; direction?: number };
 
 export type Tally = Record<MonsterKind, number>;

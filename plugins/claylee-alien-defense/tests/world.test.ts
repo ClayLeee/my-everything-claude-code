@@ -1,7 +1,7 @@
 import { expect, test } from "claude-code/testing";
 
 import { countTasks, phaseOf } from "../hooks/openspec";
-import { BOSS_HITS, FRAME_MS } from "../hooks/sim/constants";
+import { BOSS_HITS, FRAME_MS, STAGE_ROWS, TALL_ROWS } from "../hooks/sim/constants";
 import type { Mode } from "../hooks/sim/types";
 import { createWorld } from "../hooks/sim/world";
 
@@ -82,7 +82,7 @@ test("with nothing to fight the alien cycles through sleep, workout and flex", a
   expect([...seen].sort()).toEqual(["flex", "sleep", "workout"]);
 });
 
-test("every mode draws at the narrowest and widest pane", async () => {
+test("every mode draws at the narrowest and widest pane, short and docked", async () => {
   const modes: Mode[] = [
     { kind: "free" },
     openspec("dawn"),
@@ -90,18 +90,21 @@ test("every mode draws at the narrowest and widest pane", async () => {
     openspec("dusk"),
     openspec("night"),
   ];
-  for (const columns of [44, 72]) {
-    for (const mode of modes) {
-      const world = createWorld();
-      world.resize(columns);
-      world.setMode({ kind: "free" });
-      world.setMode(mode);
-      const id = world.spawn();
-      world.defeat({ id, isFailure: false });
-      for (let step = 0; step < 200; step += 1) {
-        world.tick(FRAME_MS);
-        const bitmap = world.frame();
-        expect(bitmap.width).toBe(columns);
+  for (const rows of [STAGE_ROWS, TALL_ROWS]) {
+    for (const columns of [44, 72]) {
+      for (const mode of modes) {
+        const world = createWorld();
+        world.resize(columns, rows);
+        world.setMode({ kind: "free" });
+        world.setMode(mode);
+        const id = world.spawn();
+        world.defeat({ id, isFailure: false });
+        for (let step = 0; step < 200; step += 1) {
+          world.tick(FRAME_MS);
+          const bitmap = world.frame();
+          expect(bitmap.width).toBe(columns);
+          expect(bitmap.height).toBe(rows * 2);
+        }
       }
     }
   }

@@ -2,8 +2,8 @@ import { clearBitmap, createBitmap } from "../shared/pixel/bitmap";
 import type { Bitmap } from "../shared/pixel/bitmap";
 import { BOSS_TITLES } from "../art/boss";
 import { MONSTER_NAMES } from "../art/monsters";
-import { drawScene } from "../draw/scene";
 import { EFFECT_LIFE_MS } from "../draw/effects";
+import { drawScene, muzzleOf } from "../draw/scene";
 import { blendSky, skyFor } from "../draw/sky";
 import type { SkyStyle } from "../draw/sky";
 import { phaseRank } from "../openspec";
@@ -19,22 +19,22 @@ import {
   COOLDOWN_MS,
   DEATH_MS,
   FLASH_MS,
-  FLOOR_TOP,
+  floorOf,
   HOME_X,
   IDLE_MAX_MS,
   IDLE_MIN_MS,
   IMPACT_PROGRESS,
   KNOCKBACK_PIXELS,
+  LIFT_CYCLE_MS,
   LOG_LIMIT,
   MAX_ALIVE_MONSTERS,
   MAX_COLUMNS,
   MONSTER_FRONT_X,
   MONSTER_GAP,
   MONSTER_SPEED_PIXELS_PER_SECOND,
-  MUZZLE_OFFSET_X,
-  MUZZLE_OFFSET_Y,
   PHASE_BLEND_MS,
-  STAGE_HEIGHT,
+  SHAKE_MS,
+  STAGE_ROWS,
   WAKE_MS,
 } from "./constants";
 import type {
@@ -52,9 +52,8 @@ import type {
 
 const KINDS: readonly [MonsterKind, ...MonsterKind[]] = ["slime", "eyeworm", "moth", "squid"];
 const ACTIVITIES: readonly [IdleActivity, ...IdleActivity[]] = ["sleep", "workout", "flex"];
-const MONSTER_WIDTH = 12;
+const MONSTER_WIDTH = 13;
 const READY_LINGER_MS = 2500;
-const IDLE_EFFECT_MS: Record<IdleActivity, number> = { sleep: 1100, workout: 1600, flex: 900 };
 
 const PHASE_LABELS: Record<Phase, string> = {
   dawn: "黎明・寫文件",
@@ -64,8 +63,8 @@ const PHASE_LABELS: Record<Phase, string> = {
 };
 
 const ACTIVITY_LINES: Record<IdleActivity, string> = {
-  sleep: "躺在地上打呼",
-  workout: "開始做伏地挺身",
+  sleep: "鑽進睡袋呼呼大睡",
+  workout: "開始舉槓鈴",
   flex: "對著星空秀肌肉",
 };
 
@@ -84,15 +83,19 @@ export function emptyTally(): Tally {
 export function createWorld(options: { seed?: number } = {}) {
   const random = seeded(options.seed ?? 23);
   let columns = MAX_COLUMNS;
-  let bitmap = createBitmap({ width: columns, height: STAGE_HEIGHT });
+  let height = STAGE_ROWS * 2;
+  let floor = floorOf(height);
+  let bitmap = createBitmap({ width: columns, height });
   let monsters: Monster[] = [];
   let effects: Effect[] = [];
   let boss: Boss | undefined;
-  let pendingBosses: string[] = [];
+  const pendingBosses: string[] = [];
   let bossCooldownMs = 0;
+  let shakeMs = 0;
   let nextId = 1;
   let readyIdleMs = 0;
-  let idleEffectMs = 0;
+  let idleBeatMs = 0;
+  let wasLiftUp = false;
   let mode: Mode = { kind: "free" };
   let hasMode = false;
   let sky: SkyStyle = skyFor(mode);
@@ -131,11 +134,12 @@ export function createWorld(options: { seed?: number } = {}) {
     alien.activity = choices[Math.floor(random() * choices.length)] ?? ACTIVITIES[0];
     alien.activityMs = 0;
     alien.activityLengthMs = IDLE_MIN_MS + random() * (IDLE_MAX_MS - IDLE_MIN_MS);
+    idleBeatMs = 0;
     note(`外星人${ACTIVITY_LINES[alien.activity]}`);
   }
 
   function bossStandX(): number {
-    return Math.max(30, columns - BOSS_STAND_OFFSET);
+    return Math.max(32, columns - BOSS_STAND_OFFSET);
   }
 
   function summonBoss(title: string): void {
@@ -175,18 +179,22 @@ export function createWorld(options: { seed?: number } = {}) {
   function impact(): void {
     const target = retarget();
     if (!target) return;
-    const y = FLOOR_TOP - 6;
+    const y = muzzleOf(floor).y;
     if (target.kind === "boss" && boss) {
       boss.hitsRemaining -= 1;
       boss.flashMs = FLASH_MS;
       bossCooldownMs = 0;
-      effects.push({ kind: "hit", x: boss.x + 4, y: y - 1, ageMs: 0 });
+      effects.push(
+        { kind: "hit", x: boss.x + 3, y, ageMs: 0 },
+        { kind: "debris", x: boss.x + 3, y, ageMs: 0, direction: -1 },
+      );
       if (boss.hitsRemaining <= 0) {
         boss.phase = "dying";
         boss.phaseMs = 0;
         bossesSlain += 1;
         lifetime += 1;
-        effects.push({ kind: "blast", x: boss.x + 9, y: 7, ageMs: 0 });
+        shakeMs = SHAKE_MS;
+        effects.push({ kind: "blast", x: boss.x + 10, y: floor - 8, ageMs: 0 });
         note(`★ 擊敗 BOSS「${boss.title}」`);
         alien.isCheerRequested = true;
       }
@@ -196,7 +204,10 @@ export function createWorld(options: { seed?: number } = {}) {
     const monster = target.monster;
     monster.hitsRemaining -= 1;
     monster.flashMs = FLASH_MS;
-    effects.push({ kind: "hit", x: monster.x + 2, y, ageMs: 0 });
+    effects.push(
+      { kind: "hit", x: monster.x + 2, y, ageMs: 0 },
+      { kind: "debris", x: monster.x + 2, y, ageMs: 0, direction: 1 },
+    );
     if (monster.hitsRemaining <= 0) {
       monster.phase = "dying";
       monster.phaseMs = 0;
@@ -214,12 +225,42 @@ export function createWorld(options: { seed?: number } = {}) {
     );
   }
 
+  function idleEffects(dtMs: number): void {
+    idleBeatMs += dtMs;
+    if (alien.activity === "sleep") {
+      if (idleBeatMs >= 1200) {
+        idleBeatMs = 0;
+        effects.push({ kind: "zee", x: HOME_X + 4, y: floor - 10, ageMs: 0 });
+      }
+      if (!effects.some((effect) => effect.kind === "bubble"))
+        effects.push({ kind: "bubble", x: HOME_X + 9, y: floor - 5, ageMs: 0 });
+      return;
+    }
+    if (alien.activity === "workout") {
+      const isUp = alien.activityMs % LIFT_CYCLE_MS >= LIFT_CYCLE_MS / 2;
+      if (isUp && !wasLiftUp) {
+        effects.push(
+          { kind: "sweat", x: HOME_X + 4, y: floor - 10, ageMs: 0, direction: -1 },
+          { kind: "sweat", x: HOME_X + 11, y: floor - 10, ageMs: 0, direction: 1 },
+        );
+      }
+      wasLiftUp = isUp;
+      return;
+    }
+    if (idleBeatMs >= 700) {
+      idleBeatMs = 0;
+      const side = Math.floor(alien.activityMs / 700) % 2 === 0;
+      effects.push({ kind: "sparkle", x: HOME_X + (side ? 0 : 15), y: floor - 13, ageMs: 0 });
+    }
+  }
+
   function advanceAlien(dtMs: number): void {
     alien.clockMs += dtMs;
     alien.modeMs += dtMs;
     const target = retarget();
     if (alien.mode === "idle") {
       if (hasThreat()) {
+        effects = effects.filter((effect) => effect.kind !== "bubble" && effect.kind !== "zee");
         enter("wake");
         return;
       }
@@ -229,14 +270,7 @@ export function createWorld(options: { seed?: number } = {}) {
         return;
       }
       alien.activityMs += dtMs;
-      idleEffectMs += dtMs;
-      if (idleEffectMs >= IDLE_EFFECT_MS[alien.activity]) {
-        idleEffectMs = 0;
-        const kind =
-          alien.activity === "sleep" ? "zee" : alien.activity === "workout" ? "sweat" : "sparkle";
-        const x = alien.activity === "sleep" ? HOME_X + 2 : HOME_X + 11;
-        effects.push({ kind, x, y: alien.activity === "sleep" ? 8 : 3, ageMs: 0 });
-      }
+      idleEffects(dtMs);
       if (alien.activityMs >= alien.activityLengthMs) nextActivity();
       return;
     }
@@ -279,12 +313,8 @@ export function createWorld(options: { seed?: number } = {}) {
       }
       if (alien.modeMs >= AIM_MS) {
         alien.hasStruck = false;
-        effects.push({
-          kind: "muzzle",
-          x: HOME_X + MUZZLE_OFFSET_X,
-          y: 1 + MUZZLE_OFFSET_Y,
-          ageMs: 0,
-        });
+        const muzzle = muzzleOf(floor);
+        effects.push({ kind: "muzzle", x: muzzle.x, y: muzzle.y, ageMs: 0 });
         enter("fire");
       }
       return;
@@ -297,9 +327,22 @@ export function createWorld(options: { seed?: number } = {}) {
       if (alien.modeMs >= BEAM_MS) enter("cooldown");
       return;
     }
-    if (alien.mode === "cooldown" && alien.modeMs >= COOLDOWN_MS) {
-      enter("ready");
-    }
+    if (alien.mode === "cooldown" && alien.modeMs >= COOLDOWN_MS) enter("ready");
+  }
+
+  function makeMonster(id: number, kind: MonsterKind): Monster {
+    return {
+      id,
+      kind,
+      label: MONSTER_NAMES[kind],
+      x: columns,
+      hitsRemaining: 1,
+      isDoomed: false,
+      phase: "alive",
+      phaseMs: 0,
+      flashMs: 0,
+      walkMs: id * 137,
+    };
   }
 
   function advanceMonsters(dtMs: number): void {
@@ -350,34 +393,29 @@ export function createWorld(options: { seed?: number } = {}) {
     }
   }
 
-  function advanceEffects(dtMs: number): void {
-    effects.forEach((effect) => {
-      effect.ageMs += dtMs;
-    });
-    effects = effects.filter((effect) => effect.ageMs < EFFECT_LIFE_MS[effect.kind]);
+  function currentSky(): SkyStyle {
+    return blendSky(skyFrom, sky, blendMs / PHASE_BLEND_MS);
   }
 
-  function makeMonster(id: number, kind: MonsterKind): Monster {
-    return {
-      id,
-      kind,
-      label: MONSTER_NAMES[kind],
-      x: columns,
-      hitsRemaining: 1,
-      isDoomed: false,
-      phase: "alive",
-      phaseMs: 0,
-      flashMs: 0,
-      walkMs: id * 137,
-    };
+  function shake(): void {
+    if (shakeMs <= 0) return;
+    const offset = Math.floor(shakeMs / 40) % 2 === 0 ? 1 : -1;
+    const copy = [...bitmap.pixels];
+    for (let y = 0; y < bitmap.height; y += 1) {
+      for (let x = 0; x < bitmap.width; x += 1) {
+        bitmap.pixels[y * bitmap.width + x] =
+          copy[y * bitmap.width + Math.min(bitmap.width - 1, Math.max(0, x + offset))] ?? null;
+      }
+    }
   }
 
   return {
-    resize(nextColumns: number): void {
-      if (nextColumns !== columns) {
-        columns = nextColumns;
-        bitmap = createBitmap({ width: columns, height: STAGE_HEIGHT });
-      }
+    resize(nextColumns: number, rows: number = STAGE_ROWS): void {
+      if (nextColumns === columns && rows * 2 === height) return;
+      columns = nextColumns;
+      height = rows * 2;
+      floor = floorOf(height);
+      bitmap = createBitmap({ width: columns, height });
     },
 
     restore(saved: { lifetime: number }): void {
@@ -460,10 +498,14 @@ export function createWorld(options: { seed?: number } = {}) {
 
     tick(dtMs: number): void {
       blendMs = Math.min(PHASE_BLEND_MS, blendMs + dtMs);
+      shakeMs = Math.max(0, shakeMs - dtMs);
       advanceBoss(dtMs);
       advanceAlien(dtMs);
       advanceMonsters(dtMs);
-      advanceEffects(dtMs);
+      effects.forEach((effect) => {
+        effect.ageMs += dtMs;
+      });
+      effects = effects.filter((effect) => effect.ageMs < EFFECT_LIFE_MS[effect.kind]);
     },
 
     summary(): string {
@@ -479,14 +521,11 @@ export function createWorld(options: { seed?: number } = {}) {
 
     frame(): Bitmap {
       clearBitmap(bitmap);
-      drawScene({ bitmap, sky: currentSky(), mode, alien, monsters, boss, effects, slain });
+      drawScene({ bitmap, floor, sky: currentSky(), mode, alien, monsters, boss, effects });
+      shake();
       return bitmap;
     },
   };
-
-  function currentSky(): SkyStyle {
-    return blendSky(skyFrom, sky, blendMs / PHASE_BLEND_MS);
-  }
 }
 
 export type World = ReturnType<typeof createWorld>;

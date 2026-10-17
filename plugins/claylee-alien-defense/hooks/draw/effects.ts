@@ -31,52 +31,103 @@ const BURSTS: Partial<Record<EffectKind, Burst>> = {
   },
   blast: {
     durationMs: 1200,
-    reach: 16,
+    reach: 18,
     colors: [0xffffff, 0xfff3b0, 0xffa64d, 0xff4d6d, 0x7a3db8],
     angles: RING,
     hasFlash: true,
   },
   sparkle: {
-    durationMs: 500,
+    durationMs: 600,
     reach: 3,
-    colors: [0xffffff, 0xfff3b0],
+    colors: [0xffffff, 0xfff3b0, 0xf2c14e],
     angles: [0, 90, 180, 270],
     hasFlash: true,
   },
 };
 
-const Z_ROWS = ["###", "..#", ".#.", "#..", "###"];
-
 export const EFFECT_LIFE_MS: Record<EffectKind, number> = {
   hit: 280,
   muzzle: 140,
   blast: 1200,
-  sparkle: 500,
-  sweat: 700,
-  zee: 2200,
+  sparkle: 600,
+  sweat: 650,
+  zee: 2400,
+  bubble: 2200,
+  debris: 600,
 };
 
-function drawZee(bitmap: Bitmap, effect: Effect): void {
-  const progress = effect.ageMs / EFFECT_LIFE_MS.zee;
-  const x = Math.round(effect.x + progress * 4);
-  const y = Math.round(effect.y - progress * 8);
-  const color = progress < 0.6 ? 0xdfe7ff : 0x8a8fb8;
-  Z_ROWS.forEach((row, dy) => {
+const Z_SMALL = ["##", ".#", "##"];
+const Z_BIG = ["###", "..#", ".#.", "#..", "###"];
+
+function drawGlyph(
+  bitmap: Bitmap,
+  rows: readonly string[],
+  x: number,
+  y: number,
+  color: Color,
+): void {
+  rows.forEach((row, dy) => {
     Array.from(row).forEach((cell, dx) => {
       if (cell === "#") setPixel({ bitmap, x: x + dx, y: y + dy, color });
     });
   });
 }
 
+function drawZee(bitmap: Bitmap, effect: Effect): void {
+  const progress = effect.ageMs / EFFECT_LIFE_MS.zee;
+  const x = Math.round(effect.x + progress * 6 + Math.sin(progress * 6) * 1.2);
+  const y = Math.round(effect.y - progress * 9);
+  const color = progress < 0.5 ? 0xe6ecff : progress < 0.8 ? 0xa9b3d9 : 0x5a5f8a;
+  drawGlyph(bitmap, progress < 0.35 ? Z_SMALL : Z_BIG, x, y, color);
+}
+
+function drawBubble(bitmap: Bitmap, effect: Effect): void {
+  const progress = effect.ageMs / EFFECT_LIFE_MS.bubble;
+  if (progress > 0.92) {
+    [-2, 2].forEach((dx) =>
+      setPixel({ bitmap, x: effect.x + dx, y: effect.y - 1, color: 0xbfe9ff }),
+    );
+    return;
+  }
+  const radius = 0.5 + Math.sin(progress * Math.PI * 3) * 0.3 + progress * 1.2;
+  for (let angle = 0; angle < 360; angle += 30) {
+    const radians = toRadians(angle);
+    setPixel({
+      bitmap,
+      x: effect.x + radius + Math.cos(radians) * radius,
+      y: effect.y + Math.sin(radians) * radius,
+      color: 0x9fdcff,
+    });
+  }
+  setPixel({ bitmap, x: effect.x + radius * 0.6, y: effect.y - radius * 0.5, color: 0xffffff });
+}
+
 function drawSweat(bitmap: Bitmap, effect: Effect): void {
   const progress = effect.ageMs / EFFECT_LIFE_MS.sweat;
-  setPixel({ bitmap, x: effect.x, y: effect.y + progress * 6, color: 0x7fd4ff });
+  const direction = effect.direction ?? 1;
+  const x = effect.x + direction * progress * 5;
+  const y = effect.y - progress * 3 + progress * progress * 7;
+  setPixel({ bitmap, x, y, color: 0x7fd4ff });
+  setPixel({ bitmap, x, y: y - 1, color: 0xd6f3ff });
+}
+
+function drawDebris(bitmap: Bitmap, effect: Effect): void {
+  const progress = effect.ageMs / EFFECT_LIFE_MS.debris;
+  const direction = effect.direction ?? 1;
+  for (let piece = 0; piece < 3; piece += 1) {
+    const spread = (piece - 1) * 0.8;
+    const x = effect.x + direction * progress * (4 + piece * 2);
+    const y = effect.y + spread - progress * 4 + progress * progress * 9;
+    setPixel({ bitmap, x, y, color: piece === 0 ? 0xffffff : 0xff8be6 });
+  }
 }
 
 export function drawEffect(options: { bitmap: Bitmap; effect: Effect }): void {
   const { bitmap, effect } = options;
   if (effect.kind === "zee") return drawZee(bitmap, effect);
+  if (effect.kind === "bubble") return drawBubble(bitmap, effect);
   if (effect.kind === "sweat") return drawSweat(bitmap, effect);
+  if (effect.kind === "debris") return drawDebris(bitmap, effect);
   const burst = BURSTS[effect.kind];
   if (!burst) return;
   const progress = effect.ageMs / burst.durationMs;
