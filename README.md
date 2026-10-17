@@ -91,7 +91,7 @@ plugins/
 | Event | Hook | Description |
 |-------|------|-------------|
 | Stop | global console.log check | Scan all git-changed files |
-| tool.call (mod) | push guard | Deny `git push` until the checks in `.claude/push-checks.json` passed on the pushed tree; `/push-checks` shows status |
+| tool.call (mod) | push guard | Deny `git push` until the checks in `.claude/push-checks.json` passed on the pushed tree; `/push-checks` shows status, `/push-checks run` runs them |
 
 ### Rules
 

@@ -5,11 +5,17 @@ type Passed = Record<string, string>;
 type Denied = { deny: string };
 
 const CONFIG = ".claude/push-checks.json";
-const PUSH = /\bgit\b(?:\s+-C\s+("[^"]+"|'[^']+'|\S+))?\s+push\b/;
+const PUSH = /(?:^|[;&|(\n])\s*git(?:\s+-C\s+("[^"]+"|'[^']+'|\S+))?\s+push\b/;
+const RUN_TIMEOUT_MS = 600_000;
+const TAIL_LINES = 15;
 
 async function git($: $, cwd: string, args: string[]): Promise<string | null> {
-  const ran = await $.process.run(["git", ...args], { cwd });
-  return ran.exitCode === 0 ? ran.stdout.trim() : null;
+  try {
+    const ran = await $.process.run(["git", ...args], { cwd });
+    return ran.exitCode === 0 ? ran.stdout.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 async function checksOf($: $, top: string): Promise<string[] | null> {
@@ -94,6 +100,40 @@ async function guard<R extends ToolCallResult<string>>(
   return ran;
 }
 
+async function shellArgv($: $, command: string): Promise<string[]> {
+  return (await $.env.get("OS")) === "Windows_NT"
+    ? ["cmd", "/d", "/s", "/c", command]
+    : ["sh", "-c", command];
+}
+
+function tail(text: string): string {
+  return text.trimEnd().split("\n").slice(-TAIL_LINES).join("\n");
+}
+
+async function runChecks($: $, top: string, checks: string[]): Promise<string> {
+  const lines: string[] = [];
+  const done: string[] = [];
+  for (const check of checks) {
+    const ran = await $.process.run(await shellArgv($, check), {
+      cwd: top,
+      timeoutMs: RUN_TIMEOUT_MS,
+    });
+    if (ran.exitCode !== 0) {
+      lines.push(`✗ ${check} (exit ${ran.exitCode})`, tail(`${ran.stdout}\n${ran.stderr}`));
+      break;
+    }
+    done.push(check);
+    lines.push(`✓ ${check}`);
+  }
+  const tree = done.length > 0 ? await workTree($, top) : null;
+  if (tree) {
+    const passed = await passedOf($, top);
+    for (const check of done) passed[check] = tree;
+    await $.store.set(storeKey(top), passed);
+  }
+  return lines.join("\n");
+}
+
 const failed: Denied = { deny: "push-guard: the guard failed, so the push was not let through." };
 
 export const register: Register = (on) => {
@@ -108,16 +148,18 @@ export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     await $.command.register({
       name: "push-checks",
-      description: "Show which push checks have passed on HEAD",
+      description: "Show which push checks have passed on HEAD; `run` runs them",
+      argumentHint: "[run]",
     });
     return next(e);
   });
 
-  on("command.run", { command: "push-checks" }, async ($) => {
+  on("command.run", { command: "push-checks" }, async ($, e) => {
     const cwd = await $.session.cwd();
     const top = await git($, cwd, ["rev-parse", "--show-toplevel"]);
     const checks = top ? await checksOf($, top) : null;
     if (!top || !checks) return { text: `No ${CONFIG} in this project; pushes are not guarded.` };
+    if (e.args.trim() === "run") return { text: await runChecks($, top, checks) };
     const missing = await missingFor($, top, checks);
     return {
       text: checks.map((check) => `${missing.includes(check) ? "✗" : "✓"} ${check}`).join("\n"),

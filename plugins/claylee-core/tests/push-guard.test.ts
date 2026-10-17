@@ -1,13 +1,14 @@
 import type { On } from "claude-code";
-import { expect, mock, test } from "claude-code/testing";
+import { type Engine, expect, mock, test } from "claude-code/testing";
 
 const REPO = "/repo";
 const CHECKS = ["pnpm lint", "pnpm test"];
 
-type Repo = { headTree: string; workTree: string; config?: string };
+type Repo = { headTree: string; workTree: string; config?: string; shell?: string[] };
 
 function engine(on: On, repo: Repo) {
   mock.store(on);
+  mock.env(on, { OS: "Windows_NT" });
   on("session.cwd", () => ({ value: REPO }));
   on("command.register", ($, event) => ({ value: { command: event.name } }));
   on("fs.read", ($, event) => {
@@ -19,6 +20,7 @@ function engine(on: On, repo: Repo) {
     return { value: repo.config };
   });
   on("process.run", ($, event) => {
+    if (event.init?.cwd?.includes("$")) throw new Error(`no such directory ${event.init.cwd}`);
     const args = event.argv.join(" ");
     const ok = (stdout: string) => ({
       value: {
@@ -33,6 +35,20 @@ function engine(on: On, repo: Repo) {
     if (args === "git stash create") return ok(repo.workTree === repo.headTree ? "" : "stashsha\n");
     if (args === "git rev-parse stashsha^{tree}") return ok(`${repo.workTree}\n`);
     if (args === "git rev-parse HEAD^{tree}") return ok(`${repo.headTree}\n`);
+    if (event.argv[0] === "cmd") {
+      const check = event.argv[event.argv.length - 1] ?? "";
+      repo.shell?.push(check);
+      if (!check.includes("fail")) return ok("done\n");
+      return {
+        value: {
+          exitCode: 1,
+          stdout: "",
+          stderr: "1 test failed\n",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
     throw new Error(`unexpected ${args}`);
   });
   on("tool.call", ($, event) => {
@@ -97,4 +113,67 @@ test("an edit after the checks makes the push wait for a fresh run", async ($, o
   repo.workTree = "t3";
   const ran = await $.tool.call({ tool: "Bash", command: "git push" });
   expect(ran.deny).toContain("pnpm lint");
+});
+
+test("git push named inside a string or message is not a push", async ($, on) => {
+  engine(on, { headTree: "t1", workTree: "t1", config });
+  const commit = await $.tool.call({ tool: "Bash", command: 'git commit -m "explain git push"' });
+  expect(commit.deny).toBeUndefined();
+  const echo = await $.tool.call({
+    tool: "PowerShell",
+    command: "Write-Output 'run git push later'",
+  });
+  expect(echo.deny).toBeUndefined();
+  const chained = await $.tool.call({ tool: "Bash", command: "pnpm lint && git -C /repo push" });
+  expect(chained.deny).toContain("pnpm test");
+});
+
+test("a -C path that cannot be resolved is not a guarded repo", async ($, on) => {
+  engine(on, { headTree: "t1", workTree: "t1", config });
+  const ran = await $.tool.call({
+    tool: "PowerShell",
+    command: "git -C $repo push origin develop",
+  });
+  expect(ran.deny).toBeUndefined();
+});
+
+const run = ($: Engine, args: string) =>
+  $.command.run({
+    command: "push-checks",
+    args,
+    origin: { kind: "composer" },
+    presentation: { isFullscreen: false, columns: 100 },
+  });
+
+test("/push-checks run runs every check in order and lets the push through", async ($, on) => {
+  const repo: Repo = { headTree: "t1", workTree: "t1", config, shell: [] };
+  engine(on, repo);
+  const result = await run($, "run");
+  expect(repo.shell).toEqual(["pnpm lint", "pnpm test"]);
+  expect(result.text).toContain("✓ pnpm lint");
+  expect(result.text).toContain("✓ pnpm test");
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toBeUndefined();
+});
+
+test("/push-checks run stops at the first failing check", async ($, on) => {
+  const repo: Repo = {
+    headTree: "t1",
+    workTree: "t1",
+    config: JSON.stringify({ checks: ["pnpm fail-lint", "pnpm test"] }),
+    shell: [],
+  };
+  engine(on, repo);
+  const result = await run($, "run");
+  expect(repo.shell).toEqual(["pnpm fail-lint"]);
+  expect(result.text).toContain("✗ pnpm fail-lint");
+  expect(result.text).toContain("1 test failed");
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toContain("pnpm fail-lint");
+});
+
+test("/push-checks with no argument shows the status", async ($, on) => {
+  engine(on, { headTree: "t1", workTree: "t1", config });
+  const result = await run($, "");
+  expect(result.text).toContain("✗ pnpm lint");
 });
