@@ -27,7 +27,7 @@
       "name": "claylee-openspec",
       "source": "./plugins/claylee-openspec",
       "description": "OpenSpec + Superpowers workflow injection. Conditionally injects workflow docs when project has openspec/ directory or .claude/openspec-enabled marker.",
-      "version": "0.1.0"
+      "version": "0.2.1"
     }
   ]
 }
