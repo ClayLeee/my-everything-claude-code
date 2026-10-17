@@ -7,10 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **my-everything-claude-code** is a Claude Code **marketplace** containing 4 separately-installable plugins. It is NOT a typical application — it is a plugin distribution repository.
 
 The 4 plugins:
-- **claylee-core** — behavioral contract rule + console.log check
+- **claylee-core** — behavioral contract rule + console.log check + push-guard mod
 - **claylee-e2e-testing** — Playwright E2E skill + `/e2e:*` commands
 - **claylee-code-quality-agents** — 4 sub-agents for code review / build fixes / security / dead code
-- **claylee-openspec** — OpenSpec workflow injection (conditional on `openspec/` dir)
+- **claylee-openspec** — OpenSpec workflow injection (conditional on `openspec/` dir) + `retro-doc-sync` skill
 
 Install (pick any subset):
 ```bash
@@ -38,6 +38,12 @@ All hook scripts are Node.js (pure stdlib, no npm dependencies) under `plugins/<
 
 **claylee-core** (1 script):
 - **check-console-log.js** — scans all git-changed files for `console.log` (Stop)
+
+### Mods (function-hook modules)
+
+A plugin's `hooks/hooks.json` can name a TypeScript module under `modules` next to its classic `hooks`. Test with `claude plugin test <plugin dir>` and check with `claude plugin validate <plugin dir>`.
+
+**claylee-core** — `hooks/push-guard.ts`: in a project that has `.claude/push-checks.json` (`{ "checks": ["pnpm lint", ...] }`), denies a Bash or PowerShell `git push` until every listed check has passed on the tree being pushed. A check counts when it runs as its own command (`&&` chains allowed, no pipes or `;`) and succeeds; it records the working tree's git tree hash (`git stash create`), so committing the checked work keeps the pass and any later edit voids it. Projects without the file are untouched. `/push-checks` shows which checks have passed on `HEAD`.
 
 **claylee-openspec** (2 scripts):
 - **inject-openspec.js** — dual-mode workflow injector (SessionStart = full, UserPromptSubmit = compressed reminder)
@@ -98,6 +104,7 @@ All agents output in 繁體中文.
 
 ### Skills
 
+- **retro-doc-sync** (in `claylee-openspec`) — backfills OpenSpec specs, Superpowers docs and characterization tests for code already merged or pushed (an MR, a branch, a range), without touching production code. `scripts/triage.mjs <range> [repo]` does the deterministic first pass (commit types, `specFlag`, `testGaps`) so the model only judges what it flags; judge per range, not per commit, since a `feat:` is often followed by its `docs(openspec):` commit
 - **e2e-testing** (in `claylee-e2e-testing`) — Playwright E2E testing patterns with 3-level progressive disclosure: SKILL.md (core conventions, ~310 lines) → references/ (12 judgment-based guides) → templates/ (8 deterministic code files) + scripts/ (scaffold.js, generate-report.js). Commands resolve `$SKILL_DIR` via Glob and load only the references they need
 
 ### Commands

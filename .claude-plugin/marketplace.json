@@ -8,8 +8,8 @@
     {
       "name": "claylee-core",
       "source": "./plugins/claylee-core",
-      "description": "Behavioral contract rule + a Stop hook that flags console.log in git-changed files",
-      "version": "0.1.1"
+      "description": "Behavioral contract rule + a Stop hook that flags console.log in git-changed files + a push-guard mod for projects with .claude/push-checks.json",
+      "version": "0.2.0"
     },
     {
       "name": "claylee-e2e-testing",
@@ -26,8 +26,8 @@
     {
       "name": "claylee-openspec",
       "source": "./plugins/claylee-openspec",
-      "description": "OpenSpec + Superpowers workflow injection. Conditionally injects workflow docs when project has openspec/ directory or .claude/openspec-enabled marker.",
-      "version": "0.2.1"
+      "description": "OpenSpec + Superpowers workflow injection. Conditionally injects workflow docs when project has openspec/ directory or .claude/openspec-enabled marker. Includes the retro-doc-sync skill.",
+      "version": "0.3.0"
     }
   ]
 }

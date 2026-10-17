@@ -21,10 +21,10 @@ This repo is a **Claude Code marketplace** with 4 plugins. Install only the ones
 
 | Plugin | What it provides | When to install |
 |---|---|---|
-| **claylee-core** | Behavioral contract rule + a Stop hook that flags `console.log` in git-changed files | Always — basic quality safety net |
+| **claylee-core** | Behavioral contract rule + a Stop hook that flags `console.log` in git-changed files + a push-guard mod (opt-in per project) | Always — basic quality safety net |
 | **claylee-e2e-testing** | Playwright E2E skill + 7 `/e2e:*` commands (no hooks, on-demand only) | Writing Playwright E2E tests |
 | **claylee-code-quality-agents** | 4 sub-agents (code-review, build-error-resolver, security-reviewer, refactor-cleaner) | Want specialist agents for code review/cleanup |
-| **claylee-openspec** | OpenSpec workflow injection (conditional — only fires when project has `openspec/` dir or `.claude/openspec-enabled` marker) | Working with OpenSpec-style projects |
+| **claylee-openspec** | OpenSpec workflow injection (conditional — only fires when project has `openspec/` dir or `.claude/openspec-enabled` marker) + `retro-doc-sync` skill | Working with OpenSpec-style projects |
 
 ## Structure
 
@@ -34,9 +34,10 @@ This repo is a **Claude Code marketplace** with 4 plugins. Install only the ones
 plugins/
 ├── claylee-core/
 │   ├── .claude-plugin/plugin.json
-│   ├── hooks/hooks.json
+│   ├── hooks/hooks.json          # Stop hook + push-guard.ts module
 │   ├── rules/behavioral-contract.md
-│   └── scripts/hooks/            # console.log check
+│   ├── scripts/hooks/            # console.log check
+│   └── tests/                    # push-guard tests (claude plugin test)
 ├── claylee-e2e-testing/
 │   ├── .claude-plugin/plugin.json
 │   ├── commands/e2e/             # 7 /e2e:* commands
@@ -48,7 +49,8 @@ plugins/
     ├── .claude-plugin/plugin.json
     ├── hooks/hooks.json
     ├── config/                   # OpenSpec workflow docs
-    └── scripts/hooks/            # 2 OpenSpec hooks
+    ├── scripts/hooks/            # 2 OpenSpec hooks
+    └── skills/retro-doc-sync/    # backfill specs/docs/tests for merged code
 ```
 
 ## Development Workflow
@@ -89,6 +91,7 @@ plugins/
 | Event | Hook | Description |
 |-------|------|-------------|
 | Stop | global console.log check | Scan all git-changed files |
+| tool.call (mod) | push guard | Deny `git push` until the checks in `.claude/push-checks.json` passed on the pushed tree; `/push-checks` shows status |
 
 ### Rules
 
@@ -98,6 +101,7 @@ Global rule installed to `~/.claude/rules/` for automatic enforcement (provided 
 
 ### Skills
 
+- **retro-doc-sync** — Backfill OpenSpec specs, Superpowers docs and tests for an MR, branch or commit range someone already merged, without touching production code
 - **e2e-testing** — Playwright E2E testing patterns, POM examples, flaky test strategies, multi-role auth. Includes scaffold script (BasePage, config, auth, error-utils templates) and report generator script for automated markdown reports
 
 ### Agents
