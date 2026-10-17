@@ -62,6 +62,12 @@ const PHASE_LABELS: Record<Phase, string> = {
   night: "入夜・待 archive",
 };
 
+const IDLE_ACTIONS: Record<IdleActivity, string> = {
+  sleep: "睡覺中",
+  workout: "舉槓鈴中",
+  flex: "秀肌肉中",
+};
+
 const ACTIVITY_LINES: Record<IdleActivity, string> = {
   sleep: "鑽進睡袋呼呼大睡",
   workout: "開始舉槓鈴",
@@ -105,8 +111,8 @@ export function createWorld(options: { seed?: number } = {}) {
   let lifetime = 0;
   let slain = 0;
   let bossesSlain = 0;
-  let lines: string[] = [];
-  const overflow = new Map<number, MonsterKind>();
+  let lines: string[] = ["外星人鑽進睡袋呼呼大睡"];
+  const overflow = new Map<number, { kind: MonsterKind; tool: string }>();
 
   const alien: Alien = {
     mode: "idle",
@@ -160,10 +166,21 @@ export function createWorld(options: { seed?: number } = {}) {
     note(`⚠ BOSS「${title}」降臨`);
   }
 
-  function recordKill(kind: MonsterKind): void {
+  function recordKill(kind: MonsterKind, tool: string): void {
     tally = { ...tally, [kind]: tally[kind] + 1 };
     slain += 1;
     lifetime += 1;
+    note(`擊倒${MONSTER_NAMES[kind]}（${tool}）`);
+  }
+
+  function action(): string {
+    if (boss && boss.phase !== "dying")
+      return `BOSS 戰：${boss.title} HP ${boss.hitsRemaining}/${BOSS_HITS}`;
+    const alive = monsters.filter((monster) => monster.phase === "alive").length + overflow.size;
+    if (alive > 0) return `迎戰 ${alive} 隻異形`;
+    if (alien.mode === "cheer") return "慶祝勝利";
+    if (alien.mode === "idle") return IDLE_ACTIONS[alien.activity];
+    return "警戒中";
   }
 
   function retarget(): { kind: "monster"; monster: Monster } | { kind: "boss" } | undefined {
@@ -211,7 +228,7 @@ export function createWorld(options: { seed?: number } = {}) {
     if (monster.hitsRemaining <= 0) {
       monster.phase = "dying";
       monster.phaseMs = 0;
-      recordKill(monster.kind);
+      recordKill(monster.kind, monster.tool);
       return;
     }
     monster.x += KNOCKBACK_PIXELS;
@@ -261,6 +278,9 @@ export function createWorld(options: { seed?: number } = {}) {
     if (alien.mode === "idle") {
       if (hasThreat()) {
         effects = effects.filter((effect) => effect.kind !== "bubble" && effect.kind !== "zee");
+        const onlyBoss =
+          boss !== undefined && !monsters.some((monster) => monster.phase === "alive");
+        note(onlyBoss ? "BOSS 來襲，外星人起身迎戰" : "異形來襲，外星人起身迎戰");
         enter("wake");
         return;
       }
@@ -330,10 +350,11 @@ export function createWorld(options: { seed?: number } = {}) {
     if (alien.mode === "cooldown" && alien.modeMs >= COOLDOWN_MS) enter("ready");
   }
 
-  function makeMonster(id: number, kind: MonsterKind): Monster {
+  function makeMonster(id: number, kind: MonsterKind, tool: string): Monster {
     return {
       id,
       kind,
+      tool,
       label: MONSTER_NAMES[kind],
       x: columns,
       hitsRemaining: 1,
@@ -365,9 +386,9 @@ export function createWorld(options: { seed?: number } = {}) {
     );
     const room =
       MAX_ALIVE_MONSTERS - monsters.filter((monster) => monster.phase === "alive").length;
-    [...overflow.entries()].slice(0, Math.max(0, room)).forEach(([id, kind]) => {
+    [...overflow.entries()].slice(0, Math.max(0, room)).forEach(([id, waiting]) => {
       overflow.delete(id);
-      monsters.push(makeMonster(id, kind));
+      monsters.push(makeMonster(id, waiting.kind, waiting.tool));
     });
   }
 
@@ -465,15 +486,15 @@ export function createWorld(options: { seed?: number } = {}) {
       if (next.kind === "free") note(`change「${previous.change}」已 archive，回到夜間巡邏`);
     },
 
-    spawn(): number {
+    spawn(tool: string = "工具"): number {
       const id = nextId;
       nextId += 1;
       const kind = KINDS[(id - 1) % KINDS.length] ?? KINDS[0];
       if (monsters.filter((monster) => monster.phase === "alive").length >= MAX_ALIVE_MONSTERS) {
-        overflow.set(id, kind);
+        overflow.set(id, { kind, tool });
         return id;
       }
-      monsters.push(makeMonster(id, kind));
+      monsters.push(makeMonster(id, kind, tool));
       return id;
     },
 
@@ -485,10 +506,10 @@ export function createWorld(options: { seed?: number } = {}) {
         if (outcome.isFailure) note(`工具失敗：${monster.label}擋下了一發雷射`);
         return;
       }
-      const kind = overflow.get(outcome.id);
-      if (kind) {
+      const waiting = overflow.get(outcome.id);
+      if (waiting) {
         overflow.delete(outcome.id);
-        recordKill(kind);
+        recordKill(waiting.kind, waiting.tool);
       }
     },
 
@@ -508,15 +529,14 @@ export function createWorld(options: { seed?: number } = {}) {
       effects = effects.filter((effect) => effect.ageMs < EFFECT_LIFE_MS[effect.kind]);
     },
 
+    action,
+
     summary(): string {
-      const bossPart =
-        boss && boss.phase !== "dying"
-          ? `⚠ BOSS「${boss.title}」HP ${boss.hitsRemaining}/${BOSS_HITS} · `
-          : "";
-      if (mode.kind === "free") return `${bossPart}夜間巡邏 · 本次擊倒 ${slain} · 累計 ${lifetime}`;
+      if (mode.kind === "free")
+        return `${action()} · 夜間巡邏 · 本次擊倒 ${slain} · 累計 ${lifetime}`;
       const progress =
         mode.phase === "dawn" ? `文件 ${mode.docs}/6` : `任務 ${mode.done}/${mode.total}`;
-      return `${bossPart}${mode.change} · ${PHASE_LABELS[mode.phase]} ${progress} · 本次擊倒 ${slain}`;
+      return `${action()} · ${mode.change} · ${PHASE_LABELS[mode.phase]} ${progress} · 擊倒 ${slain}`;
     },
 
     frame(): Bitmap {
