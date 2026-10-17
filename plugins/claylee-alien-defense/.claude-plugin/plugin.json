@@ -1,0 +1,12 @@
+{
+  "name": "claylee-alien-defense",
+  "version": "0.1.0",
+  "description": "像素動畫 pane：外星人用雷射擊退每次工具呼叫帶來的異形；在 OpenSpec 專案裡，天色隨 change 的階段從黎明走到入夜，換階段時出現 BOSS。/alien 開關。",
+  "author": {
+    "name": "ClayLeee",
+    "url": "https://github.com/ClayLeee"
+  },
+  "repository": "https://github.com/ClayLeee/my-everything-claude-code",
+  "license": "MIT",
+  "keywords": ["mod", "pixel-art", "openspec"]
+}
