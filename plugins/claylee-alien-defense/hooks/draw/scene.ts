@@ -1,4 +1,4 @@
-import { ALIEN, MUZZLE_X, MUZZLE_Y } from "../art/alien";
+import { ALIEN, FLEX_SHIFT_X, MUZZLE_X, MUZZLE_Y } from "../art/alien";
 import { BOSS_CORE, BOSS_FRAMES, BOSS_WIDTH } from "../art/boss";
 import { DEATH_GLOW, MONSTER_FRAMES } from "../art/monsters";
 import { setPixel, stamp } from "../shared/pixel/bitmap";
@@ -11,6 +11,8 @@ import {
   BOSS_DEATH_MS,
   BOSS_HITS,
   DEATH_MS,
+  FLEX_SIDE_MS,
+  FLEX_RELAX_MS,
   HOME_X,
   LIFT_CYCLE_MS,
   WAKE_MS,
@@ -153,7 +155,21 @@ function drawBoss(bitmap: Bitmap, boss: Boss, floor: number): void {
   }
 }
 
-function idleSprite(alien: Alien): { sprite: Bitmap; isLow: boolean } {
+function drawFlex(bitmap: Bitmap, ms: number, x: number, y: number): void {
+  const isPumped = ms % FLEX_SIDE_MS >= FLEX_RELAX_MS;
+  const side = Math.floor(ms / FLEX_SIDE_MS) % 2 === 0 ? "right" : "left";
+  const sprite =
+    side === "right"
+      ? isPumped
+        ? ALIEN.flexRightPump
+        : ALIEN.flexRight
+      : isPumped
+        ? ALIEN.flexLeftPump
+        : ALIEN.flexLeft;
+  stamp({ target: bitmap, source: sprite, x: x + FLEX_SHIFT_X[side], y: y - sprite.height });
+}
+
+function idleSprite(alien: Alien): { sprite: Bitmap; isLow: boolean } | undefined {
   const t = alien.clockMs;
   if (alien.activity === "sleep")
     return {
@@ -165,21 +181,21 @@ function idleSprite(alien: Alien): { sprite: Bitmap; isLow: boolean } {
       sprite: alien.activityMs % LIFT_CYCLE_MS < LIFT_CYCLE_MS / 2 ? ALIEN.liftDown : ALIEN.liftUp,
       isLow: false,
     };
-  return { sprite: Math.floor(t / 600) % 2 === 0 ? ALIEN.flex : ALIEN.flexPump, isLow: false };
+  return undefined;
 }
 
 function drawAlien(bitmap: Bitmap, alien: Alien, floor: number): void {
   for (let dx = 1; dx < 12; dx += 1)
     setPixel({ bitmap, x: HOME_X + dx, y: floor, color: 0x120c1e });
   if (alien.mode === "idle") {
-    const { sprite } = idleSprite(alien);
-    stamp({ target: bitmap, source: sprite, x: HOME_X, y: floor - sprite.height });
+    const idle = idleSprite(alien);
+    if (idle === undefined) drawFlex(bitmap, alien.activityMs, HOME_X, floor);
+    else stamp({ target: bitmap, source: idle.sprite, x: HOME_X, y: floor - idle.sprite.height });
     return;
   }
   if (alien.mode === "cheer") {
-    const sprite = Math.floor(alien.modeMs / 220) % 2 === 0 ? ALIEN.flex : ALIEN.flexPump;
     const hop = Math.round(2 * Math.abs(Math.sin(alien.modeMs / 120)));
-    stamp({ target: bitmap, source: sprite, x: HOME_X, y: floor - sprite.height - hop });
+    drawFlex(bitmap, alien.modeMs + FLEX_RELAX_MS, HOME_X, floor - hop);
     return;
   }
   const t = alien.clockMs;

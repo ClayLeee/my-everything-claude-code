@@ -25,6 +25,8 @@ import {
   IDLE_MIN_MS,
   IMPACT_PROGRESS,
   KNOCKBACK_PIXELS,
+  FLEX_SIDE_MS,
+  FLEX_RELAX_MS,
   LIFT_CYCLE_MS,
   LOG_LIMIT,
   MAX_ALIVE_MONSTERS,
@@ -102,6 +104,7 @@ export function createWorld(options: { seed?: number } = {}) {
   let readyIdleMs = 0;
   let idleBeatMs = 0;
   let wasLiftUp = false;
+  let wasPumped = false;
   let mode: Mode = { kind: "free" };
   let hasMode = false;
   let sky: SkyStyle = skyFor(mode);
@@ -264,11 +267,12 @@ export function createWorld(options: { seed?: number } = {}) {
       wasLiftUp = isUp;
       return;
     }
-    if (idleBeatMs >= 700) {
-      idleBeatMs = 0;
-      const side = Math.floor(alien.activityMs / 700) % 2 === 0;
-      effects.push({ kind: "sparkle", x: HOME_X + (side ? 0 : 15), y: floor - 13, ageMs: 0 });
+    const isPumped = alien.activityMs % FLEX_SIDE_MS >= FLEX_RELAX_MS;
+    if (isPumped && !wasPumped) {
+      const isRight = Math.floor(alien.activityMs / FLEX_SIDE_MS) % 2 === 0;
+      effects.push({ kind: "sparkle", x: HOME_X + (isRight ? 12 : 1), y: floor - 11, ageMs: 0 });
     }
+    wasPumped = isPumped;
   }
 
   function advanceAlien(dtMs: number): void {

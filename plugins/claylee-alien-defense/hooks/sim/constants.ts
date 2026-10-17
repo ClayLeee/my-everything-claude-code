@@ -33,6 +33,8 @@ export const SHAKE_MS = 700;
 export const IDLE_MIN_MS = 9000;
 export const IDLE_MAX_MS = 15000;
 export const LIFT_CYCLE_MS = 1400;
+export const FLEX_SIDE_MS = 1500;
+export const FLEX_RELAX_MS = 500;
 export const PHASE_BLEND_MS = 8000;
 export const LOG_LIMIT = 8;
 

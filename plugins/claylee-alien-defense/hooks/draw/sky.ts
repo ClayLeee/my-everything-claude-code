@@ -185,8 +185,8 @@ export function drawSky(options: {
     });
   }
 
-  if (isTall && sky.moonAmount > 0.5) {
-    paint(bitmap, PLANET_ROWS, 4, 2, { p: 0x8a6ad8, P: 0x5a3fa6, i: 0xd9c8ff });
+  if (isTall && sky.moonAmount > 0.5 && bitmap.width >= 56) {
+    paint(bitmap, PLANET_ROWS, bitmap.width - 42, 4, { p: 0x8a6ad8, P: 0x5a3fa6, i: 0xd9c8ff });
   }
 
   if (sky.sunAmount > 0.5) {
