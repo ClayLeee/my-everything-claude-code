@@ -4,7 +4,7 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 
 ## Install
 
-This repo is a **Claude Code marketplace** with 5 plugins. Install only the ones you need.
+This repo is a **Claude Code marketplace** with 4 plugins. Install only the ones you need.
 
 ```bash
 # Add marketplace
@@ -12,7 +12,6 @@ This repo is a **Claude Code marketplace** with 5 plugins. Install only the ones
 
 # Install plugins individually (pick any subset)
 /plugin install claylee-core@ClayLeee-my-everything-claude-code
-/plugin install claylee-continuous-learning@ClayLeee-my-everything-claude-code
 /plugin install claylee-e2e-testing@ClayLeee-my-everything-claude-code
 /plugin install claylee-code-quality-agents@ClayLeee-my-everything-claude-code
 /plugin install claylee-openspec@ClayLeee-my-everything-claude-code
@@ -23,7 +22,6 @@ This repo is a **Claude Code marketplace** with 5 plugins. Install only the ones
 | Plugin | What it provides | When to install |
 |---|---|---|
 | **claylee-core** | Behavioral contract rule + 5 protection hooks (git push warning, doc blocker, console.log detection, build artifact check) | Always — basic quality safety net |
-| **claylee-continuous-learning** | Instinct-based learning skill + 9 `/cl:*` commands + 7 observation/session hooks | Want session-to-session learning system |
 | **claylee-e2e-testing** | Playwright E2E skill + 7 `/e2e:*` commands (no hooks, on-demand only) | Writing Playwright E2E tests |
 | **claylee-code-quality-agents** | 4 sub-agents (code-review, build-error-resolver, security-reviewer, refactor-cleaner) | Want specialist agents for code review/cleanup |
 | **claylee-openspec** | OpenSpec workflow injection (conditional — only fires when project has `openspec/` dir or `.claude/openspec-enabled` marker) | Working with OpenSpec-style projects |
@@ -32,21 +30,13 @@ This repo is a **Claude Code marketplace** with 5 plugins. Install only the ones
 
 ```
 .claude-plugin/
-└── marketplace.json              # Lists all 5 plugins
+└── marketplace.json              # Lists all 4 plugins
 plugins/
 ├── claylee-core/
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
 │   ├── rules/behavioral-contract.md
 │   └── scripts/hooks/            # 5 protection hooks
-├── claylee-continuous-learning/
-│   ├── .claude-plugin/plugin.json
-│   ├── hooks/hooks.json
-│   ├── commands/cl/              # 9 /cl:* commands
-│   ├── skills/continuous-learning-v2/
-│   └── scripts/
-│       ├── hooks/                # 7 observation/session hooks
-│       └── lib/                  # 4 shared utilities
 ├── claylee-e2e-testing/
 │   ├── .claude-plugin/plugin.json
 │   ├── commands/e2e/             # 7 /e2e:* commands
@@ -68,24 +58,12 @@ plugins/
 │                            Development Workflow                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-                           ┌──────────────────────┐
-                           │    Session Start      │
-                           └──────────┬───────────┘
-                                      │
-                                      ▼
-                           ┌───────────────────────────────────────┐
-                           │  load context hook                    │
-                           │  restore previous session summary     │
-                           └──────────────┬────────────────────────┘
-                                          │
-                                          ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  Development Loop                                                            │
 │                                                                              │
 │  ┌──────────────────────┐    ┌──────────────────────────────────────────┐   │
-│  │    Write / Edit      │───▶│  ● observe hook        capture tool usage│   │
-│  │        Code          │───▶│  ● console.log warning  flag debug stmts │   │
-│  │                      │───▶│  ● suggest /compact     after 50+ edits  │   │
+│  │    Write / Edit      │───▶│  ● console.log warning  flag debug stmts │   │
+│  │        Code          │───▶│  ● suggest /compact     after 50+ edits  │   │
 │  └──────────────────────┘───▶│  ● block random .md     prevent extra docs│  │
 │                               └──────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -108,34 +86,7 @@ plugins/
                            ┌───────────────────────────────────────┐
                            │  git push reminder hook               │
                            │  review before pushing                │
-                           └──────────────┬────────────────────────┘
-                                          │
-                                          ▼
-                           ┌──────────────────────┐
-                           │    Session End        │
-                           └──────────┬───────────┘
-                                      │
-            ┌─────────────────────────┼─────────────────────────┐
-            ▼                         ▼                         ▼
-  ┌──────────────────┐     ┌────────────────────┐     ┌──────────────────┐
-  │  session record  │     │   auto-analyze     │     │  auto-summarize  │
-  │  + evaluate      │     │  extract instincts │     │  session summary │
-  └──────────────────┘     └────────┬───────────┘     └──────────────────┘
-                                    │
-                                    ▼
-                           ┌────────────────────┐
-                           │  instincts/personal │
-                           └────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  Learning Cycle  (async)                                                     │
-│                                                                              │
-│  instincts/personal ──/cl:evolve──────────▶  evolved commands               │
-│                                              skills · agents                │
-│                                                                              │
-│  instincts/personal ──/cl:instinct-export──▶  share with teammates          │
-│                       ◀──/cl:instinct-import──                               │
-└─────────────────────────────────────────────────────────────────────────────┘
+                           └───────────────────────────────────────┘
 ```
 
 ## What's Included
@@ -147,17 +98,8 @@ plugins/
 | PreToolUse | git push reminder | Warn before pushing |
 | PreToolUse | block random .md | Prevent unnecessary doc files |
 | PreToolUse | suggest compact | Remind `/compact` after 50 edits |
-| PreToolUse | observe (pre) | Collect tool usage observations |
 | PostToolUse | console.log warning | Flag `console.log` in edited code |
-| PostToolUse | observe (post) | Collect tool results |
-| PreCompact | compaction log | Record compaction events |
-| PreCompact | auto-analyze | Extract instincts from observations |
-| SessionStart | load context | Load previous session summary |
 | Stop | global console.log check | Scan all git-changed files |
-| SessionEnd | session record | Save session metadata |
-| SessionEnd | evaluate session | Log session length |
-| SessionEnd | auto-analyze | Extract instincts from observations |
-| SessionEnd | auto-summarize | Generate session summary |
 
 ### Rules
 
@@ -167,7 +109,6 @@ Global rule installed to `~/.claude/rules/` for automatic enforcement (provided 
 
 ### Skills
 
-- **continuous-learning-v2** — Instinct-based learning from session observations
 - **e2e-testing** — Playwright E2E testing patterns, POM examples, flaky test strategies, multi-role auth. Includes scaffold script (BasePage, config, auth, error-utils templates) and report generator script for automated markdown reports
 
 ### Agents
@@ -185,15 +126,6 @@ Global rule installed to `~/.claude/rules/` for automatic enforcement (provided 
 - `/e2e:run` — Run existing tests with error classification, failure-type summary, and next-step suggestions
 - `/e2e:remote` — Scaffold Playwright project, explore remote URL via MCP, create and run tests, MCP debug loop on failure
 - `/e2e:record` — Record browser actions with Playwright codegen, convert to POM + spec, MCP debug loop on failure
-- `/cl:status` — Show learned instincts with confidence scores
-- `/cl:analyze` — Manually trigger observation analysis
-- `/cl:log` — Show recent observer log entries
-- `/cl:sync` — Update instincts.md from current instincts
-- `/cl:evolve` — Cluster related instincts into commands/skills/agents
-- `/cl:instinct-export` — Export instincts to shareable YAML format
-- `/cl:instinct-import` — Import instincts with conflict detection
-- `/cl:learn-eval` — Extract session patterns with quality self-evaluation
-- `/cl:skill-create` — Analyze git history to generate SKILL.md files
 
 ## E2E Testing Workflow
 
