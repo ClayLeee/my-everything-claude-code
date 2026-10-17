@@ -58,6 +58,24 @@ function engine(on: On, repo: Repo) {
     const result = { stdout: "", stderr: "", interrupted: false };
     return failed ? { result, isError: true as const } : { result };
   });
+
+  const screen = { toasts: [] as string[], statuses: [] as (string | undefined)[] };
+  let toasted: (() => void) | null = null;
+  mock.clock(on);
+  on("ui.toast", ($, event) => {
+    screen.toasts.push(event.text);
+    toasted?.();
+    return { value: undefined };
+  });
+  on("ui.status", ($, event) => {
+    screen.statuses.push(event.text);
+    return { value: undefined };
+  });
+  const nextToast = () =>
+    new Promise<void>((resolve) => {
+      toasted = resolve;
+    });
+  return { screen, nextToast };
 }
 
 const config = JSON.stringify({ checks: CHECKS });
@@ -154,31 +172,55 @@ const run = ($: Engine, args: string) =>
     presentation: { isFullscreen: false, columns: 100 },
   });
 
-test("/push-checks run runs every check in order and lets the push through", async ($, on) => {
+test("/push-checks run answers at once, runs in the background and lets the push through", async ($, on) => {
   const repo: Repo = { headTree: "t1", workTree: "t1", config, shell: [] };
-  engine(on, repo);
+  const { screen, nextToast } = engine(on, repo);
+  const finished = nextToast();
   const result = await run($, "run");
+  expect(result.text).toContain("背景");
+  await finished;
   expect(repo.shell).toEqual(["pnpm lint", "pnpm test"]);
-  expect(result.text).toContain("✓ pnpm lint");
-  expect(result.text).toContain("✓ pnpm test");
+  expect(screen.statuses).toEqual([
+    "push-checks 1/2 · pnpm lint",
+    "push-checks 2/2 · pnpm test",
+    undefined,
+  ]);
+  expect(screen.toasts).toEqual(["✓ push-checks：2 項全部通過"]);
   const ran = await $.tool.call({ tool: "Bash", command: "git push" });
   expect(ran.deny).toBeUndefined();
+  const status = await run($, "");
+  expect(status.text).toContain("✓ pnpm test");
+  expect(status.text).toContain("上次執行");
 });
 
-test("/push-checks run stops at the first failing check", async ($, on) => {
+test("/push-checks run stops at the first failure and keeps its output for /push-checks", async ($, on) => {
   const repo: Repo = {
     headTree: "t1",
     workTree: "t1",
     config: JSON.stringify({ checks: ["pnpm fail-lint", "pnpm test"] }),
     shell: [],
   };
-  engine(on, repo);
-  const result = await run($, "run");
+  const { screen, nextToast } = engine(on, repo);
+  const finished = nextToast();
+  await run($, "run");
+  await finished;
   expect(repo.shell).toEqual(["pnpm fail-lint"]);
-  expect(result.text).toContain("✗ pnpm fail-lint");
-  expect(result.text).toContain("1 test failed");
+  expect(screen.toasts[0]).toContain("pnpm fail-lint 失敗");
+  const status = await run($, "");
+  expect(status.text).toContain("✗ pnpm fail-lint");
+  expect(status.text).toContain("1 test failed");
   const ran = await $.tool.call({ tool: "Bash", command: "git push" });
   expect(ran.deny).toContain("pnpm fail-lint");
+});
+
+test("a second /push-checks run while one is going is refused", async ($, on) => {
+  const repo: Repo = { headTree: "t1", workTree: "t1", config, shell: [] };
+  const { nextToast } = engine(on, repo);
+  const finished = nextToast();
+  await run($, "run");
+  const again = await run($, "run");
+  expect(again.text).toContain("已經在執行中");
+  await finished;
 });
 
 test("/push-checks with no argument shows the status", async ($, on) => {

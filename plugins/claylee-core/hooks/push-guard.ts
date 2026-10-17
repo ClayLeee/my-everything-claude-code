@@ -84,9 +84,9 @@ async function guard<R extends ToolCallResult<string>>(
       if (missing.length > 0) {
         return {
           deny: [
-            `push-guard: ${CONFIG} requires these checks to pass on the commit being pushed:`,
+            `push-guard：${CONFIG} 規定這些檢查要在這次 push 的內容上通過：`,
             ...missing.map((check) => `  - ${check}`),
-            "Run each as its own command (chaining with && is fine; no pipes or ;), then push again.",
+            "執行 /push-checks run，或把每項檢查單獨執行（可以用 && 串接，不能用 pipe 或 ;），再重新 push。",
           ].join("\n"),
         };
       }
@@ -127,31 +127,84 @@ function tail(text: string): string {
   return text.trimEnd().split("\n").slice(-TAIL_LINES).join("\n");
 }
 
-async function runChecks($: $, top: string, checks: string[]): Promise<string> {
-  const lines: string[] = [];
-  const done: string[] = [];
-  for (const check of checks) {
+type CheckResult = { check: string; ok: boolean; seconds: number; exitCode: number };
+type LastRun = { finishedAt: number; results: CheckResult[]; tail?: string };
+
+const lastRunKey = (top: string) => `lastRun:${top}`;
+let running: string | null = null;
+
+async function runChecks($: $, top: string, checks: string[]): Promise<LastRun> {
+  const results: CheckResult[] = [];
+  let failureTail: string | undefined;
+  for (const [index, check] of checks.entries()) {
+    $.ui.status(`push-checks ${index + 1}/${checks.length} · ${check}`);
+    const start = await $.clock.now();
     const ran = await $.process.run(await shellArgv($, check), {
       cwd: top,
       timeoutMs: RUN_TIMEOUT_MS,
     });
-    if (ran.exitCode !== 0) {
-      lines.push(`✗ ${check} (exit ${ran.exitCode})`, tail(`${ran.stdout}\n${ran.stderr}`));
+    const ok = ran.exitCode === 0;
+    const seconds = Math.round(((await $.clock.now()) - start) / 1000);
+    results.push({ check, ok, seconds, exitCode: ran.exitCode });
+    if (!ok) {
+      failureTail = tail(`${ran.stdout}\n${ran.stderr}`);
       break;
     }
-    done.push(check);
-    lines.push(`✓ ${check}`);
   }
-  const tree = done.length > 0 ? await workTree($, top) : null;
+  const passedChecks = results.filter((result) => result.ok).map((result) => result.check);
+  const tree = passedChecks.length > 0 ? await workTree($, top) : null;
   if (tree) {
     const passed = await passedOf($, top);
-    for (const check of done) passed[check] = tree;
+    for (const check of passedChecks) passed[check] = tree;
     await $.store.set(storeKey(top), passed);
+  }
+  const lastRun: LastRun = { finishedAt: await $.clock.now(), results };
+  if (failureTail) lastRun.tail = failureTail;
+  await $.store.set(lastRunKey(top), lastRun);
+  return lastRun;
+}
+
+async function runInBackground($: $, top: string, checks: string[]): Promise<void> {
+  running = top;
+  try {
+    const lastRun = await runChecks($, top, checks);
+    const failure = lastRun.results.find((result) => !result.ok);
+    $.ui.toast(
+      failure
+        ? `✗ push-checks：${failure.check} 失敗（exit ${failure.exitCode}），用 /push-checks 看輸出`
+        : `✓ push-checks：${lastRun.results.length} 項全部通過`,
+    );
+  } catch (error) {
+    $.ui.toast(`✗ push-checks 執行中斷：${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    $.ui.status(undefined);
+    running = null;
+  }
+}
+
+function ago(ms: number): string {
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 1) return "剛剛";
+  return minutes < 60 ? `${minutes} 分鐘前` : `${Math.round(minutes / 60)} 小時前`;
+}
+
+async function statusText($: $, top: string, checks: string[]): Promise<string> {
+  const missing = await missingFor($, top, checks);
+  const lines = checks.map((check) => `${missing.includes(check) ? "✗" : "✓"} ${check}`);
+  if (running === top) lines.push("", "執行中，進度看狀態列");
+  const lastRun = (await $.store.get(lastRunKey(top))) as LastRun | undefined;
+  if (lastRun) {
+    lines.push("", `上次執行：${ago((await $.clock.now()) - lastRun.finishedAt)}`);
+    for (const result of lastRun.results) {
+      const exit = result.ok ? "" : `（exit ${result.exitCode}）`;
+      lines.push(`  ${result.ok ? "✓" : "✗"} ${result.check}  ${result.seconds}s${exit}`);
+    }
+    if (lastRun.tail) lines.push("", lastRun.tail);
   }
   return lines.join("\n");
 }
 
-const failed: Denied = { deny: "push-guard: the guard failed, so the push was not let through." };
+const failed: Denied = { deny: "push-guard：檢查程式本身出錯，這次 push 沒有放行。" };
 
 export const register: Register = (on) => {
   on("tool.call", { tool: "Bash" }, ($, e, next) => guard($, e.command, () => next(e))).catch(
@@ -165,7 +218,7 @@ export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     await $.command.register({
       name: "push-checks",
-      description: "Show which push checks have passed on HEAD; `run` runs them",
+      description: "顯示 push 前檢查的狀態；加上 run 會在背景執行檢查",
       argumentHint: "[run]",
     });
     return next(e);
@@ -175,11 +228,14 @@ export const register: Register = (on) => {
     const cwd = await $.session.cwd();
     const top = await git($, cwd, ["rev-parse", "--show-toplevel"]);
     const checks = top ? await checksOf($, top) : null;
-    if (!top || !checks) return { text: `No ${CONFIG} in this project; pushes are not guarded.` };
-    if (e.args.trim() === "run") return { text: await runChecks($, top, checks) };
-    const missing = await missingFor($, top, checks);
-    return {
-      text: checks.map((check) => `${missing.includes(check) ? "✗" : "✓"} ${check}`).join("\n"),
-    };
+    if (!top || !checks) return { text: `這個專案沒有 ${CONFIG}，push 不受保護。` };
+    if (e.args.trim() === "run") {
+      if (running) return { text: "push-checks 已經在執行中，進度看狀態列。" };
+      void runInBackground($, top, checks);
+      return {
+        text: `已在背景開始執行 ${checks.length} 項檢查，進度看狀態列，完成時會跳通知。`,
+      };
+    }
+    return { text: await statusText($, top, checks) };
   });
 };
