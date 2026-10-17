@@ -45,7 +45,21 @@ function ranChecks(command: string, checks: string[]): string[] {
 }
 
 function unquote(path: string): string {
-  return path.replace(/^["']|["']$/g, "");
+  return path
+    .replace(/^["']|["']$/g, "")
+    .replace(/^\/([a-zA-Z])\//, (_, drive: string) => `${drive.toUpperCase()}:/`);
+}
+
+function lastCd(text: string): string | null {
+  const moves = [
+    ...text.matchAll(/(?:^|[;&|(\n])\s*(?:cd|Set-Location|pushd)\s+("[^"]+"|'[^']+'|[^\s;&|)]+)/g),
+  ];
+  const target = moves[moves.length - 1]?.[1];
+  return target ? unquote(target) : null;
+}
+
+async function dirOf($: $, command: string, upTo: number): Promise<string> {
+  return lastCd(command.slice(0, upTo)) ?? (await $.session.cwd());
 }
 
 async function missingFor($: $, top: string, checks: string[]): Promise<string[]> {
@@ -62,7 +76,7 @@ async function guard<R extends ToolCallResult<string>>(
   const push = PUSH.exec(command);
 
   if (push) {
-    const dir = push[1] ? unquote(push[1]) : await $.session.cwd();
+    const dir = push[1] ? unquote(push[1]) : await dirOf($, command, push.index);
     const top = await git($, dir, ["rev-parse", "--show-toplevel"]);
     const checks = top ? await checksOf($, top) : null;
     if (top && checks) {
@@ -85,7 +99,10 @@ async function guard<R extends ToolCallResult<string>>(
   const result = ran.result as { interrupted?: boolean; backgroundTaskId?: string } | undefined;
   if (result?.interrupted || result?.backgroundTaskId) return ran;
 
-  const top = await git($, await $.session.cwd(), ["rev-parse", "--show-toplevel"]);
+  const top = await git($, await dirOf($, command, command.length), [
+    "rev-parse",
+    "--show-toplevel",
+  ]);
   const checks = top ? await checksOf($, top) : null;
   if (!top || !checks) return ran;
   const done = ranChecks(command, checks);

@@ -31,7 +31,8 @@ function engine(on: On, repo: Repo) {
         isStderrTruncated: false,
       },
     });
-    if (args === "git rev-parse --show-toplevel") return ok(`${REPO}\n`);
+    if (args === "git rev-parse --show-toplevel")
+      return ok(event.init?.cwd?.startsWith("C:/other") ? "C:/other\n" : `${REPO}\n`);
     if (args === "git stash create") return ok(repo.workTree === repo.headTree ? "" : "stashsha\n");
     if (args === "git rev-parse stashsha^{tree}") return ok(`${repo.workTree}\n`);
     if (args === "git rev-parse HEAD^{tree}") return ok(`${repo.headTree}\n`);
@@ -135,6 +136,14 @@ test("a -C path that cannot be resolved is not a guarded repo", async ($, on) =>
     command: "git -C $repo push origin develop",
   });
   expect(ran.deny).toBeUndefined();
+});
+
+test("a push after cd into another repo is judged by that repo", async ($, on) => {
+  engine(on, { headTree: "t1", workTree: "t1", config });
+  const away = await $.tool.call({ tool: "Bash", command: "cd /c/other && git push origin main" });
+  expect(away.deny).toBeUndefined();
+  const back = await $.tool.call({ tool: "Bash", command: "cd /c/other && cd /repo && git push" });
+  expect(back.deny).toContain("pnpm lint");
 });
 
 const run = ($: Engine, args: string) =>
