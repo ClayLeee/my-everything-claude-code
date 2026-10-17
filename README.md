@@ -21,7 +21,7 @@ This repo is a **Claude Code marketplace** with 4 plugins. Install only the ones
 
 | Plugin | What it provides | When to install |
 |---|---|---|
-| **claylee-core** | Behavioral contract rule + 5 protection hooks (git push warning, doc blocker, console.log detection, build artifact check) | Always — basic quality safety net |
+| **claylee-core** | Behavioral contract rule + a Stop hook that flags `console.log` in git-changed files | Always — basic quality safety net |
 | **claylee-e2e-testing** | Playwright E2E skill + 7 `/e2e:*` commands (no hooks, on-demand only) | Writing Playwright E2E tests |
 | **claylee-code-quality-agents** | 4 sub-agents (code-review, build-error-resolver, security-reviewer, refactor-cleaner) | Want specialist agents for code review/cleanup |
 | **claylee-openspec** | OpenSpec workflow injection (conditional — only fires when project has `openspec/` dir or `.claude/openspec-enabled` marker) | Working with OpenSpec-style projects |
@@ -36,7 +36,7 @@ plugins/
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
 │   ├── rules/behavioral-contract.md
-│   └── scripts/hooks/            # 5 protection hooks
+│   └── scripts/hooks/            # console.log check
 ├── claylee-e2e-testing/
 │   ├── .claude-plugin/plugin.json
 │   ├── commands/e2e/             # 7 /e2e:* commands
@@ -62,10 +62,9 @@ plugins/
 │  Development Loop                                                            │
 │                                                                              │
 │  ┌──────────────────────┐    ┌──────────────────────────────────────────┐   │
-│  │    Write / Edit      │───▶│  ● console.log warning  flag debug stmts │   │
-│  │        Code          │───▶│  ● suggest /compact     after 50+ edits  │   │
-│  └──────────────────────┘───▶│  ● block random .md     prevent extra docs│  │
-│                               └──────────────────────────────────────────┘   │
+│  │    Write / Edit      │───▶│  ● console.log check   at end of turn    │   │
+│  │        Code          │    │                                          │   │
+│  └──────────────────────┘    └──────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
          │              │              │              │             │
     need quality    build broken  security concern  cleanup     need E2E
@@ -80,13 +79,7 @@ plugins/
                                        ▼
                            ┌──────────────────────┐
                            │  git commit + push   │
-                           └──────────┬───────────┘
-                                      │
-                                      ▼
-                           ┌───────────────────────────────────────┐
-                           │  git push reminder hook               │
-                           │  review before pushing                │
-                           └───────────────────────────────────────┘
+                           └──────────────────────┘
 ```
 
 ## What's Included
@@ -95,10 +88,6 @@ plugins/
 
 | Event | Hook | Description |
 |-------|------|-------------|
-| PreToolUse | git push reminder | Warn before pushing |
-| PreToolUse | block random .md | Prevent unnecessary doc files |
-| PreToolUse | suggest compact | Remind `/compact` after 50 edits |
-| PostToolUse | console.log warning | Flag `console.log` in edited code |
 | Stop | global console.log check | Scan all git-changed files |
 
 ### Rules
