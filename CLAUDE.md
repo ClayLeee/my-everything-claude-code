@@ -4,13 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**my-everything-claude-code** is a Claude Code **marketplace** containing 4 separately-installable plugins. It is NOT a typical application — it is a plugin distribution repository.
+**my-everything-claude-code** is a Claude Code **marketplace** containing 5 separately-installable plugins. It is NOT a typical application — it is a plugin distribution repository.
 
-The 4 plugins:
+The 5 plugins:
 - **claylee-core** — behavioral contract rule + console.log check + push-guard mod
 - **claylee-e2e-testing** — Playwright E2E skill + `/e2e:*` commands
 - **claylee-code-quality-agents** — 4 sub-agents for code review / build fixes / security / dead code
 - **claylee-openspec** — OpenSpec workflow injection (conditional on `openspec/` dir) + `retro-doc-sync` skill
+- **claylee-alien-defense** — pixel-art pane mod (`/alien`): alien vs creatures, OpenSpec stage as the planet's day
 
 Install (pick any subset):
 ```bash
@@ -44,6 +45,8 @@ All hook scripts are Node.js (pure stdlib, no npm dependencies) under `plugins/<
 A plugin's `hooks/hooks.json` can name a TypeScript module under `modules` next to its classic `hooks`. Test with `claude plugin test <plugin dir>` and check with `claude plugin validate <plugin dir>`.
 
 **claylee-core** — `hooks/push-guard.ts`: in a project that has `.claude/push-checks.json` (`{ "checks": ["pnpm lint", ...] }`), denies a Bash or PowerShell `git push` until every listed check has passed on the tree being pushed. A check counts when it runs as its own command (`&&` chains allowed, no pipes or `;`) and succeeds; it records the working tree's git tree hash (`git stash create`), so committing the checked work keeps the pass and any later edit voids it. Projects without the file are untouched. Only a `git` at a command position counts as a push (start of a line, or after `&&`, `||`, `;`, `|`, `(`), so `git push` inside a string or commit message is not one. The repo is the `-C` path, else the last `cd`/`Set-Location`/`pushd` before the push in the same command (`/c/...` read as `C:/...`), else the session's directory; a path git cannot resolve (an unexpanded `$var`) counts as an unguarded repo. `/push-checks` shows which checks have passed on `HEAD`; `/push-checks run` answers at once and runs them in the background, in order through the shell (`cmd /c` on Windows, `sh -c` elsewhere, 10-minute cap each): the plugin's status line shows `push-checks 3/4 · <check>`, a toast reports the result, and a second `run` while one is going is refused. It stops at the first failure and records the passes. Only the latest run is kept, in `$.store` (per-check durations and the failing check's last 15 lines), and `/push-checks` shows it; nothing is written to disk. User-facing text is 繁體中文.
+
+**claylee-alien-defense** — `hooks/register.tsx`: a pane drawn with the samurai-dojo pixel engine copied into `hooks/shared/` (MIT, license kept there; do not edit it beyond what the game needs). `sim/world.ts` is the game state (alien state machine, monsters, boss, effects); `draw/` paints it; `art/` holds the sprites as character maps. Each tool call spawns a creature that dies when the call ends (a failed call costs a second shot). `openspec.ts` polls `openspec/changes/` every 3 s: no active change is free mode (night patrol); otherwise docs < 6 is dawn, tasks under half done is noon, at least half is dusk, all checked is night. Moving forward a stage, or archiving, summons a boss. With nothing to fight the alien sleeps, does push-ups or flexes. `/alien on|off|stats`; it shares `~/.claude/mods/active-game` with samurai-dojo, so only one of the two panes shows at a time.
 
 **claylee-openspec** (2 scripts):
 - **inject-openspec.js** — dual-mode workflow injector (SessionStart = full, UserPromptSubmit = compressed reminder)

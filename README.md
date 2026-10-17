@@ -4,7 +4,7 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 
 ## Install
 
-This repo is a **Claude Code marketplace** with 4 plugins. Install only the ones you need.
+This repo is a **Claude Code marketplace** with 5 plugins. Install only the ones you need.
 
 ```bash
 # Add marketplace
@@ -15,6 +15,7 @@ This repo is a **Claude Code marketplace** with 4 plugins. Install only the ones
 /plugin install claylee-e2e-testing@ClayLeee-my-everything-claude-code
 /plugin install claylee-code-quality-agents@ClayLeee-my-everything-claude-code
 /plugin install claylee-openspec@ClayLeee-my-everything-claude-code
+/plugin install claylee-alien-defense@ClayLeee-my-everything-claude-code
 ```
 
 ## Plugins
@@ -25,6 +26,7 @@ This repo is a **Claude Code marketplace** with 4 plugins. Install only the ones
 | **claylee-e2e-testing** | Playwright E2E skill + 7 `/e2e:*` commands (no hooks, on-demand only) | Writing Playwright E2E tests |
 | **claylee-code-quality-agents** | 4 sub-agents (code-review, build-error-resolver, security-reviewer, refactor-cleaner) | Want specialist agents for code review/cleanup |
 | **claylee-openspec** | OpenSpec workflow injection (conditional — only fires when project has `openspec/` dir or `.claude/openspec-enabled` marker) + `retro-doc-sync` skill | Working with OpenSpec-style projects |
+| **claylee-alien-defense** | Pixel-art pane: an alien lasers down a creature per tool call; in OpenSpec projects the sky runs dawn → night with the change's stage and a boss appears at each stage change. `/alien` toggles it | Want a game to watch while Claude works |
 
 ## Structure
 
@@ -45,12 +47,16 @@ plugins/
 ├── claylee-code-quality-agents/
 │   ├── .claude-plugin/plugin.json
 │   └── agents/                   # 4 agents
-└── claylee-openspec/
+├── claylee-openspec/
+│   ├── .claude-plugin/plugin.json
+│   ├── hooks/hooks.json
+│   ├── config/                   # OpenSpec workflow docs
+│   ├── scripts/hooks/            # 2 OpenSpec hooks
+│   └── skills/retro-doc-sync/    # backfill specs/docs/tests for merged code
+└── claylee-alien-defense/
     ├── .claude-plugin/plugin.json
-    ├── hooks/hooks.json
-    ├── config/                   # OpenSpec workflow docs
-    ├── scripts/hooks/            # 2 OpenSpec hooks
-    └── skills/retro-doc-sync/    # backfill specs/docs/tests for merged code
+    ├── hooks/                    # register.tsx, sim/, draw/, art/, shared/ (pixel engine, MIT)
+    └── tests/                    # claude plugin test
 ```
 
 ## Development Workflow
@@ -234,3 +240,5 @@ pnpm test:e2e:report                                         # View HTML report
 ## Credits
 
 Hooks system adapted from [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) (MIT License).
+
+The pixel engine in `plugins/claylee-alien-defense/hooks/shared/` (bitmap, sprite, cells, colors, stage) comes from samurai-dojo in [theonly1me/claude-code-mods](https://github.com/theonly1me/claude-code-mods) (MIT License, Copyright (c) 2026 Atchyut); its license is kept beside it.
