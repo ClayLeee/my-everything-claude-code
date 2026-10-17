@@ -33,7 +33,7 @@
       "name": "claylee-alien-defense",
       "source": "./plugins/claylee-alien-defense",
       "description": "Pixel-art pane mod: an alien lasers down the creatures each tool call brings; in OpenSpec projects the sky follows the change's stage from dawn to night and a boss appears at each stage change. Toggle with /alien.",
-      "version": "0.2.3"
+      "version": "0.2.4"
     }
   ]
 }
