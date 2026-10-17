@@ -104,6 +104,7 @@ export function createWorld(options: { seed?: number } = {}) {
   let readyIdleMs = 0;
   let idleBeatMs = 0;
   let wasLiftUp = false;
+  let lifts = 0;
   let wasPumped = false;
   let mode: Mode = { kind: "free" };
   let hasMode = false;
@@ -259,10 +260,15 @@ export function createWorld(options: { seed?: number } = {}) {
     if (alien.activity === "workout") {
       const isUp = alien.activityMs % LIFT_CYCLE_MS >= LIFT_CYCLE_MS / 2;
       if (isUp && !wasLiftUp) {
-        effects.push(
-          { kind: "sweat", x: HOME_X + 4, y: floor - 10, ageMs: 0, direction: -1 },
-          { kind: "sweat", x: HOME_X + 11, y: floor - 10, ageMs: 0, direction: 1 },
-        );
+        lifts += 1;
+        const isLeft = lifts % 2 === 1;
+        effects.push({
+          kind: "sweat",
+          x: HOME_X + (isLeft ? 4 : 11),
+          y: floor - 10,
+          ageMs: 0,
+          direction: isLeft ? -1 : 1,
+        });
       }
       wasLiftUp = isUp;
       return;
