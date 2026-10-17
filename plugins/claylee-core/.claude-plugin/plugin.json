@@ -1,7 +1,7 @@
 {
   "name": "claylee-core",
-  "version": "0.1.0",
-  "description": "Behavioral contract rule + general code-quality protection hooks (git push warning, doc-creation blocker, console.log detection, build artifact check)",
+  "version": "0.1.1",
+  "description": "Behavioral contract rule + a Stop hook that flags console.log in git-changed files",
   "author": {
     "name": "ClayLeee",
     "url": "https://github.com/ClayLeee"

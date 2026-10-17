@@ -395,10 +395,10 @@ Proceed as new-feature (for retro-as-new-feature) or spec-rewrite (for retro-as-
 
 ### Guardrail interaction
 
-The 6-artifact guardrail in `check-artifacts.js` blocks production code edits when `openspec/changes/<name>/` is incomplete. For retro-doc this naturally fits:
-- D-1 + D-2 are doc-only (hook permits)
-- D-4 only edits test files (hook permits — tests aren't on the blocked extension list)
-- Production code edits during D-4 should never happen if **Buggy-code halt** is followed; a real bug requires switching to code-only first (delete the in-progress `openspec/changes/<name>/` to unblock the hook before starting code-only)
+The 6-artifact guardrail (no production code edits while any `openspec/changes/<name>/` is incomplete) is a rule you follow, not a hook that enforces it. For retro-doc this naturally fits:
+- D-1 + D-2 are doc-only (the guardrail permits them)
+- D-4 only edits test files (the guardrail permits them)
+- Production code edits during D-4 should never happen if **Buggy-code halt** is followed; a real bug requires switching to code-only first (delete the in-progress `openspec/changes/<name>/` before starting code-only)
 
 ---
 

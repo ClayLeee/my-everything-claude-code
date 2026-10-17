@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **my-everything-claude-code** is a Claude Code **marketplace** containing 4 separately-installable plugins. It is NOT a typical application — it is a plugin distribution repository.
 
 The 4 plugins:
-- **claylee-core** — behavioral contract rule + 5 protection hooks
+- **claylee-core** — behavioral contract rule + console.log check
 - **claylee-e2e-testing** — Playwright E2E skill + `/e2e:*` commands
 - **claylee-code-quality-agents** — 4 sub-agents for code review / build fixes / security / dead code
 - **claylee-openspec** — OpenSpec workflow injection (conditional on `openspec/` dir)
@@ -36,11 +36,7 @@ Hook conventions (same across plugins):
 
 All hook scripts are Node.js (pure stdlib, no npm dependencies) under `plugins/<plugin>/scripts/hooks/`:
 
-**claylee-core** (5 scripts):
-- **warn-git-push.js** — reminder before git push
-- **block-docs.js** — blocks creation of unnecessary `.md`/`.txt` files
-- **check-artifacts.js** — flags edits to build-artifact files
-- **detect-console-log.js** — warns about `console.log` in just-edited files (PostToolUse)
+**claylee-core** (1 script):
 - **check-console-log.js** — scans all git-changed files for `console.log` (Stop)
 
 **claylee-openspec** (2 scripts):
@@ -65,8 +61,8 @@ Under `plugins/claylee-e2e-testing/skills/e2e-testing/scripts/`, same convention
 ### Command Frontmatter
 Per official Claude Code docs, valid fields: `name`, `description`, `argument-hint`, `model`, `context`, `allowed-tools`, `disable-model-invocation`, `user-invocable`, `agent`, `hooks`. Do NOT use: `category`, `tags`, `args`, `skills` (these have no effect in command frontmatter).
 
-### Allowed Documentation Files
-The hook system blocks creation of `.md` files except: `README.md`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, `SKILL.md`, `MEMORY.md`, `HOOKS.md`, and any `.md` files under `playwright/` directories (E2E analysis/plan/report artifacts).
+### Hook Matchers and Exit Codes
+A hook's `matcher` filters on tool name only (`Write`, `Edit|Write`, `*`); conditions on `tool_input` belong in the script or in the handler's `if` field (one permission rule, e.g. `Bash(git push*)`). A PreToolUse hook blocks only by exiting 2 or by printing a `permissionDecision: "deny"` JSON; exit 1 is a non-blocking error and the tool call goes ahead.
 
 ### Commit Convention
 Conventional Commits format. All AI-assisted commits include:
