@@ -4,7 +4,13 @@ import { type Engine, expect, mock, test } from "claude-code/testing";
 const REPO = "/repo";
 const CHECKS = ["pnpm lint", "pnpm test"];
 
-type Repo = { headTree: string; workTree: string; config?: string; shell?: string[] };
+type Repo = {
+  headTree: string;
+  workTree: string;
+  config?: string;
+  shell?: string[];
+  tools?: string[];
+};
 
 function engine(on: On, repo: Repo) {
   mock.store(on);
@@ -54,7 +60,8 @@ function engine(on: On, repo: Repo) {
   });
   on("tool.call", ($, event) => {
     const command = "command" in event ? String(event.command) : "";
-    const failed = command.includes("fail");
+    repo.tools?.push(command);
+    const failed = command.includes("fail-");
     const result = { stdout: "", stderr: "", interrupted: false };
     return failed ? { result, isError: true as const } : { result };
   });
@@ -111,6 +118,30 @@ test("a failed or piped check does not count", async ($, on) => {
   const ran = await $.tool.call({ tool: "Bash", command: "git push" });
   expect(ran.deny).toContain("pnpm fail-lint");
   expect(ran.deny).toContain("pnpm test");
+});
+
+test("a check piped in Bash counts, run with pipefail so its own exit status decides", async ($, on) => {
+  const repo: Repo = { headTree: "t1", workTree: "t1", config, tools: [] };
+  engine(on, repo);
+  await $.tool.call({ tool: "Bash", command: "pnpm lint 2>&1 | tail -20 && pnpm test | head" });
+  expect(repo.tools).toEqual(["set -o pipefail; pnpm lint 2>&1 | tail -20 && pnpm test | head"]);
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toBeUndefined();
+});
+
+test("a failed piped check, a check behind || or a check piped into does not count", async ($, on) => {
+  engine(on, {
+    headTree: "t1",
+    workTree: "t1",
+    config: JSON.stringify({ checks: ["pnpm fail-lint", "pnpm test", "pnpm lint"] }),
+  });
+  await $.tool.call({ tool: "Bash", command: "pnpm fail-lint | tail -20" });
+  await $.tool.call({ tool: "Bash", command: "pnpm test || true" });
+  await $.tool.call({ tool: "Bash", command: "echo x | pnpm lint" });
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toContain("pnpm fail-lint");
+  expect(ran.deny).toContain("pnpm test");
+  expect(ran.deny).toContain("pnpm lint");
 });
 
 test("checks that passed on uncommitted work still count once it is committed", async ($, on) => {
