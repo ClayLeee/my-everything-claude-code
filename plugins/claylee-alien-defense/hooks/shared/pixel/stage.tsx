@@ -28,7 +28,18 @@ export type StageOptions = {
 const POLL_MS = 1000;
 const REMOUNT_MS = 250;
 const PANE_COLUMNS = 46;
+// Rows under the scene asked for inline: the summary and one more for when it wraps.
+const SUMMARY_ROWS = 2;
 const ACTIVE_FILE = ".claude/mods/active-game";
+
+// CJK and full-width characters take two terminal columns.
+function textRows(text: string, columns: number): number {
+  const width = [...text].reduce(
+    (sum, char) => sum + ((char.codePointAt(0) ?? 0) >= 0x2e80 ? 2 : 1),
+    0,
+  );
+  return Math.max(1, Math.ceil(width / Math.max(1, columns)));
+}
 
 let stage: StageOptions | undefined;
 let activePath = "";
@@ -81,7 +92,7 @@ export function installStage(on: On): void {
       const opened = await $.ui.open({
         id: options.game,
         title: options.title,
-        rows: options.rows + 1,
+        rows: options.rows + SUMMARY_ROWS,
         columns: PANE_COLUMNS,
       });
       isPaneOpen = true;
@@ -161,7 +172,7 @@ export function installStage(on: On): void {
       await $.ui.open({
         id: options.game,
         title: options.title,
-        rows: options.rows + 1,
+        rows: options.rows + SUMMARY_ROWS,
         columns: PANE_COLUMNS,
       });
       isPaneOpen = true;
@@ -204,7 +215,8 @@ export function installStage(on: On): void {
       isDocked && options.tallRows !== undefined && e.props.scroll.bodyRows >= options.tallRows + 2
         ? options.tallRows
         : options.rows;
-    const logRows = isDocked ? Math.max(0, e.props.scroll.bodyRows - rows - 3) : 0;
+    const summaryRows = textRows(lastSummary, e.props.bodyColumns);
+    const logRows = isDocked ? Math.max(0, e.props.scroll.bodyRows - rows - summaryRows - 2) : 0;
     const lines = options.scene.log().slice(0, logRows);
     if (e.surface !== "terminal" || e.props.bodyColumns < options.minColumns) {
       const { Box, Text } = $.ui.resolve(e);
@@ -226,7 +238,7 @@ export function installStage(on: On): void {
     return (
       <Box flexDirection="column">
         <Raster key={`${options.game}:stage`} columns={columns} rows={rows} cells={lastCells} />
-        <Text dimColor wrap="truncate">
+        <Text dimColor wrap="wrap">
           {lastSummary}
         </Text>
         {lines.length > 0 ? (
