@@ -10,6 +10,7 @@ type Repo = {
   config?: string;
   shell?: string[];
   tools?: string[];
+  outcome?: { interrupted?: boolean; backgroundTaskId?: string };
 };
 
 function engine(on: On, repo: Repo) {
@@ -62,7 +63,7 @@ function engine(on: On, repo: Repo) {
     const command = "command" in event ? String(event.command) : "";
     repo.tools?.push(command);
     const failed = command.includes("fail-");
-    const result = { stdout: "", stderr: "", interrupted: false };
+    const result = { stdout: "", stderr: "", interrupted: false, ...repo.outcome };
     return failed ? { result, isError: true as const } : { result };
   });
 
@@ -163,6 +164,24 @@ test("an edit after the checks makes the push wait for a fresh run", async ($, o
   repo.workTree = "t3";
   const ran = await $.tool.call({ tool: "Bash", command: "git push" });
   expect(ran.deny).toContain("pnpm lint");
+});
+
+test("a check moved to the background or interrupted does not count, and a toast says so", async ($, on) => {
+  const repo: Repo = { headTree: "t1", workTree: "t1", config };
+  const { screen } = engine(on, repo);
+  repo.outcome = { backgroundTaskId: "b1" };
+  await $.tool.call({ tool: "Bash", command: "pnpm test 2>&1 | tail -6" });
+  repo.outcome = { interrupted: true };
+  await $.tool.call({ tool: "PowerShell", command: "pnpm lint" });
+  repo.outcome = { backgroundTaskId: "b2" };
+  await $.tool.call({ tool: "Bash", command: "pnpm build" });
+  expect(screen.toasts).toHaveLength(2);
+  expect(screen.toasts[0]).toContain("pnpm test 被移到背景");
+  expect(screen.toasts[1]).toContain("pnpm lint 被中斷");
+  expect(screen.toasts[0]).toContain("/push-checks run");
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toContain("pnpm test");
+  expect(ran.deny).toContain("移到背景");
 });
 
 test("git push named inside a string or message is not a push", async ($, on) => {

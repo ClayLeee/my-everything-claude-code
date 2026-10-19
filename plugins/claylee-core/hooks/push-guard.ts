@@ -94,6 +94,7 @@ async function guard<R extends ToolCallResult<string>>(
             `push-guard：${CONFIG} 規定這些檢查要在這次 push 的內容上通過：`,
             ...missing.map((check) => `  - ${check}`),
             "執行 /push-checks run，或把每項檢查單獨執行（可以用 && 串接；Bash 可以接 pipe，PowerShell 不行；不能用 || 或 ;），再重新 push。",
+            "被中斷或移到背景的執行不算數。",
           ].join("\n"),
         };
       }
@@ -113,7 +114,13 @@ async function guard<R extends ToolCallResult<string>>(
   if (!top || done.length === 0) return ran;
   if (ran.deny !== undefined || ran.isError === true) return ran;
   const result = ran.result as { interrupted?: boolean; backgroundTaskId?: string } | undefined;
-  if (result?.interrupted || result?.backgroundTaskId) return ran;
+  if (result?.interrupted || result?.backgroundTaskId) {
+    const why = result.backgroundTaskId ? "移到背景" : "中斷";
+    $.ui.toast(
+      `push-guard：${done.join("、")} 被${why}，這次不算通過。用 /push-checks run，或在前景重跑。`,
+    );
+    return ran;
+  }
 
   const tree = await workTree($, top);
   if (tree) {
