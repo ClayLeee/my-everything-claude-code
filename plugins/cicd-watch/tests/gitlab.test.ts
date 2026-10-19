@@ -15,8 +15,17 @@ import {
   progressBar,
   pulseColor,
   statusLetter,
+  storeKeyFor,
   wrapText,
 } from "../hooks/gitlab";
+
+test("keys the watch list by workspace, however its path is written", async () => {
+  expect(storeKeyFor("C:/Users/me/repo")).toBe("projects:C:/Users/me/repo");
+  expect(storeKeyFor("c:\\Users\\me\\repo\\")).toBe("projects:C:/Users/me/repo");
+  expect(storeKeyFor("/home/me/repo/\n")).toBe("projects:/home/me/repo");
+  expect(storeKeyFor("/")).toBe("projects:/");
+  expect(storeKeyFor("/home/me/a")).not.toBe(storeKeyFor("/home/me/b"));
+});
 
 test("parses a full URL with a subgroup", async () => {
   expect(parseTarget("https://git.acme.io/grp/sub/app/")).toEqual({

@@ -28,6 +28,18 @@ export function parseTarget(input: string): WatchedProject | undefined {
   return { id: `${host}/${path}${ref ? `@${ref}` : ""}`, host, path, ref };
 }
 
+// Each workspace (git repo root, else the session's directory) keeps its own watch list.
+// Slashes are unified, the drive letter upper-cased and a trailing slash dropped, so the
+// same folder always lands on the same key.
+export function storeKeyFor(root: string): string {
+  const folder = root
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^([a-z]):/i, (_, drive: string) => `${drive.toUpperCase()}:`)
+    .replace(/(.)\/+$/, "$1");
+  return `projects:${folder}`;
+}
+
 export function shortName(p: WatchedProject): string {
   return p.path.split("/").pop() ?? p.path;
 }
