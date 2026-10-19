@@ -1,11 +1,19 @@
-import { ALIEN, FLEX_SHIFT_X, GUN_CELLS, GUN_TIP, MUZZLE_X, MUZZLE_Y } from "../art/alien";
+import {
+  ALIEN,
+  FLEX_FRONT_SHIFT_X,
+  FLEX_SHIFT_X,
+  GUN_CELLS,
+  GUN_TIP,
+  MUZZLE_X,
+  MUZZLE_Y,
+} from "../art/alien";
 import { BOSS_CORE, BOSS_FRAMES, BOSS_WIDTH } from "../art/boss";
 import { DIGITS, SKULL, STAR, TIMES } from "../art/digits";
 import { COMET_TAIL, FLYER_COLORS, SATELLITE_ROWS, UFO_LIGHTS, UFO_ROWS } from "../art/flyers";
 import { DEATH_GLOW, MONSTER_FRAMES } from "../art/monsters";
 import { setPixel, stamp } from "../shared/pixel/bitmap";
 import type { Bitmap, Color, Tint } from "../shared/pixel/bitmap";
-import { mixColors, WHITE } from "../shared/pixel/colors";
+import { mixColors, toRadians, WHITE } from "../shared/pixel/colors";
 import { phaseRank } from "../openspec";
 import {
   ALIEN_HEIGHT,
@@ -17,7 +25,6 @@ import {
   FLEX_RELAX_MS,
   HEAT_MS,
   HOME_X,
-  LIFT_CYCLE_MS,
   LONG_CALL_MS,
   STATS_ENTRY_MS,
   STATS_MS,
@@ -36,6 +43,8 @@ import type {
   Orb,
   Tally,
 } from "../sim/types";
+import { flexPose, liftPose, sleepPose } from "../sim/routines";
+import type { LiftPhase, SleepPose } from "../sim/routines";
 import { drawEffect } from "./effects";
 import { drawSky } from "./sky";
 import type { SkyStyle } from "./sky";
@@ -200,19 +209,87 @@ function drawFlex(bitmap: Bitmap, ms: number, x: number, y: number): void {
   stamp({ target: bitmap, source: sprite, x: x + FLEX_SHIFT_X[side], y: y - sprite.height });
 }
 
-function idleSprite(alien: Alien): { sprite: Bitmap; isLow: boolean } | undefined {
-  const t = alien.clockMs;
-  if (alien.activity === "sleep")
-    return {
-      sprite: Math.floor(t / 1100) % 2 === 0 ? ALIEN.sleep : ALIEN.sleepBreath,
-      isLow: true,
-    };
-  if (alien.activity === "workout")
-    return {
-      sprite: alien.activityMs % LIFT_CYCLE_MS < LIFT_CYCLE_MS / 2 ? ALIEN.liftDown : ALIEN.liftUp,
-      isLow: false,
-    };
-  return undefined;
+const LIFT_FRAMES: Record<LiftPhase, Bitmap> = {
+  rack: ALIEN.liftDown,
+  press: ALIEN.liftPress,
+  strain: ALIEN.liftStrain,
+  bounce: ALIEN.liftBounce,
+  lockout: ALIEN.liftUp,
+  lower: ALIEN.liftPress,
+  rest: ALIEN.liftRest,
+};
+
+const BUBBLE_COLOR: Color = 0x9fdcff;
+
+// The snot bubble swells on the out-breath and pops into a spray now and then.
+function drawSnot(bitmap: Bitmap, pose: SleepPose, x: number, y: number): void {
+  if (pose.popMs !== undefined) {
+    const spread = 1 + Math.round(pose.popMs / 90);
+    [-1, 1].forEach((side) => {
+      setPixel({ bitmap, x: x + 1 + side * spread, y: y - 1, color: 0xbfe9ff });
+      setPixel({ bitmap, x: x + 1 + side * (spread - 1), y: y + 1, color: BUBBLE_COLOR });
+    });
+    return;
+  }
+  if (pose.bubble === undefined) return;
+  const radius = 0.3 + pose.bubble * 1.9;
+  for (let angle = 0; angle < 360; angle += 30) {
+    const radians = toRadians(angle);
+    setPixel({
+      bitmap,
+      x: x + radius + Math.cos(radians) * radius,
+      y: y + Math.sin(radians) * radius,
+      color: BUBBLE_COLOR,
+    });
+  }
+  if (radius > 1) setPixel({ bitmap, x: x + radius * 0.6, y: y - radius * 0.5, color: WHITE });
+}
+
+function drawIdle(bitmap: Bitmap, alien: Alien, floor: number): void {
+  if (alien.activity === "sleep") {
+    const pose = sleepPose(alien.activityMs);
+    const isFull = pose.fill > 0.5;
+    const sprite = pose.isFacingAway
+      ? isFull
+        ? ALIEN.sleepAwayBreath
+        : ALIEN.sleepAway
+      : isFull
+        ? ALIEN.sleepBreath
+        : ALIEN.sleep;
+    const y = floor - sprite.height - pose.tossY;
+    stamp({ target: bitmap, source: sprite, x: HOME_X, y });
+    drawSnot(bitmap, pose, HOME_X + 9, y + 2);
+    return;
+  }
+  if (alien.activity === "workout") {
+    const pose = liftPose(alien.activityMs);
+    const sprite = pose.isPanting ? ALIEN.liftPant : LIFT_FRAMES[pose.phase];
+    stamp({ target: bitmap, source: sprite, x: HOME_X + pose.shakeX, y: floor - sprite.height });
+    return;
+  }
+  const pose = flexPose(alien.activityMs);
+  if (pose.phase === "breathe" || pose.phase === "relax") {
+    const sprite = ALIEN.standBare;
+    stamp({ target: bitmap, source: sprite, x: HOME_X, y: floor - sprite.height + pose.dipY });
+    return;
+  }
+  const isPumped = pose.phase === "hit";
+  if (pose.shot === "front") {
+    const sprite = isPumped ? ALIEN.flexFrontPump : ALIEN.flexFront;
+    const x = HOME_X + FLEX_FRONT_SHIFT_X + pose.shakeX;
+    stamp({ target: bitmap, source: sprite, x, y: floor - sprite.height });
+    return;
+  }
+  const sprite =
+    pose.shot === "right"
+      ? isPumped
+        ? ALIEN.flexRightPump
+        : ALIEN.flexRight
+      : isPumped
+        ? ALIEN.flexLeftPump
+        : ALIEN.flexLeft;
+  const x = HOME_X + FLEX_SHIFT_X[pose.shot] + pose.shakeX;
+  stamp({ target: bitmap, source: sprite, x, y: floor - sprite.height });
 }
 
 const CELL_EMPTY: Color = 0x3a1430;
@@ -259,9 +336,7 @@ function drawAlien(bitmap: Bitmap, alien: Alien, floor: number): void {
     return;
   }
   if (alien.mode === "idle") {
-    const idle = idleSprite(alien);
-    if (idle === undefined) drawFlex(bitmap, alien.activityMs, HOME_X, floor);
-    else stamp({ target: bitmap, source: idle.sprite, x: HOME_X, y: floor - idle.sprite.height });
+    drawIdle(bitmap, alien, floor);
     return;
   }
   if (alien.mode === "cheer") {

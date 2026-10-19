@@ -66,7 +66,6 @@ export const EFFECT_LIFE_MS: Record<EffectKind, number> = {
   sparkle: 600,
   sweat: 650,
   zee: 2400,
-  bubble: 2200,
   debris: 600,
   smoke: 900,
   splash: 380,
@@ -97,27 +96,6 @@ function drawZee(bitmap: Bitmap, effect: Effect): void {
   const y = Math.round(effect.y - progress * 9);
   const color = progress < 0.5 ? 0xe6ecff : progress < 0.8 ? 0xa9b3d9 : 0x5a5f8a;
   drawGlyph(bitmap, progress < 0.35 ? Z_SMALL : Z_BIG, x, y, color);
-}
-
-function drawBubble(bitmap: Bitmap, effect: Effect): void {
-  const progress = effect.ageMs / EFFECT_LIFE_MS.bubble;
-  if (progress > 0.92) {
-    [-2, 2].forEach((dx) =>
-      setPixel({ bitmap, x: effect.x + dx, y: effect.y - 1, color: 0xbfe9ff }),
-    );
-    return;
-  }
-  const radius = 0.5 + Math.sin(progress * Math.PI * 3) * 0.3 + progress * 1.2;
-  for (let angle = 0; angle < 360; angle += 30) {
-    const radians = toRadians(angle);
-    setPixel({
-      bitmap,
-      x: effect.x + radius + Math.cos(radians) * radius,
-      y: effect.y + Math.sin(radians) * radius,
-      color: 0x9fdcff,
-    });
-  }
-  setPixel({ bitmap, x: effect.x + radius * 0.6, y: effect.y - radius * 0.5, color: 0xffffff });
 }
 
 function drawSweat(bitmap: Bitmap, effect: Effect): void {
@@ -181,7 +159,6 @@ export function drawEffect(options: { bitmap: Bitmap; effect: Effect }): void {
   if (effect.kind === "portal") return drawPortal(bitmap, effect);
   if (effect.kind === "smoke") return drawSmoke(bitmap, effect);
   if (effect.kind === "zee") return drawZee(bitmap, effect);
-  if (effect.kind === "bubble") return drawBubble(bitmap, effect);
   if (effect.kind === "sweat") return drawSweat(bitmap, effect);
   if (effect.kind === "debris") return drawDebris(bitmap, effect);
   const burst = BURSTS[effect.kind];
