@@ -222,17 +222,12 @@ async function workspaceKey($: $): Promise<string> {
   }
 }
 
-// The list for this workspace; the first workspace opened after upgrading takes over the
-// old shared list, and the others start empty.
+// The list for this workspace, only what was added here; the old shared list is dropped.
 async function loadList($: $): Promise<WatchedProject[]> {
   storeKey = await workspaceKey($);
-  const stored = await $.store.get(storeKey);
-  if (Array.isArray(stored)) return stored as WatchedProject[];
-  const legacy = await $.store.get(LEGACY_STORE_KEY);
-  if (!Array.isArray(legacy)) return [];
-  await $.store.set(storeKey, legacy);
   await $.store.delete(LEGACY_STORE_KEY);
-  return legacy as WatchedProject[];
+  const stored = await $.store.get(storeKey);
+  return Array.isArray(stored) ? (stored as WatchedProject[]) : [];
 }
 
 async function boot($: $): Promise<number> {
