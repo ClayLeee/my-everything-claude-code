@@ -3,7 +3,7 @@ import type { Bitmap } from "../shared/pixel/bitmap";
 import { BOSS_TITLES } from "../art/boss";
 import { MONSTER_NAMES } from "../art/monsters";
 import { EFFECT_LIFE_MS } from "../draw/effects";
-import { drawScene, isPresenting, muzzleOf, partyLayout } from "../draw/scene";
+import { boardLeft, drawScene, isPresenting, muzzleOf, partyLayout } from "../draw/scene";
 import { blendSky, skyFor } from "../draw/sky";
 import type { SkyStyle } from "../draw/sky";
 import { DOC_COUNT, phaseRank } from "../openspec";
@@ -390,7 +390,7 @@ export function createWorld(options: { seed?: number } = {}) {
     idleBeat = beat;
   }
 
-  // A spark where the hands meet on each high-five, and two fireworks beside the UFO at the finale.
+  // A spark where the hands meet on each high-five, and two fireworks over the alien at the finale.
   function partyEffects(): void {
     if (!isPresenting(alien)) return;
     const pose = partyPose(STATS_MS - alien.statsMs);
@@ -398,11 +398,16 @@ export function createWorld(options: { seed?: number } = {}) {
     const slap = pose.isSlap ? `slap:${pose.entry}` : "";
     const finale = pose.isFinale ? "finale" : "";
     if (slap && !partyBeat.includes(slap)) effects.push({ kind: "sparkle", ...layout.slap, ageMs: 0 });
-    // Only where there is sky over the alien to burst in; the short pane has none.
+    // Only where there is sky over the alien to burst in (the short pane has none), left of the
+    // UFO and clear of the board by a firework's reach.
     if (finale && !partyBeat.includes(finale) && layout.hoverY >= 0) {
-      [layout.ufoX - 4, layout.ufoX + 16].forEach((x) =>
-        effects.push({ kind: "firework", x, y: layout.hoverY, ageMs: 0 }),
-      );
+      const reach = 7;
+      [
+        { x: layout.ufoX - 4, y: layout.hoverY },
+        { x: layout.ufoX - 10, y: layout.hoverY - 2 },
+      ]
+        .filter((spot) => spot.x + reach < boardLeft(columns))
+        .forEach((spot) => effects.push({ kind: "firework", ...spot, ageMs: 0 }));
     }
     partyBeat = `${slap} ${finale}`;
   }
