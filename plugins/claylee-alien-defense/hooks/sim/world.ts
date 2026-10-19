@@ -3,11 +3,11 @@ import type { Bitmap } from "../shared/pixel/bitmap";
 import { BOSS_TITLES } from "../art/boss";
 import { MONSTER_NAMES } from "../art/monsters";
 import { EFFECT_LIFE_MS } from "../draw/effects";
-import { drawScene, muzzleOf } from "../draw/scene";
+import { drawScene, isPresenting, muzzleOf, partyLayout } from "../draw/scene";
 import { blendSky, skyFor } from "../draw/sky";
 import type { SkyStyle } from "../draw/sky";
 import { DOC_COUNT, phaseRank } from "../openspec";
-import { flexPose, liftPose, sleepPose } from "./routines";
+import { flexPose, liftPose, partyPose, sleepPose } from "./routines";
 import {
   AIM_MS,
   BAG_MS,
@@ -168,6 +168,8 @@ export function createWorld(options: { seed?: number } = {}) {
   let readyIdleMs = 0;
   // The idle routine's last keyframe, so effects fire once as a new one starts.
   let idleBeat = "";
+  // Likewise for the stats party.
+  let partyBeat = "";
   let mode: Mode = { kind: "free" };
   let hasMode = false;
   let sky: SkyStyle = skyFor(mode);
@@ -388,6 +390,23 @@ export function createWorld(options: { seed?: number } = {}) {
     idleBeat = beat;
   }
 
+  // A spark where the hands meet on each high-five, and two fireworks beside the UFO at the finale.
+  function partyEffects(): void {
+    if (!isPresenting(alien)) return;
+    const pose = partyPose(STATS_MS - alien.statsMs);
+    const layout = partyLayout(floor);
+    const slap = pose.isSlap ? `slap:${pose.entry}` : "";
+    const finale = pose.isFinale ? "finale" : "";
+    if (slap && !partyBeat.includes(slap)) effects.push({ kind: "sparkle", ...layout.slap, ageMs: 0 });
+    // Only where there is sky over the alien to burst in; the short pane has none.
+    if (finale && !partyBeat.includes(finale) && layout.hoverY >= 0) {
+      [layout.ufoX - 4, layout.ufoX + 16].forEach((x) =>
+        effects.push({ kind: "firework", x, y: layout.hoverY, ageMs: 0 }),
+      );
+    }
+    partyBeat = `${slap} ${finale}`;
+  }
+
   function advanceAlien(dtMs: number): void {
     alien.clockMs += dtMs;
     alien.modeMs += dtMs;
@@ -395,6 +414,7 @@ export function createWorld(options: { seed?: number } = {}) {
     alien.hurtMs = Math.max(0, alien.hurtMs - dtMs);
     alien.bagMs = Math.max(0, alien.bagMs - dtMs);
     alien.statsMs = Math.max(0, alien.statsMs - dtMs);
+    partyEffects();
     alien.askMs = asking > 0 ? alien.askMs + dtMs : 0;
     const target = retarget();
     if (alien.mode === "idle") {
@@ -653,6 +673,7 @@ export function createWorld(options: { seed?: number } = {}) {
     // `/alien stats`: the alien shows off a board that counts up the kills.
     showStats(): void {
       alien.statsMs = STATS_MS;
+      partyBeat = "";
       effects = effects.filter((effect) => effect.kind !== "zee");
     },
 

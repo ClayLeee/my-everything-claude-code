@@ -82,7 +82,8 @@ export type EffectKind =
   | "splash"
   | "distant"
   | "portal"
-  | "combo";
+  | "combo"
+  | "firework";
 
 export type Effect = {
   kind: EffectKind;

@@ -1,8 +1,10 @@
 import { expect, test } from "claude-code/testing";
 
 import { ALIEN } from "../hooks/art/alien";
+import { ROBOT } from "../hooks/art/friends";
 import type { Bitmap } from "../hooks/shared/pixel/bitmap";
-import { BREATH_MS, flexPose, liftPose, sleepPose } from "../hooks/sim/routines";
+import { STATS_ENTRY_MS, STATS_MS, STATS_TOTAL_MS } from "../hooks/sim/constants";
+import { BREATH_MS, flexPose, liftPose, partyPose, sleepPose } from "../hooks/sim/routines";
 
 const sample = <T>(pose: (ms: number) => T, untilMs: number, stepMs = 20): T[] => {
   const poses: T[] = [];
@@ -18,6 +20,30 @@ test("every pose variant differs from the frame it was cut from", () => {
   expect(sameBitmap(ALIEN.flexFront, ALIEN.flexFrontPump)).toBe(false);
   expect(sameBitmap(ALIEN.sleep, ALIEN.sleepAway)).toBe(false);
   expect(sameBitmap(ALIEN.sleepBreath, ALIEN.sleepAwayBreath)).toBe(false);
+  expect(sameBitmap(ALIEN.cheer, ALIEN.cheerWave)).toBe(false);
+  expect(sameBitmap(ROBOT.idle, ROBOT.highFive)).toBe(false);
+});
+
+test("the stats party lands the robot before the first line and high-fives on every line", () => {
+  const poses = sample(partyPose, STATS_MS);
+  const landed = partyPose(STATS_TOTAL_MS);
+  expect(landed.phase).toBe("party");
+  expect(landed.robot).toBe(1);
+  // One slap per board line: four creatures and the boss.
+  const slaps = poses.filter((pose, index) => pose.isSlap && !poses[index - 1]?.isSlap);
+  expect(slaps.length).toBe(5);
+  expect(slaps.every((pose) => pose.isHighFive)).toBe(true);
+  // The finale comes with the boss line only.
+  const finale = poses.filter((pose) => pose.isFinale);
+  expect(finale.length).toBeGreaterThan(0);
+  expect(finale.every((pose) => pose.entry === 4)).toBe(true);
+  expect(partyPose(STATS_TOTAL_MS + 4 * STATS_ENTRY_MS).isFinale).toBe(true);
+  // The UFO comes down, takes the robot back and is gone as the board fades.
+  expect(partyPose(0).ufo).toBe(0);
+  const last = partyPose(STATS_MS - 1);
+  expect(last.robot).toBeUndefined();
+  expect(last.ufo).toBeLessThan(0.1);
+  expect(poses.some((pose) => pose.phase === "lift" && pose.isBeamOn)).toBe(true);
 });
 
 test("a lift grinds up slower than it comes down and rests after a set", () => {

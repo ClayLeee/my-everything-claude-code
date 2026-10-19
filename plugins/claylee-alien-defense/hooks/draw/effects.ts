@@ -58,6 +58,13 @@ const BURSTS: Partial<Record<EffectKind, Burst>> = {
     angles: [0, 90, 180, 270],
     hasFlash: true,
   },
+  firework: {
+    durationMs: 900,
+    reach: 6,
+    colors: [0xffffff, 0xffe066, 0xff6ad5, 0x6fd6ff, 0x7a3db8],
+    angles: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330],
+    hasFlash: true,
+  },
 };
 
 export const EFFECT_LIFE_MS: Record<EffectKind, number> = {
@@ -73,6 +80,7 @@ export const EFFECT_LIFE_MS: Record<EffectKind, number> = {
   distant: 520,
   portal: 900,
   combo: 900,
+  firework: 900,
 };
 
 const Z_SMALL = ["##", ".#", "##"];
