@@ -7,11 +7,14 @@ import {
   phaseOf,
   pickChange,
 } from "../hooks/openspec";
+import { QUESTION_COLOR } from "../hooks/draw/scene";
 import {
+  ALIEN_HEIGHT,
   BOSS_HITS,
   BOSS_MAX_HITS,
   BOSS_MIN_HITS,
   FRAME_MS,
+  HOME_X,
   KNOCKBACK_MS,
   KNOCKBACK_PIXELS,
   LONG_CALL_MS,
@@ -111,6 +114,16 @@ test("a tool brings the creature that matches what it does", async () => {
   expect(kindFor("mcp__lean-ctx__ctx_compose", 1)).toBe("moth");
   expect(kindFor("AskUserQuestion", 1)).toBe("slime");
   expect(kindFor("AskUserQuestion", 2)).toBe("eyeworm");
+  expect(kindFor("NotebookEdit", 1)).toBe("slime");
+  expect(kindFor("TodoWrite", 1)).toBe("slime");
+  expect(kindFor("SendMessage", 1)).toBe("moth");
+});
+
+test("a tool name is matched by whole words, not by letters inside them", async () => {
+  expect(kindFor("mcp__x__set_target", 1)).toBe("moth");
+  expect(kindFor("mcp__x__budget_report", 1)).toBe("moth");
+  expect(kindFor("mcp__x__prune_cache", 1)).toBe("moth");
+  expect(kindFor("mcp__x__get_budget", 1)).toBe("eyeworm");
 });
 
 test("a landed shot holds the scene for a beat", async () => {
@@ -315,6 +328,74 @@ test("with nothing to fight the alien cycles through sleep, workout and flex", a
     seen.add(world.alien().activity);
   }
   expect([...seen].sort()).toEqual(["flex", "sleep", "workout"]);
+});
+
+test("a boss summoned while the last one dies waits for its death to play out", async () => {
+  const world = createWorld();
+  world.setMode(openspec("dawn"));
+  world.setMode(openspec("noon"));
+  for (let step = 0; step < 2000 && world.boss()?.phase !== "dying"; step += 1)
+    world.tick(FRAME_MS);
+  expect(world.boss()?.phase).toBe("dying");
+  world.setMode(openspec("dusk"));
+  expect(world.boss()?.title).toBe("吞噬者");
+  expect(world.boss()?.phase).toBe("dying");
+  run(world, 5000);
+  expect(world.boss()?.title).not.toBe("吞噬者");
+  expect(world.boss()?.phase).toBeDefined();
+});
+
+test("while Claude waits on the person the alien stands up with a question mark", async () => {
+  const world = createWorld();
+  world.setMode({ kind: "free" });
+  world.ask();
+  run(world, 1000);
+  expect(world.summary().startsWith("等你回覆中")).toBe(true);
+  expect(world.alien().mode).not.toBe("idle");
+  expect(world.monsters()).toHaveLength(0);
+  const floor = STAGE_ROWS * 2 - 2;
+  const { pixels, width } = world.frame();
+  expect(pixels[(floor - ALIEN_HEIGHT) * width + HOME_X + 15]).toBe(QUESTION_COLOR);
+  run(world, 20000);
+  expect(world.alien().mode).not.toBe("idle");
+  world.answer();
+  run(world, 4000);
+  expect(world.alien().mode).toBe("idle");
+  expect(world.summary().startsWith("等你回覆中")).toBe(false);
+});
+
+test("kills in quick succession count up a combo, slow ones do not", async () => {
+  const world = createWorld();
+  world.setMode({ kind: "free" });
+  const ids = [world.spawn("Read"), world.spawn("Read"), world.spawn("Read")];
+  run(world, 3000);
+  ids.forEach((id) => world.defeat({ id, isFailure: false }));
+  let best = 0;
+  for (let step = 0; step < 150; step += 1) {
+    world.tick(FRAME_MS);
+    world.effects().forEach((effect) => {
+      if (effect.kind === "combo") best = Math.max(best, effect.value ?? 0);
+    });
+  }
+  expect(best).toBe(3);
+  expect(world.log()).toContain("擊倒眼球蟲（Read）· 3 連擊");
+  const slow = createWorld();
+  slow.setMode({ kind: "free" });
+  slow.defeat({ id: slow.spawn(), isFailure: false });
+  run(slow, 6000);
+  slow.defeat({ id: slow.spawn(), isFailure: false });
+  run(slow, 6000);
+  expect(slow.log().some((line) => line.includes("連擊"))).toBe(false);
+});
+
+test("an MCP tool goes by its own short name on the log", async () => {
+  const world = createWorld();
+  world.setMode({ kind: "free" });
+  world.defeat({ id: world.spawn("mcp__lean-ctx__ctx_read"), isFailure: false });
+  run(world, 6000);
+  expect(world.tally().eyeworm).toBe(1);
+  expect(world.log().some((line) => line.endsWith("（ctx_read）"))).toBe(true);
+  expect(world.log().some((line) => line.includes("mcp__"))).toBe(false);
 });
 
 test("every mode draws at the narrowest and widest pane, short and docked", async () => {

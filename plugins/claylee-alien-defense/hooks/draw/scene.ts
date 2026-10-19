@@ -8,7 +8,7 @@ import {
   MUZZLE_Y,
 } from "../art/alien";
 import { BOSS_CORE, BOSS_FRAMES, BOSS_WIDTH } from "../art/boss";
-import { DIGITS, SKULL, STAR, TIMES } from "../art/digits";
+import { DIGITS, QUESTION, SKULL, STAR, TIMES } from "../art/digits";
 import { COMET_TAIL, FLYER_COLORS, SATELLITE_ROWS, UFO_LIGHTS, UFO_ROWS } from "../art/flyers";
 import { DEATH_GLOW, MONSTER_FRAMES } from "../art/monsters";
 import { setPixel, stamp } from "../shared/pixel/bitmap";
@@ -413,7 +413,15 @@ function drawFlyer(bitmap: Bitmap, flyer: Flyer): void {
   );
 }
 
-const STAT_KINDS: readonly MonsterKind[] = ["slime", "eyeworm", "moth", "squid"];
+export const QUESTION_COLOR = 0xffd84a;
+
+// Waiting on the person: a question mark beside the head, where the short pane has room.
+function drawAsk(bitmap: Bitmap, alien: Alien, floor: number): void {
+  if (alien.askMs <= 0) return;
+  drawGlyph(bitmap, QUESTION, HOME_X + 14, floor - ALIEN_HEIGHT, QUESTION_COLOR);
+}
+
+const STAT_KINDS: readonly MonsterKind[] =["slime", "eyeworm", "moth", "squid"];
 
 function drawGlyph(bitmap: Bitmap, rows: readonly string[], x: number, y: number, color: Color): void {
   paintRows(bitmap, rows, x, y, (cell) => (cell === "#" ? color : undefined));
@@ -570,6 +578,7 @@ export function drawScene(options: {
   drawBag(bitmap, alien, floor);
   drawStats(bitmap, alien, options.stats, floor);
   drawAlien(bitmap, alien, floor);
+  drawAsk(bitmap, alien, floor);
   options.orbs.forEach((orb) => drawOrb(bitmap, orb));
   drawBeam(bitmap, alien, floor);
   options.effects.forEach((effect) => drawEffect({ bitmap, effect }));

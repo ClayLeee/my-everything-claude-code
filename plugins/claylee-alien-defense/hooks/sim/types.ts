@@ -66,6 +66,8 @@ export type Alien = {
   hurtMs: number;
   bagMs: number;
   statsMs: number;
+  // How long Claude has been waiting on the person; 0 when it is not.
+  askMs: number;
 };
 
 export type EffectKind =
@@ -79,8 +81,17 @@ export type EffectKind =
   | "smoke"
   | "splash"
   | "distant"
-  | "portal";
+  | "portal"
+  | "combo";
 
-export type Effect = { kind: EffectKind; x: number; y: number; ageMs: number; direction?: number };
+export type Effect = {
+  kind: EffectKind;
+  x: number;
+  y: number;
+  ageMs: number;
+  direction?: number;
+  // The combo count a `combo` effect shows.
+  value?: number;
+};
 
 export type Tally = Record<MonsterKind, number>;

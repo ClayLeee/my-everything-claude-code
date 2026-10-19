@@ -10,6 +10,9 @@ import { createWorld } from "./sim/world";
 // Versions before 0.4.0 kept a lifetime kill count here; kills now last one session.
 const OLD_LIFETIME_KEY = "lifetimeKills";
 const POLL_MS = 3000;
+// Tools that wait on the person by nature. A permission ask is left out: `tool.check`
+// sees it before the mode settles it, so under bypass it would cry wolf.
+const ASK_TOOLS: ReadonlySet<string> = new Set(["AskUserQuestion", "ExitPlanMode"]);
 
 async function projectRoot($: EngineInterface): Promise<string> {
   const cwd = await $.session.cwd();
@@ -72,7 +75,7 @@ export const register: Register = (on) => {
   installStage(on);
 
   on("session.start", async ($, e, next) => {
-    // Kills count per session, so a new session (a restart or /clear) starts from zero.
+    // Kills count per session: a restart starts from zero here, a /clear in session.end.
     world.resetCounts();
     await $.store.delete(OLD_LIFETIME_KEY).catch(() => undefined);
     const top = await projectRoot($);
@@ -98,6 +101,16 @@ export const register: Register = (on) => {
   });
 
   on("tool.call", async ($, e, next) => {
+    // These calls last exactly as long as the person takes to answer: no creature, the
+    // alien waits on them instead.
+    if (ASK_TOOLS.has(e.tool)) {
+      world.ask();
+      try {
+        return await next(e);
+      } finally {
+        world.answer();
+      }
+    }
     const id = world.spawn(e.tool);
     try {
       const ran = await next(e);
@@ -107,6 +120,12 @@ export const register: Register = (on) => {
       world.defeat({ id, isFailure: true });
       throw error;
     }
+  });
+
+  // A /clear goes on in the same process and fires no session.start.
+  on("session.end", async ($, e, next) => {
+    if (e.reason === "clear") world.resetCounts();
+    return next(e);
   });
 
   on("turn.complete", async ($, e, next) => {

@@ -29,6 +29,8 @@ export const FLASH_MS = 110;
 export const WALK_FRAME_MS = 300;
 
 export const LONG_CALL_MS = 10000;
+// Kills this close together chain into a combo.
+export const COMBO_MS = 1500;
 export const RAGE_MS = 600;
 export const HURT_SHAKE_MS = 250;
 

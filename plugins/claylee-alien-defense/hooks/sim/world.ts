@@ -6,7 +6,7 @@ import { EFFECT_LIFE_MS } from "../draw/effects";
 import { drawScene, muzzleOf } from "../draw/scene";
 import { blendSky, skyFor } from "../draw/sky";
 import type { SkyStyle } from "../draw/sky";
-import { phaseRank } from "../openspec";
+import { DOC_COUNT, phaseRank } from "../openspec";
 import { flexPose, liftPose, sleepPose } from "./routines";
 import {
   AIM_MS,
@@ -22,6 +22,7 @@ import {
   BOSS_SPEED_PIXELS_PER_SECOND,
   BOSS_STAND_OFFSET,
   CHEER_MS,
+  COMBO_MS,
   COMET_DROP,
   COOLDOWN_MS,
   DEATH_MS,
@@ -114,20 +115,32 @@ export function bossHitsFor(mode: Mode): number {
 
 // Reading and searching brings eye worms, writing brings slimes, running commands brings
 // squids, and work handed elsewhere (agents, skills, other MCP tools) brings moths. Matched
-// on the tool's own name, the last `__` segment of an MCP tool, first match wins.
-const TOOL_KINDS: readonly (readonly [MonsterKind, RegExp])[] = [
-  ["eyeworm", /read|grep|glob|search|find|tree|list|fetch|query|view|get/],
-  ["slime", /edit|write|patch|create|update|delete|rename|notebook/],
-  // Before squid: "skill" holds "kill".
-  ["moth", /agent|task|skill|workflow|send/],
-  ["squid", /bash|powershell|shell|exec|run|kill|command/],
+// on whole words of the tool's own name (the last `__` segment of an MCP tool, split at
+// camel case, `_` and `-`), so `set_target` holds no "get"; first match wins.
+const TOOL_KINDS: readonly (readonly [MonsterKind, ReadonlySet<string>])[] = [
+  ["eyeworm", new Set(["read", "grep", "glob", "search", "find", "tree", "list", "fetch", "query", "view", "get"])],
+  ["slime", new Set(["edit", "write", "patch", "create", "update", "delete", "rename", "notebook"])],
+  ["moth", new Set(["agent", "task", "skill", "workflow", "send"])],
+  ["squid", new Set(["bash", "shell", "exec", "run", "kill", "command"])],
 ];
+
+function wordsOf(name: string): string[] {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/);
+}
+
+// A tool's own name: an MCP tool's last `__` segment, so the log stays short.
+export function toolName(tool: string): string {
+  return tool.split("__").pop() || tool;
+}
 
 // Which creature a tool call brings, so the scene shows at a glance what Claude is doing.
 // Tools that match nothing take turns by id.
 export function kindFor(tool: string, id: number): MonsterKind {
-  const name = (tool.split("__").pop() ?? tool).toLowerCase();
-  const match = TOOL_KINDS.find(([, pattern]) => pattern.test(name));
+  const words = wordsOf(toolName(tool));
+  const match = TOOL_KINDS.find(([, names]) => words.some((word) => names.has(word)));
   if (match) return match[0];
   if (tool.startsWith("mcp__")) return "moth";
   return KINDS[(id - 1) % KINDS.length] ?? KINDS[0];
@@ -163,6 +176,8 @@ export function createWorld(options: { seed?: number } = {}) {
   let tally: Tally = emptyTally();
   let slain = 0;
   let bossesSlain = 0;
+  let combo = 0;
+  let lastKillMs = -Infinity;
   let lines: string[] = ["外星人鑽進睡袋呼呼大睡"];
   const overflow = new Map<number, { kind: MonsterKind; tool: string }>();
 
@@ -180,7 +195,10 @@ export function createWorld(options: { seed?: number } = {}) {
     hurtMs: 0,
     bagMs: 0,
     statsMs: 0,
+    askMs: 0,
   };
+  // Questions put to the person still open (AskUserQuestion, ExitPlanMode).
+  let asking = 0;
 
   function note(line: string): void {
     lines = [line, ...lines].slice(0, LOG_LIMIT);
@@ -205,7 +223,8 @@ export function createWorld(options: { seed?: number } = {}) {
   }
 
   function summonBoss(title: string, hits: number): void {
-    if (boss && boss.phase !== "dying") {
+    // A dying boss still plays out its death before the next one steps in.
+    if (boss) {
       pendingBosses.push({ title, hits });
       return;
     }
@@ -224,10 +243,25 @@ export function createWorld(options: { seed?: number } = {}) {
     note(`⚠ BOSS「${title}」降臨`);
   }
 
-  function recordKill(kind: MonsterKind, tool: string): void {
+  // Kills within COMBO_MS of the last chain into a combo, shown from the second on.
+  function recordKill(kind: MonsterKind, tool: string, x: number): void {
     tally = { ...tally, [kind]: tally[kind] + 1 };
     slain += 1;
-    note(`擊倒${MONSTER_NAMES[kind]}（${tool}）`);
+    combo = alien.clockMs - lastKillMs <= COMBO_MS ? combo + 1 : 1;
+    lastKillMs = alien.clockMs;
+    if (combo < 2) {
+      note(`擊倒${MONSTER_NAMES[kind]}（${tool}）`);
+      return;
+    }
+    note(`擊倒${MONSTER_NAMES[kind]}（${tool}）· ${combo} 連擊`);
+    const width = 4 + String(combo).length * 4;
+    effects.push({
+      kind: "combo",
+      x: Math.min(x, columns - width),
+      y: Math.max(0, floor - 14),
+      ageMs: 0,
+      value: combo,
+    });
   }
 
   function aliveMonsters(): Monster[] {
@@ -236,6 +270,7 @@ export function createWorld(options: { seed?: number } = {}) {
 
   function action(): string {
     if (alien.statsMs > 0) return `戰績：擊倒 ${slain} 隻 · BOSS ${bossesSlain}`;
+    if (asking > 0) return `等你回覆中 · ${Math.floor(alien.askMs / 1000)} 秒`;
     if (boss && boss.phase !== "dying")
       return `BOSS 戰：${boss.title} HP ${boss.hitsRemaining}/${boss.maxHits}`;
     const living = aliveMonsters();
@@ -298,7 +333,7 @@ export function createWorld(options: { seed?: number } = {}) {
     if (monster.hitsRemaining <= 0) {
       monster.phase = "dying";
       monster.phaseMs = 0;
-      recordKill(monster.kind, monster.tool);
+      recordKill(monster.kind, monster.tool, monster.x + 2);
       return;
     }
     monster.knockMs = KNOCKBACK_MS;
@@ -360,8 +395,16 @@ export function createWorld(options: { seed?: number } = {}) {
     alien.hurtMs = Math.max(0, alien.hurtMs - dtMs);
     alien.bagMs = Math.max(0, alien.bagMs - dtMs);
     alien.statsMs = Math.max(0, alien.statsMs - dtMs);
+    alien.askMs = asking > 0 ? alien.askMs + dtMs : 0;
     const target = retarget();
     if (alien.mode === "idle") {
+      // A question for the person gets the alien up to wait on the answer.
+      if (asking > 0) {
+        if (alien.activity === "sleep") alien.bagMs = BAG_MS;
+        effects = effects.filter((effect) => effect.kind !== "zee");
+        enter("wake");
+        return;
+      }
       if (hasThreat()) {
         if (alien.activity === "sleep") alien.bagMs = BAG_MS;
         effects = effects.filter((effect) => effect.kind !== "zee");
@@ -407,7 +450,7 @@ export function createWorld(options: { seed?: number } = {}) {
         enter("cheer");
         return;
       }
-      readyIdleMs = hasThreat() ? 0 : readyIdleMs + dtMs;
+      readyIdleMs = hasThreat() || asking > 0 ? 0 : readyIdleMs + dtMs;
       if (readyIdleMs >= READY_LINGER_MS) {
         readyIdleMs = 0;
         enter("idle");
@@ -662,11 +705,12 @@ export function createWorld(options: { seed?: number } = {}) {
       const id = nextId;
       nextId += 1;
       const kind = kindFor(tool, id);
+      const name = toolName(tool);
       if (aliveMonsters().length >= MAX_ALIVE_MONSTERS) {
-        overflow.set(id, { kind, tool });
+        overflow.set(id, { kind, tool: name });
         return id;
       }
-      arrive(id, kind, tool);
+      arrive(id, kind, name);
       return id;
     },
 
@@ -687,14 +731,20 @@ export function createWorld(options: { seed?: number } = {}) {
       if (waiting) {
         // It never reached the field: a far-off flash past the right edge stands for the kill.
         overflow.delete(outcome.id);
-        recordKill(waiting.kind, waiting.tool);
-        effects.push({
-          kind: "distant",
-          x: columns - 4 - Math.floor(random() * 6),
-          y: floor - 6 - Math.floor(random() * 3),
-          ageMs: 0,
-        });
+        const x = columns - 4 - Math.floor(random() * 6);
+        effects.push({ kind: "distant", x, y: floor - 6 - Math.floor(random() * 3), ageMs: 0 });
+        recordKill(waiting.kind, waiting.tool, x);
       }
+    },
+
+    // Claude puts a question to the person, and later has the answer.
+    ask(): void {
+      if (asking === 0) note("外星人轉頭等你回覆");
+      asking += 1;
+    },
+
+    answer(): void {
+      asking = Math.max(0, asking - 1);
     },
 
     // Cheers a turn only when it brought kills.
@@ -732,7 +782,7 @@ export function createWorld(options: { seed?: number } = {}) {
       if (mode.kind === "free")
         return `${action()} · 夜間巡邏 · 擊倒 ${slain}`;
       const progress =
-        mode.phase === "dawn" ? `文件 ${mode.docs}/6` : `任務 ${mode.done}/${mode.total}`;
+        mode.phase === "dawn" ? `文件 ${mode.docs}/${DOC_COUNT}` : `任務 ${mode.done}/${mode.total}`;
       const others = mode.others > 0 ? ` · 另有 ${mode.others} 個 change` : "";
       return `${action()} · ${mode.change} · ${PHASE_LABELS[mode.phase]} ${progress} · 擊倒 ${slain}${others}`;
     },
