@@ -18,19 +18,17 @@ import {
   wrapText,
 } from "../hooks/gitlab";
 
-const HOST = "gitlab.example.org";
-
-test("parses group/project with the default host", async () => {
-  expect(parseTarget("grp/sub/app", HOST)).toEqual({
-    id: `${HOST}/grp/sub/app`,
-    host: HOST,
+test("parses a full URL with a subgroup", async () => {
+  expect(parseTarget("https://git.acme.io/grp/sub/app/")).toEqual({
+    id: "git.acme.io/grp/sub/app",
+    host: "git.acme.io",
     path: "grp/sub/app",
     ref: undefined,
   });
 });
 
 test("parses a full URL with .git and a branch", async () => {
-  const p = parseTarget("https://git.acme.io/team/app.git@develop", HOST);
+  const p = parseTarget("https://git.acme.io/team/app.git@develop");
   expect(p?.host).toBe("git.acme.io");
   expect(p?.path).toBe("team/app");
   expect(p?.ref).toBe("develop");
@@ -38,19 +36,20 @@ test("parses a full URL with .git and a branch", async () => {
 });
 
 test("takes the branch from a /-/tree/ URL", async () => {
-  const p = parseTarget("https://git.acme.io/team/app/-/tree/feature/x", HOST);
+  const p = parseTarget("https://git.acme.io/team/app/-/tree/feature/x");
   expect(p?.path).toBe("team/app");
   expect(p?.ref).toBe("feature/x");
 });
 
-test("without a default host, group/project is refused but a URL still parses", async () => {
-  expect(parseTarget("grp/app", "")).toBeUndefined();
-  expect(parseTarget("https://git.acme.io/team/app", "")?.id).toBe("git.acme.io/team/app");
+test("refuses anything that is not a full URL", async () => {
+  expect(parseTarget("grp/app")).toBeUndefined();
+  expect(parseTarget("git.acme.io/team/app@develop")).toBeUndefined();
+  expect(parseTarget("   ")).toBeUndefined();
 });
 
-test("refuses a bare name without a group", async () => {
-  expect(parseTarget("app", HOST)).toBeUndefined();
-  expect(parseTarget("   ", HOST)).toBeUndefined();
+test("refuses a URL without a group", async () => {
+  expect(parseTarget("https://git.acme.io/app")).toBeUndefined();
+  expect(parseTarget("https://git.acme.io")).toBeUndefined();
 });
 
 test("counts finished and running jobs", async () => {

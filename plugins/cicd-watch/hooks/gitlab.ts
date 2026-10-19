@@ -3,9 +3,9 @@ import type { JobInfo, PipelineInfo, Snapshot, StageInfo, WatchedProject } from 
 export const ACTIVE = ["created", "waiting_for_resource", "preparing", "pending", "running"];
 const FINISHED_JOB = ["success", "failed", "canceled", "skipped", "manual"];
 
-export function parseTarget(input: string, defaultHost: string): WatchedProject | undefined {
+export function parseTarget(input: string): WatchedProject | undefined {
   let text = input.trim();
-  if (!text) return undefined;
+  if (!/^https?:\/\//.test(text)) return undefined;
   let ref: string | undefined;
   const at = text.lastIndexOf("@");
   if (at > 0) {
@@ -22,11 +22,8 @@ export function parseTarget(input: string, defaultHost: string): WatchedProject 
     if (!ref && rest.startsWith("tree/")) ref = rest.slice(5) || undefined;
     text = text.slice(0, tree);
   }
-  const parts = text.split("/").filter(Boolean);
-  const first = parts[0] ?? "";
-  const hasHost = first.includes(".");
-  const host = hasHost ? first : defaultHost;
-  const path = (hasHost ? parts.slice(1) : parts).join("/");
+  const [host = "", ...segments] = text.split("/").filter(Boolean);
+  const path = segments.join("/");
   if (!host || !path.includes("/")) return undefined;
   return { id: `${host}/${path}${ref ? `@${ref}` : ""}`, host, path, ref };
 }
