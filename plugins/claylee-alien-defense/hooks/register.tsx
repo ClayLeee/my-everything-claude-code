@@ -2,10 +2,11 @@ import type { EngineInterface, Register } from "claude-code";
 
 import { MONSTER_NAMES } from "./art/monsters";
 import { readMode } from "./openspec";
-import { configureStage, installStage } from "./shared/pixel/stage";
+import { configureStage, installStage, isStageShown } from "./shared/pixel/stage";
 import { FRAME_MS, MAX_COLUMNS, MIN_COLUMNS, STAGE_ROWS, TALL_ROWS } from "./sim/constants";
 import type { MonsterKind } from "./sim/types";
 import { createWorld } from "./sim/world";
+import type { World } from "./sim/world";
 
 const LIFETIME_KEY = "lifetimeKills";
 const POLL_MS = 3000;
@@ -20,10 +21,23 @@ async function projectRoot($: EngineInterface): Promise<string> {
   }
 }
 
+// Writes the lifetime count only when it moved since the last write that went through.
+async function saveLifetime(
+  $: EngineInterface,
+  world: World,
+  saved: { lifetime: number },
+): Promise<void> {
+  const lifetime = world.lifetime();
+  if (lifetime === saved.lifetime) return;
+  await $.store.set(LIFETIME_KEY, lifetime);
+  saved.lifetime = lifetime;
+}
+
 export const register: Register = (on) => {
   const world = createWorld();
   let isPolling = false;
   let isWatching = false;
+  const saved = { lifetime: 0 };
 
   function report(): string[] {
     const tally = world.tally();
@@ -62,13 +76,15 @@ export const register: Register = (on) => {
   installStage(on);
 
   on("session.start", async ($, e, next) => {
-    world.restore({ lifetime: Number((await $.store.get(LIFETIME_KEY)) ?? 0) });
+    saved.lifetime = Number((await $.store.get(LIFETIME_KEY)) ?? 0);
+    world.restore({ lifetime: saved.lifetime });
     const top = await projectRoot($);
     const poll = async (): Promise<void> => {
       if (isPolling) return;
       isPolling = true;
       try {
-        world.setMode(await readMode($, top));
+        const mode = world.mode();
+        world.setMode(await readMode($, top, mode.kind === "openspec" ? mode.change : undefined));
       } finally {
         isPolling = false;
       }
@@ -77,7 +93,9 @@ export const register: Register = (on) => {
     if (!isWatching) {
       isWatching = true;
       $.clock.every(POLL_MS, () => {
-        void poll();
+        void saveLifetime($, world, saved).catch(() => undefined);
+        // A hidden pane catches up on the stage when it shows again.
+        if (isStageShown()) void poll();
       });
     }
     return next(e);
@@ -97,12 +115,12 @@ export const register: Register = (on) => {
 
   on("turn.complete", async ($, e, next) => {
     world.celebrate();
-    await $.store.set(LIFETIME_KEY, world.lifetime());
+    await saveLifetime($, world, saved);
     return next(e);
   });
 
   on("session.end", async ($, e, next) => {
-    await $.store.set(LIFETIME_KEY, world.lifetime());
+    await saveLifetime($, world, saved);
     return next(e);
   });
 };

@@ -9,10 +9,15 @@ import type { SkyStyle } from "../draw/sky";
 import { phaseRank } from "../openspec";
 import {
   AIM_MS,
+  BAG_MS,
   BEAM_MS,
+  BOSS_ATTACK_MS,
   BOSS_DEATH_MS,
   BOSS_FIRE_INTERVAL_MS,
+  BOSS_HIT_STOP_MS,
   BOSS_HITS,
+  BOSS_MAX_HITS,
+  BOSS_MIN_HITS,
   BOSS_SPEED_PIXELS_PER_SECOND,
   BOSS_STAND_OFFSET,
   CHEER_MS,
@@ -20,21 +25,28 @@ import {
   DEATH_MS,
   FLASH_MS,
   floorOf,
+  HEAT_MS,
+  HIT_STOP_MS,
   HOME_X,
+  HURT_SHAKE_MS,
   IDLE_MAX_MS,
   IDLE_MIN_MS,
   IMPACT_PROGRESS,
+  KNOCKBACK_MS,
   KNOCKBACK_PIXELS,
   FLEX_SIDE_MS,
   FLEX_RELAX_MS,
   LIFT_CYCLE_MS,
   LOG_LIMIT,
+  LONG_CALL_MS,
   MAX_ALIVE_MONSTERS,
   MAX_COLUMNS,
   MONSTER_FRONT_X,
   MONSTER_GAP,
   MONSTER_SPEED_PIXELS_PER_SECOND,
+  ORB_SPEED_PIXELS_PER_SECOND,
   PHASE_BLEND_MS,
+  RAGE_MS,
   SHAKE_MS,
   STAGE_ROWS,
   WAKE_MS,
@@ -48,6 +60,7 @@ import type {
   Mode,
   Monster,
   MonsterKind,
+  Orb,
   Phase,
   Tally,
 } from "./types";
@@ -88,6 +101,33 @@ export function emptyTally(): Tally {
   return { slime: 0, eyeworm: 0, moth: 0, squid: 0 };
 }
 
+// A bigger change ends with a tougher boss: half its task count, within bounds.
+export function bossHitsFor(mode: Mode): number {
+  if (mode.kind !== "openspec" || mode.total === 0) return BOSS_HITS;
+  return Math.min(BOSS_MAX_HITS, Math.max(BOSS_MIN_HITS, Math.round(mode.total / 2)));
+}
+
+// Reading and searching brings eye worms, writing brings slimes, running commands brings
+// squids, and work handed elsewhere (agents, skills, other MCP tools) brings moths. Matched
+// on the tool's own name, the last `__` segment of an MCP tool, first match wins.
+const TOOL_KINDS: readonly (readonly [MonsterKind, RegExp])[] = [
+  ["eyeworm", /read|grep|glob|search|find|tree|list|fetch|query|view|get/],
+  ["slime", /edit|write|patch|create|update|delete|rename|notebook/],
+  // Before squid: "skill" holds "kill".
+  ["moth", /agent|task|skill|workflow|send/],
+  ["squid", /bash|powershell|shell|exec|run|kill|command/],
+];
+
+// Which creature a tool call brings, so the scene shows at a glance what Claude is doing.
+// Tools that match nothing take turns by id.
+export function kindFor(tool: string, id: number): MonsterKind {
+  const name = (tool.split("__").pop() ?? tool).toLowerCase();
+  const match = TOOL_KINDS.find(([, pattern]) => pattern.test(name));
+  if (match) return match[0];
+  if (tool.startsWith("mcp__")) return "moth";
+  return KINDS[(id - 1) % KINDS.length] ?? KINDS[0];
+}
+
 export function createWorld(options: { seed?: number } = {}) {
   const random = seeded(options.seed ?? 23);
   let columns = MAX_COLUMNS;
@@ -97,8 +137,12 @@ export function createWorld(options: { seed?: number } = {}) {
   let monsters: Monster[] = [];
   let effects: Effect[] = [];
   let boss: Boss | undefined;
-  const pendingBosses: string[] = [];
+  const pendingBosses: { title: string; hits: number }[] = [];
   let bossCooldownMs = 0;
+  let bossAttackMs = 0;
+  let orbs: Orb[] = [];
+  let freezeMs = 0;
+  let killsAtCelebrate = 0;
   let shakeMs = 0;
   let nextId = 1;
   let readyIdleMs = 0;
@@ -128,6 +172,9 @@ export function createWorld(options: { seed?: number } = {}) {
     targetX: 0,
     hasStruck: false,
     isCheerRequested: false,
+    heatMs: 0,
+    hurtMs: 0,
+    bagMs: 0,
   };
 
   function note(line: string): void {
@@ -152,14 +199,15 @@ export function createWorld(options: { seed?: number } = {}) {
     return Math.max(32, columns - BOSS_STAND_OFFSET);
   }
 
-  function summonBoss(title: string): void {
+  function summonBoss(title: string, hits: number): void {
     if (boss && boss.phase !== "dying") {
-      pendingBosses.push(title);
+      pendingBosses.push({ title, hits });
       return;
     }
     boss = {
       x: columns,
-      hitsRemaining: BOSS_HITS,
+      hitsRemaining: hits,
+      maxHits: hits,
       phase: "enter",
       phaseMs: 0,
       flashMs: 0,
@@ -167,6 +215,7 @@ export function createWorld(options: { seed?: number } = {}) {
       title,
     };
     bossCooldownMs = 0;
+    bossAttackMs = 0;
     note(`⚠ BOSS「${title}」降臨`);
   }
 
@@ -177,10 +226,20 @@ export function createWorld(options: { seed?: number } = {}) {
     note(`擊倒${MONSTER_NAMES[kind]}（${tool}）`);
   }
 
+  function aliveMonsters(): Monster[] {
+    return monsters.filter((monster) => monster.phase === "alive");
+  }
+
   function action(): string {
     if (boss && boss.phase !== "dying")
-      return `BOSS 戰：${boss.title} HP ${boss.hitsRemaining}/${BOSS_HITS}`;
-    const alive = monsters.filter((monster) => monster.phase === "alive").length + overflow.size;
+      return `BOSS 戰：${boss.title} HP ${boss.hitsRemaining}/${boss.maxHits}`;
+    const living = aliveMonsters();
+    const alive = living.length + overflow.size;
+    const [longest] = living
+      .filter((monster) => !monster.isDoomed && monster.waitMs >= LONG_CALL_MS)
+      .sort((first, second) => second.waitMs - first.waitMs);
+    if (longest)
+      return `迎戰 ${alive} 隻異形 · ${longest.tool} 已等 ${Math.floor(longest.waitMs / 1000)} 秒`;
     if (alive > 0) return `迎戰 ${alive} 隻異形`;
     if (alien.mode === "cheer") return "慶祝勝利";
     if (alien.mode === "idle") return IDLE_ACTIONS[alien.activity];
@@ -205,6 +264,7 @@ export function createWorld(options: { seed?: number } = {}) {
       boss.hitsRemaining -= 1;
       boss.flashMs = FLASH_MS;
       bossCooldownMs = 0;
+      freezeMs = BOSS_HIT_STOP_MS;
       effects.push(
         { kind: "hit", x: boss.x + 3, y, ageMs: 0 },
         { kind: "debris", x: boss.x + 3, y, ageMs: 0, direction: -1 },
@@ -215,6 +275,7 @@ export function createWorld(options: { seed?: number } = {}) {
         bossesSlain += 1;
         lifetime += 1;
         shakeMs = SHAKE_MS;
+        orbs = [];
         effects.push({ kind: "blast", x: boss.x + 10, y: floor - 8, ageMs: 0 });
         note(`★ 擊敗 BOSS「${boss.title}」`);
         alien.isCheerRequested = true;
@@ -225,6 +286,7 @@ export function createWorld(options: { seed?: number } = {}) {
     const monster = target.monster;
     monster.hitsRemaining -= 1;
     monster.flashMs = FLASH_MS;
+    freezeMs = HIT_STOP_MS;
     effects.push(
       { kind: "hit", x: monster.x + 2, y, ageMs: 0 },
       { kind: "debris", x: monster.x + 2, y, ageMs: 0, direction: 1 },
@@ -235,12 +297,12 @@ export function createWorld(options: { seed?: number } = {}) {
       recordKill(monster.kind, monster.tool);
       return;
     }
-    monster.x += KNOCKBACK_PIXELS;
+    monster.knockMs = KNOCKBACK_MS;
   }
 
   function hasThreat(): boolean {
     return (
-      monsters.some((monster) => monster.phase === "alive") ||
+      aliveMonsters().length > 0 ||
       overflow.size > 0 ||
       (boss !== undefined && boss.phase !== "dying")
     );
@@ -284,9 +346,13 @@ export function createWorld(options: { seed?: number } = {}) {
   function advanceAlien(dtMs: number): void {
     alien.clockMs += dtMs;
     alien.modeMs += dtMs;
+    alien.heatMs = Math.max(0, alien.heatMs - dtMs);
+    alien.hurtMs = Math.max(0, alien.hurtMs - dtMs);
+    alien.bagMs = Math.max(0, alien.bagMs - dtMs);
     const target = retarget();
     if (alien.mode === "idle") {
       if (hasThreat()) {
+        if (alien.activity === "sleep") alien.bagMs = BAG_MS;
         effects = effects.filter((effect) => effect.kind !== "bubble" && effect.kind !== "zee");
         const onlyBoss =
           boss !== undefined && !monsters.some((monster) => monster.phase === "alive");
@@ -354,7 +420,12 @@ export function createWorld(options: { seed?: number } = {}) {
         alien.hasStruck = true;
         impact();
       }
-      if (alien.modeMs >= BEAM_MS) enter("cooldown");
+      if (alien.modeMs >= BEAM_MS) {
+        const muzzle = muzzleOf(floor);
+        alien.heatMs = HEAT_MS;
+        effects.push({ kind: "smoke", x: muzzle.x - 1, y: muzzle.y - 1, ageMs: 0 });
+        enter("cooldown");
+      }
       return;
     }
     if (alien.mode === "cooldown" && alien.modeMs >= COOLDOWN_MS) enter("ready");
@@ -373,39 +444,53 @@ export function createWorld(options: { seed?: number } = {}) {
       phaseMs: 0,
       flashMs: 0,
       walkMs: id * 137,
+      waitMs: 0,
+      rageMs: 0,
+      knockMs: 0,
     };
   }
 
+  // A creature steps out of a portal at the right edge.
+  function arrive(id: number, kind: MonsterKind, tool: string): void {
+    monsters.push(makeMonster(id, kind, tool));
+    effects.push({ kind: "portal", x: columns - 3, y: floor - 6, ageMs: 0 });
+  }
+
   function advanceMonsters(dtMs: number): void {
-    monsters
-      .filter((monster) => monster.phase === "alive")
-      .sort((first, second) => first.x - second.x)
-      .forEach((monster, rank) => {
-        const limit = MONSTER_FRONT_X + rank * (MONSTER_WIDTH + MONSTER_GAP);
+    const living = aliveMonsters().sort((first, second) => first.x - second.x);
+    living.forEach((monster, rank) => {
+      const limit = MONSTER_FRONT_X + rank * (MONSTER_WIDTH + MONSTER_GAP);
+      if (monster.knockMs > 0) {
+        // Ease out: speed falls linearly to zero over KNOCKBACK_MS; taking it at the middle
+        // of each step makes the steps add up to exactly KNOCKBACK_PIXELS.
+        const step = Math.min(dtMs, monster.knockMs);
+        const middle = monster.knockMs - step / 2;
+        monster.x += (KNOCKBACK_PIXELS * 2 * middle * step) / (KNOCKBACK_MS * KNOCKBACK_MS);
+        monster.knockMs -= step;
+      } else {
         monster.x = Math.max(limit, monster.x - (MONSTER_SPEED_PIXELS_PER_SECOND * dtMs) / 1000);
-        monster.walkMs += dtMs;
-        monster.flashMs = Math.max(0, monster.flashMs - dtMs);
-      });
-    monsters
-      .filter((monster) => monster.phase === "dying")
-      .forEach((monster) => {
-        monster.phaseMs += dtMs;
-      });
-    monsters = monsters.filter(
-      (monster) => monster.phase === "alive" || monster.phaseMs < DEATH_MS,
-    );
-    const room =
-      MAX_ALIVE_MONSTERS - monsters.filter((monster) => monster.phase === "alive").length;
+      }
+      monster.walkMs += dtMs;
+      if (!monster.isDoomed) monster.waitMs += dtMs;
+      monster.flashMs = Math.max(0, monster.flashMs - dtMs);
+      monster.rageMs = Math.max(0, monster.rageMs - dtMs);
+    });
+    monsters = monsters.filter((monster) => {
+      if (monster.phase === "alive") return true;
+      monster.phaseMs += dtMs;
+      return monster.phaseMs < DEATH_MS;
+    });
+    const room = MAX_ALIVE_MONSTERS - living.length;
     [...overflow.entries()].slice(0, Math.max(0, room)).forEach(([id, waiting]) => {
       overflow.delete(id);
-      monsters.push(makeMonster(id, waiting.kind, waiting.tool));
+      arrive(id, waiting.kind, waiting.tool);
     });
   }
 
   function advanceBoss(dtMs: number): void {
     if (!boss) {
-      const title = pendingBosses.shift();
-      if (title) summonBoss(title);
+      const pending = pendingBosses.shift();
+      if (pending) summonBoss(pending.title, pending.hits);
       return;
     }
     boss.phaseMs += dtMs;
@@ -419,9 +504,29 @@ export function createWorld(options: { seed?: number } = {}) {
       }
     } else if (boss.phase === "fight") {
       bossCooldownMs += dtMs;
+      bossAttackMs += dtMs;
+      if (bossAttackMs >= BOSS_ATTACK_MS) {
+        bossAttackMs = 0;
+        const y = floor - 7;
+        orbs.push({ x: boss.x - 2, y, ageMs: 0 });
+        effects.push({ kind: "muzzle", x: boss.x, y, ageMs: 0 });
+      }
     } else if (boss.phaseMs >= BOSS_DEATH_MS) {
       boss = undefined;
     }
+  }
+
+  // Boss orbs drift at the alien's head and burst on it.
+  function advanceOrbs(dtMs: number): void {
+    orbs = orbs.filter((orb) => {
+      orb.ageMs += dtMs;
+      orb.x -= (ORB_SPEED_PIXELS_PER_SECOND * dtMs) / 1000;
+      if (orb.x > HOME_X + 11) return true;
+      alien.hurtMs = RAGE_MS;
+      shakeMs = Math.max(shakeMs, HURT_SHAKE_MS);
+      effects.push({ kind: "splash", x: orb.x, y: orb.y, ageMs: 0 });
+      return false;
+    });
   }
 
   function currentSky(): SkyStyle {
@@ -430,12 +535,14 @@ export function createWorld(options: { seed?: number } = {}) {
 
   function shake(): void {
     if (shakeMs <= 0) return;
-    const offset = Math.floor(shakeMs / 40) % 2 === 0 ? 1 : -1;
-    const copy = [...bitmap.pixels];
-    for (let y = 0; y < bitmap.height; y += 1) {
-      for (let x = 0; x < bitmap.width; x += 1) {
-        bitmap.pixels[y * bitmap.width + x] =
-          copy[y * bitmap.width + Math.min(bitmap.width - 1, Math.max(0, x + offset))] ?? null;
+    const { pixels, width } = bitmap;
+    const isLeft = Math.floor(shakeMs / 40) % 2 === 0;
+    // Shift each row one pixel in place; the edge pixel repeats.
+    for (let row = 0; row < pixels.length; row += width) {
+      if (isLeft) {
+        for (let x = 0; x < width - 1; x += 1) pixels[row + x] = pixels[row + x + 1] ?? null;
+      } else {
+        for (let x = width - 1; x > 0; x -= 1) pixels[row + x] = pixels[row + x - 1] ?? null;
       }
     }
   }
@@ -462,6 +569,8 @@ export function createWorld(options: { seed?: number } = {}) {
     alien: (): Alien => alien,
     boss: (): Boss | undefined => boss,
     monsters: (): readonly Monster[] => monsters,
+    orbs: (): readonly Orb[] => orbs,
+    effects: (): readonly Effect[] => effects,
 
     setMode(next: Mode): void {
       const previous = mode;
@@ -492,19 +601,19 @@ export function createWorld(options: { seed?: number } = {}) {
         next.change === previous.change &&
         phaseRank(next.phase) > phaseRank(previous.phase);
       const finished = next.kind === "free" || next.change !== previous.change;
-      if (advanced || finished) summonBoss(BOSS_TITLES[previous.phase]);
+      if (advanced || finished) summonBoss(BOSS_TITLES[previous.phase], bossHitsFor(previous));
       if (next.kind === "free") note(`change「${previous.change}」已 archive，回到夜間巡邏`);
     },
 
     spawn(tool: string = "工具"): number {
       const id = nextId;
       nextId += 1;
-      const kind = KINDS[(id - 1) % KINDS.length] ?? KINDS[0];
-      if (monsters.filter((monster) => monster.phase === "alive").length >= MAX_ALIVE_MONSTERS) {
+      const kind = kindFor(tool, id);
+      if (aliveMonsters().length >= MAX_ALIVE_MONSTERS) {
         overflow.set(id, { kind, tool });
         return id;
       }
-      monsters.push(makeMonster(id, kind, tool));
+      arrive(id, kind, tool);
       return id;
     },
 
@@ -513,26 +622,50 @@ export function createWorld(options: { seed?: number } = {}) {
       if (monster) {
         monster.isDoomed = true;
         monster.hitsRemaining = 1 + (outcome.isFailure ? 1 : 0);
-        if (outcome.isFailure) note(`工具失敗：${monster.label}擋下了一發雷射`);
+        if (outcome.isFailure) {
+          monster.rageMs = RAGE_MS;
+          alien.hurtMs = RAGE_MS;
+          shakeMs = Math.max(shakeMs, HURT_SHAKE_MS);
+          note(`工具失敗：${monster.label}擋下了一發雷射`);
+        }
         return;
       }
       const waiting = overflow.get(outcome.id);
       if (waiting) {
+        // It never reached the field: a far-off flash past the right edge stands for the kill.
         overflow.delete(outcome.id);
         recordKill(waiting.kind, waiting.tool);
+        effects.push({
+          kind: "distant",
+          x: columns - 4 - Math.floor(random() * 6),
+          y: floor - 6 - Math.floor(random() * 3),
+          ageMs: 0,
+        });
       }
     },
 
+    // Cheers a turn only when it brought kills.
     celebrate(): void {
-      alien.isCheerRequested = true;
+      const kills = slain + bossesSlain;
+      if (kills > killsAtCelebrate) alien.isCheerRequested = true;
+      killsAtCelebrate = kills;
     },
 
     tick(dtMs: number): void {
+      // Hit stop: the whole scene holds for a beat when a shot lands.
+      if (freezeMs > 0) {
+        freezeMs = Math.max(0, freezeMs - dtMs);
+        return;
+      }
       blendMs = Math.min(PHASE_BLEND_MS, blendMs + dtMs);
       shakeMs = Math.max(0, shakeMs - dtMs);
       advanceBoss(dtMs);
       advanceAlien(dtMs);
+      // A shot that just landed holds the rest of this tick too, so the target stops before
+      // it is thrown back.
+      if (freezeMs > 0) return;
       advanceMonsters(dtMs);
+      advanceOrbs(dtMs);
       effects.forEach((effect) => {
         effect.ageMs += dtMs;
       });
@@ -546,12 +679,13 @@ export function createWorld(options: { seed?: number } = {}) {
         return `${action()} · 夜間巡邏 · 本次擊倒 ${slain} · 累計 ${lifetime}`;
       const progress =
         mode.phase === "dawn" ? `文件 ${mode.docs}/6` : `任務 ${mode.done}/${mode.total}`;
-      return `${action()} · ${mode.change} · ${PHASE_LABELS[mode.phase]} ${progress} · 擊倒 ${slain}`;
+      const others = mode.others > 0 ? ` · 另有 ${mode.others} 個 change` : "";
+      return `${action()} · ${mode.change} · ${PHASE_LABELS[mode.phase]} ${progress} · 擊倒 ${slain}${others}`;
     },
 
     frame(): Bitmap {
       clearBitmap(bitmap);
-      drawScene({ bitmap, floor, sky: currentSky(), mode, alien, monsters, boss, effects });
+      drawScene({ bitmap, floor, sky: currentSky(), mode, alien, monsters, boss, orbs, effects });
       shake();
       return bitmap;
     },

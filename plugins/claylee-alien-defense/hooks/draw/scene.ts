@@ -1,4 +1,4 @@
-import { ALIEN, FLEX_SHIFT_X, MUZZLE_X, MUZZLE_Y } from "../art/alien";
+import { ALIEN, FLEX_SHIFT_X, GUN_CELLS, GUN_TIP, MUZZLE_X, MUZZLE_Y } from "../art/alien";
 import { BOSS_CORE, BOSS_FRAMES, BOSS_WIDTH } from "../art/boss";
 import { DEATH_GLOW, MONSTER_FRAMES } from "../art/monsters";
 import { setPixel, stamp } from "../shared/pixel/bitmap";
@@ -7,23 +7,39 @@ import { mixColors, WHITE } from "../shared/pixel/colors";
 import { phaseRank } from "../openspec";
 import {
   ALIEN_HEIGHT,
+  BAG_MS,
   BEAM_MS,
   BOSS_DEATH_MS,
-  BOSS_HITS,
   DEATH_MS,
   FLEX_SIDE_MS,
   FLEX_RELAX_MS,
+  HEAT_MS,
   HOME_X,
   LIFT_CYCLE_MS,
+  LONG_CALL_MS,
   WAKE_MS,
   WALK_FRAME_MS,
 } from "../sim/constants";
-import type { Alien, Boss, Effect, Mode, Monster } from "../sim/types";
+import type { Alien, Boss, Effect, Mode, Monster, Orb } from "../sim/types";
 import { drawEffect } from "./effects";
 import { drawSky } from "./sky";
 import type { SkyStyle } from "./sky";
 
 const whiten: Tint = (color) => mixColors({ from: color, to: WHITE, amount: 0.85 });
+const redden =
+  (amount: number): Tint =>
+  (color) =>
+    mixColors({ from: color, to: 0xff3b3b, amount });
+
+// White on a hit, a red blink when its call failed, a slow red pulse while a call runs long.
+function monsterTint(monster: Monster): Tint | undefined {
+  if (monster.flashMs > 0) return whiten;
+  if (monster.rageMs > 0)
+    return Math.floor(monster.rageMs / 100) % 2 === 0 ? redden(0.75) : undefined;
+  if (!monster.isDoomed && monster.waitMs >= LONG_CALL_MS)
+    return redden(((Math.sin(monster.walkMs / 250) + 1) / 2) * 0.45);
+  return undefined;
+}
 
 export function muzzleOf(floor: number): { x: number; y: number } {
   return { x: HOME_X + MUZZLE_X, y: floor - ALIEN_HEIGHT + MUZZLE_Y };
@@ -116,7 +132,7 @@ function drawMonster(bitmap: Bitmap, monster: Monster, floor: number): void {
     for (let dx = 2; dx < sprite.width - 2; dx += 1)
       setPixel({ bitmap, x: x + dx, y: floor, color: 0x120c1e });
   }
-  stamp({ target: bitmap, source: sprite, x, y, tint: monster.flashMs > 0 ? whiten : undefined });
+  stamp({ target: bitmap, source: sprite, x, y, tint: monsterTint(monster) });
 }
 
 function drawBoss(bitmap: Bitmap, boss: Boss, floor: number): void {
@@ -148,7 +164,7 @@ function drawBoss(bitmap: Bitmap, boss: Boss, floor: number): void {
     setPixel({ bitmap, x: x + dx, y: floor, color: 0x120c1e });
   stamp({ target: bitmap, source: sprite, x: x + sway, y, tint });
   const barY = Math.max(0, y - 2);
-  const filled = Math.round((boss.hitsRemaining / BOSS_HITS) * BOSS_WIDTH);
+  const filled = Math.round((boss.hitsRemaining / boss.maxHits) * BOSS_WIDTH);
   for (let dx = 0; dx < BOSS_WIDTH; dx += 1) {
     const color = dx < filled ? (dx < filled - 1 ? 0xff3b5c : 0xff8fa3) : 0x3a1a2a;
     setPixel({ bitmap, x: x + dx, y: barY, color });
@@ -184,6 +200,37 @@ function idleSprite(alien: Alien): { sprite: Bitmap; isLow: boolean } | undefine
   return undefined;
 }
 
+const CELL_EMPTY: Color = 0x3a1430;
+const CELL_DIM: Color = 0x8a2a78;
+const CELL_LIT: Color = 0xff6ad5;
+const TIP_COLD: Color = 0x7a3d6e;
+
+// The gun tells the shot: the cell idles in a slow pulse, burns white while aiming, drains
+// back to front as the beam runs, then refills while the tip cools from orange to cold.
+function drawGun(bitmap: Bitmap, alien: Alien, x: number, y: number): void {
+  const pulse = (Math.sin(alien.clockMs / 260) + 1) / 2;
+  const idleCell = mixColors({ from: CELL_DIM, to: CELL_LIT, amount: pulse });
+  const heat = alien.heatMs / HEAT_MS;
+  let lit = GUN_CELLS.length;
+  let cell = idleCell;
+  let tip = heat > 0 ? mixColors({ from: TIP_COLD, to: 0xffa64d, amount: heat }) : TIP_COLD;
+  if (alien.mode === "aim") {
+    cell = 0xffd6f5;
+    tip = WHITE;
+  } else if (alien.mode === "fire") {
+    const progress = alien.modeMs / BEAM_MS;
+    lit = GUN_CELLS.length - Math.floor(progress * GUN_CELLS.length);
+    cell = CELL_LIT;
+    tip = progress < 0.75 ? WHITE : 0xffb3ec;
+  } else if (heat > 0) {
+    lit = Math.round((1 - heat) * GUN_CELLS.length);
+  }
+  GUN_CELLS.forEach((spot, index) =>
+    setPixel({ bitmap, x: x + spot.x, y: y + spot.y, color: index < lit ? cell : CELL_EMPTY }),
+  );
+  GUN_TIP.forEach((spot) => setPixel({ bitmap, x: x + spot.x, y: y + spot.y, color: tip }));
+}
+
 function drawAlien(bitmap: Bitmap, alien: Alien, floor: number): void {
   for (let dx = 1; dx < 12; dx += 1)
     setPixel({ bitmap, x: HOME_X + dx, y: floor, color: 0x120c1e });
@@ -200,16 +247,48 @@ function drawAlien(bitmap: Bitmap, alien: Alien, floor: number): void {
   }
   const t = alien.clockMs;
   const isBlinking = (alien.mode === "ready" || alien.mode === "cooldown") && t % 3200 < 160;
-  const rising = alien.mode === "wake" ? Math.round((1 - alien.modeMs / WAKE_MS) * 3) : 0;
+  // Waking hops out of the bag: starts low, springs up, lands.
+  const wake = Math.min(1, alien.modeMs / WAKE_MS);
+  const rising =
+    alien.mode === "wake" ? Math.round(3 * (1 - wake) - 4 * Math.sin(wake * Math.PI)) : 0;
   const recoil = alien.mode === "fire" && alien.modeMs < BEAM_MS * 0.5 ? -1 : 0;
   const sprite = isBlinking
     ? ALIEN.blink
     : Math.floor(t / 900) % 2 === 0
       ? ALIEN.stand
       : ALIEN.sway;
-  stamp({ target: bitmap, source: sprite, x: HOME_X + recoil, y: floor - sprite.height + rising });
+  const x = HOME_X + recoil;
+  const y = floor - sprite.height + rising;
+  const isHurtBlink = alien.hurtMs > 0 && Math.floor(alien.hurtMs / 100) % 2 === 0;
+  stamp({ target: bitmap, source: sprite, x, y, tint: isHurtBlink ? redden(0.35) : undefined });
+  drawGun(bitmap, alien, x, y);
 }
 
+// The bag the alien slept in lies where it was and fades into the ground.
+function drawBag(bitmap: Bitmap, alien: Alien, floor: number): void {
+  if (alien.bagMs <= 0) return;
+  const fade = 1 - alien.bagMs / BAG_MS;
+  const tint: Tint = (color) => mixColors({ from: color, to: 0x120c1e, amount: fade * fade });
+  stamp({ target: bitmap, source: ALIEN.bag, x: HOME_X + 6, y: floor - ALIEN.bag.height, tint });
+}
+
+function drawOrb(bitmap: Bitmap, orb: Orb): void {
+  const x = Math.round(orb.x);
+  const pulse = Math.floor(orb.ageMs / 90) % 2 === 0;
+  [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ].forEach(([dx, dy]) =>
+    setPixel({ bitmap, x: x + (dx ?? 0), y: orb.y + (dy ?? 0), color: 0xb84dff }),
+  );
+  setPixel({ bitmap, x, y: orb.y, color: pulse ? 0xffffff : 0xffe066 });
+  setPixel({ bitmap, x: x + 2, y: orb.y, color: 0x5a1a8a });
+  setPixel({ bitmap, x: x + 3, y: orb.y + (pulse ? -1 : 1), color: 0x3a1460 });
+}
+
+// Thick at the muzzle and tapering toward the target, with a glint running down its length.
 function drawBeam(bitmap: Bitmap, alien: Alien, floor: number): void {
   if (alien.mode !== "fire") return;
   const progress = alien.modeMs / BEAM_MS;
@@ -217,16 +296,27 @@ function drawBeam(bitmap: Bitmap, alien: Alien, floor: number): void {
   const startX = muzzle.x;
   const reach = Math.min(1, progress * 2.2);
   const endX = startX + (alien.targetX - startX) * reach;
+  const length = Math.max(1, endX - startX);
   const fading = progress > 0.75;
   const core: Color = fading ? 0xd9a6ff : 0xffffff;
   const edge: Color = fading ? 0x7a3db8 : 0xff6ad5;
   for (let x = startX; x <= endX; x += 1) {
+    const along = (x - startX) / length;
     const flicker = (x + Math.floor(alien.modeMs / 30)) % 4;
     setPixel({ bitmap, x, y: muzzle.y, color: core });
-    if (!fading || flicker === 0) {
+    if ((!fading || flicker === 0) && along < 0.85) {
       setPixel({ bitmap, x, y: muzzle.y - 1, color: flicker === 0 ? 0xffb3ec : edge });
       setPixel({ bitmap, x, y: muzzle.y + 1, color: flicker === 2 ? 0xffb3ec : edge });
     }
+    if (!fading && along < 0.18) {
+      setPixel({ bitmap, x, y: muzzle.y - 2, color: 0x7a3db8 });
+      setPixel({ bitmap, x, y: muzzle.y + 2, color: 0x7a3db8 });
+    }
+  }
+  if (!fading) {
+    const glint = startX + ((alien.modeMs % 110) / 110) * length;
+    setPixel({ bitmap, x: glint, y: muzzle.y, color: 0xfff3b0 });
+    setPixel({ bitmap, x: glint - 1, y: muzzle.y, color: 0xffe066 });
   }
   if (!fading) {
     [
@@ -249,6 +339,7 @@ export function drawScene(options: {
   alien: Alien;
   monsters: readonly Monster[];
   boss: Boss | undefined;
+  orbs: readonly Orb[];
   effects: readonly Effect[];
 }): void {
   const { bitmap, alien, floor } = options;
@@ -256,7 +347,9 @@ export function drawScene(options: {
   drawOutpost(bitmap, options.mode, alien.clockMs, floor);
   if (options.boss) drawBoss(bitmap, options.boss, floor);
   options.monsters.forEach((monster) => drawMonster(bitmap, monster, floor));
+  drawBag(bitmap, alien, floor);
   drawAlien(bitmap, alien, floor);
+  options.orbs.forEach((orb) => drawOrb(bitmap, orb));
   drawBeam(bitmap, alien, floor);
   options.effects.forEach((effect) => drawEffect({ bitmap, effect }));
 }

@@ -36,6 +36,20 @@ const BURSTS: Partial<Record<EffectKind, Burst>> = {
     angles: RING,
     hasFlash: true,
   },
+  splash: {
+    durationMs: 380,
+    reach: 4,
+    colors: [0xffffff, 0xffe066, 0xffa64d, 0xb84dff],
+    angles: [-60, -30, 0, 30, 60, 120, 240],
+    hasFlash: true,
+  },
+  distant: {
+    durationMs: 520,
+    reach: 3,
+    colors: [0xffffff, 0xfff3b0, 0xffa64d, 0x7a3db8],
+    angles: [0, 90, 180, 270],
+    hasFlash: true,
+  },
   sparkle: {
     durationMs: 600,
     reach: 3,
@@ -54,6 +68,10 @@ export const EFFECT_LIFE_MS: Record<EffectKind, number> = {
   zee: 2400,
   bubble: 2200,
   debris: 600,
+  smoke: 900,
+  splash: 380,
+  distant: 520,
+  portal: 900,
 };
 
 const Z_SMALL = ["##", ".#", "##"];
@@ -122,8 +140,46 @@ function drawDebris(bitmap: Bitmap, effect: Effect): void {
   }
 }
 
+// Two puffs curling up off the hot barrel, thinning to the sky.
+function drawSmoke(bitmap: Bitmap, effect: Effect): void {
+  const progress = effect.ageMs / EFFECT_LIFE_MS.smoke;
+  const color = progress < 0.4 ? 0xb8b0c8 : progress < 0.75 ? 0x7a7490 : 0x4a4660;
+  for (let puff = 0; puff < 2; puff += 1) {
+    const rise = progress * 6 - puff * 2;
+    if (rise < 0) continue;
+    setPixel({
+      bitmap,
+      x: effect.x + Math.sin(progress * 7 + puff * 2) * 1.2,
+      y: effect.y - rise,
+      color,
+    });
+  }
+}
+
+// A tall oval that opens, swirls while the creature steps through, and closes.
+function drawPortal(bitmap: Bitmap, effect: Effect): void {
+  const progress = effect.ageMs / EFFECT_LIFE_MS.portal;
+  const openness = Math.min(1, progress * 4, (1 - progress) * 3);
+  const radiusY = 1 + openness * 5;
+  const radiusX = 0.5 + openness * 1.5;
+  const spin = progress * 720;
+  for (let angle = 0; angle < 360; angle += 20) {
+    const radians = toRadians(angle);
+    const isBright = Math.abs(((angle - spin) % 360) + 360) % 360 < 60;
+    setPixel({
+      bitmap,
+      x: effect.x + Math.cos(radians) * radiusX,
+      y: effect.y + Math.sin(radians) * radiusY,
+      color: isBright ? 0xf2c4ff : 0x9b4dff,
+    });
+  }
+  if (openness > 0.6) setPixel({ bitmap, x: effect.x, y: effect.y, color: 0x2a0a40 });
+}
+
 export function drawEffect(options: { bitmap: Bitmap; effect: Effect }): void {
   const { bitmap, effect } = options;
+  if (effect.kind === "portal") return drawPortal(bitmap, effect);
+  if (effect.kind === "smoke") return drawSmoke(bitmap, effect);
   if (effect.kind === "zee") return drawZee(bitmap, effect);
   if (effect.kind === "bubble") return drawBubble(bitmap, effect);
   if (effect.kind === "sweat") return drawSweat(bitmap, effect);

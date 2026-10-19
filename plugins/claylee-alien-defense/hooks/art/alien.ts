@@ -32,26 +32,31 @@ const ANTENNA_SWAY = [".......a.....", "......A......"];
 const EYES_OPEN = ["..oGwwGwwGo..", "..oGwkGwkGo.."];
 const EYES_SHUT = ["..oGGGGGGGo..", "..oGooGooGo.."];
 
+// The ray gun: a lit housing over an energy cell (`c`, recolored by state in the scene),
+// a ribbed barrel and an emitter tip (`a`), held by the grip under the housing.
 const BODY = [
-  "....ooooo....",
-  "...oLLGGGo...",
-  "..oLGGGGGGo..",
-  ...EYES_OPEN,
-  "..oDGGGGGDo..",
-  "...oDDDDDo...",
-  "...oTTSSo....",
-  "..oTSSsoMmmmc",
-  "..osSSsoM....",
-  "...os.os.....",
-  "..obb.obb....",
+  "....ooooo........",
+  "...oLLGGGo.......",
+  "..oLGGGGGGo......",
+  ...EYES_OPEN.map((row) => row.padEnd(17, ".")),
+  "..oDGGGGGDo......",
+  "...oDDDDDo.......",
+  "...oTTSSo.ooooo..",
+  "..oTSSsoGoBmmmMoa",
+  "..osSSsoGoccccoNa",
+  "...os.os.oPooooo.",
+  "..obb.obb.oo.....",
 ];
 
 function standing(antenna: readonly string[], eyes: readonly string[]): string[] {
   return [
-    ...antenna,
+    ...antenna.map((row) => row.padEnd(17, ".")),
     ...replaceRows({
       rows: BODY,
-      replacements: { [EYES_OPEN[0] ?? ""]: eyes[0] ?? "", [EYES_OPEN[1] ?? ""]: eyes[1] ?? "" },
+      replacements: {
+        [(EYES_OPEN[0] ?? "").padEnd(17, ".")]: (eyes[0] ?? "").padEnd(17, "."),
+        [(EYES_OPEN[1] ?? "").padEnd(17, ".")]: (eyes[1] ?? "").padEnd(17, "."),
+      },
     }),
   ];
 }
@@ -146,10 +151,19 @@ const LIFT_DOWN_ROWS = [
   "..os......so...",
   ".obb......bbo..",
 ];
+// The sleeping bag left on the ground after the alien jumps out of it.
+const BAG_ROWS = ["..ooooooooo..", ".oqqqqYqqqqo.", "oQQQQQYQQQQQo"];
+
 const parse = (rows: readonly string[]): Bitmap => parsePixelMap({ rows, palette: ALIEN_PALETTE });
 
-export const MUZZLE_X = 13;
+export const MUZZLE_X = 17;
 export const MUZZLE_Y = 10;
+// Where the scene repaints the gun by state, in sprite coordinates.
+export const GUN_CELLS = [10, 11, 12, 13].map((x) => ({ x, y: 11 }));
+export const GUN_TIP = [
+  { x: 16, y: 10 },
+  { x: 16, y: 11 },
+];
 
 export const ALIEN = {
   stand: parse(standing(ANTENNA_UP, EYES_OPEN)),
@@ -163,4 +177,5 @@ export const ALIEN = {
   sleepBreath: parse(SLEEP_BREATH_ROWS),
   liftUp: parse(LIFT_UP_ROWS),
   liftDown: parse(LIFT_DOWN_ROWS),
+  bag: parse(BAG_ROWS),
 };
