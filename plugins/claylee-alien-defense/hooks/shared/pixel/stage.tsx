@@ -16,7 +16,13 @@ export type StageScene = {
 export type StageOptions = {
   game: string;
   title: string;
-  command: { name: string; description: string; report: () => readonly string[] };
+  command: {
+    name: string;
+    description: string;
+    report: () => readonly string[];
+    // Extra subcommands the game answers itself (`/<name> <key>`), checked before the built-ins.
+    actions?: Readonly<Record<string, () => readonly string[]>>;
+  };
   rows: number;
   tallRows?: number;
   minColumns: number;
@@ -155,12 +161,18 @@ export function installStage(on: On): void {
       return next(e);
     }
     const args = e.args.trim().toLowerCase();
+    const actions = options.command.actions ?? {};
+    const action = actions[args];
+    if (action) {
+      return { text: action().join("\n") };
+    }
     if (args === "stats") {
       return { text: options.command.report().join("\n") };
     }
     if (args !== "" && args !== "on" && args !== "off") {
+      const choices = ["on", "off", "stats", ...Object.keys(actions).filter((key) => key !== "stats")];
       return {
-        text: [`Usage: /${options.command.name} [on|off|stats]`, ...options.command.report()].join(
+        text: [`Usage: /${options.command.name} [${choices.join("|")}]`, ...options.command.report()].join(
           "\n",
         ),
       };

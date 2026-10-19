@@ -49,7 +49,15 @@ export const LIFT_CYCLE_MS = 1400;
 export const FLEX_SIDE_MS = 1500;
 export const FLEX_RELAX_MS = 500;
 export const PHASE_BLEND_MS = 8000;
+export const FLYER_MIN_MS = 10000;
+export const FLYER_MAX_MS = 22000;
+export const FLYER_SPEEDS = { ufo: 9, comet: 45, satellite: 5 } as const;
+export const COMET_DROP = 0.08;
 export const LOG_LIMIT = 8;
+export const STATS_TOTAL_MS = 1400;
+export const STATS_ENTRY_MS = 900;
+// The total, then each creature kind and the boss.
+export const STATS_MS = STATS_TOTAL_MS + 5 * STATS_ENTRY_MS;
 
 export function floorOf(height: number): number {
   return height - (height > 16 ? 4 : 2);

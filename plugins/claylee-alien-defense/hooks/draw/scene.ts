@@ -1,5 +1,7 @@
 import { ALIEN, FLEX_SHIFT_X, GUN_CELLS, GUN_TIP, MUZZLE_X, MUZZLE_Y } from "../art/alien";
 import { BOSS_CORE, BOSS_FRAMES, BOSS_WIDTH } from "../art/boss";
+import { DIGITS, SKULL, STAR, TIMES } from "../art/digits";
+import { COMET_TAIL, FLYER_COLORS, SATELLITE_ROWS, UFO_LIGHTS, UFO_ROWS } from "../art/flyers";
 import { DEATH_GLOW, MONSTER_FRAMES } from "../art/monsters";
 import { setPixel, stamp } from "../shared/pixel/bitmap";
 import type { Bitmap, Color, Tint } from "../shared/pixel/bitmap";
@@ -17,10 +19,23 @@ import {
   HOME_X,
   LIFT_CYCLE_MS,
   LONG_CALL_MS,
+  STATS_ENTRY_MS,
+  STATS_MS,
+  STATS_TOTAL_MS,
   WAKE_MS,
   WALK_FRAME_MS,
 } from "../sim/constants";
-import type { Alien, Boss, Effect, Mode, Monster, Orb } from "../sim/types";
+import type {
+  Alien,
+  Boss,
+  Effect,
+  Flyer,
+  Mode,
+  Monster,
+  MonsterKind,
+  Orb,
+  Tally,
+} from "../sim/types";
 import { drawEffect } from "./effects";
 import { drawSky } from "./sky";
 import type { SkyStyle } from "./sky";
@@ -234,6 +249,15 @@ function drawGun(bitmap: Bitmap, alien: Alien, x: number, y: number): void {
 function drawAlien(bitmap: Bitmap, alien: Alien, floor: number): void {
   for (let dx = 1; dx < 12; dx += 1)
     setPixel({ bitmap, x: HOME_X + dx, y: floor, color: 0x120c1e });
+  const isPresenting =
+    alien.statsMs > 0 &&
+    (alien.mode === "idle" || alien.mode === "ready" || alien.mode === "cheer");
+  if (isPresenting) {
+    const hop = Math.round(1.5 * Math.abs(Math.sin(alien.statsMs / 180)));
+    // Always the right arm, pointing at the board; the left one would leave the pane.
+    drawFlex(bitmap, (STATS_MS - alien.statsMs) % FLEX_SIDE_MS, HOME_X, floor - hop);
+    return;
+  }
   if (alien.mode === "idle") {
     const idle = idleSprite(alien);
     if (idle === undefined) drawFlex(bitmap, alien.activityMs, HOME_X, floor);
@@ -270,6 +294,124 @@ function drawBag(bitmap: Bitmap, alien: Alien, floor: number): void {
   const fade = 1 - alien.bagMs / BAG_MS;
   const tint: Tint = (color) => mixColors({ from: color, to: 0x120c1e, amount: fade * fade });
   stamp({ target: bitmap, source: ALIEN.bag, x: HOME_X + 6, y: floor - ALIEN.bag.height, tint });
+}
+
+function paintRows(
+  bitmap: Bitmap,
+  rows: readonly string[],
+  x: number,
+  y: number,
+  colorOf: (cell: string, column: number) => Color | undefined,
+): void {
+  rows.forEach((row, dy) => {
+    Array.from(row).forEach((cell, dx) => {
+      const color = colorOf(cell, dx);
+      if (color !== undefined) setPixel({ bitmap, x: x + dx, y: y + dy, color });
+    });
+  });
+}
+
+// A UFO bobs with its lights chasing along the rim, a comet streaks with a fading tail,
+// a satellite drifts with a blinking beacon.
+function drawFlyer(bitmap: Bitmap, flyer: Flyer): void {
+  const x = Math.round(flyer.x);
+  const y = Math.round(flyer.y);
+  if (flyer.kind === "comet") {
+    COMET_TAIL.forEach((color, index) => {
+      const back = index * -flyer.direction;
+      setPixel({ bitmap, x: x + back, y: Math.round(flyer.y - index * 0.08), color });
+    });
+    setPixel({ bitmap, x, y: y - 1, color: 0xfff3b0 });
+    return;
+  }
+  if (flyer.kind === "satellite") {
+    const isBlinkOn = Math.floor(flyer.ageMs / 500) % 2 === 0;
+    paintRows(bitmap, SATELLITE_ROWS, x, y, (cell) =>
+      cell === "r" && !isBlinkOn ? 0x5a1a2a : FLYER_COLORS[cell],
+    );
+    return;
+  }
+  const bob = Math.round(Math.sin(flyer.ageMs / 400));
+  const lit = Math.floor(flyer.ageMs / 160);
+  paintRows(bitmap, UFO_ROWS, x, y + bob, (cell, column) =>
+    cell === "L" ? UFO_LIGHTS[(column + lit) % UFO_LIGHTS.length] : FLYER_COLORS[cell],
+  );
+}
+
+const STAT_KINDS: readonly MonsterKind[] = ["slime", "eyeworm", "moth", "squid"];
+
+function drawGlyph(bitmap: Bitmap, rows: readonly string[], x: number, y: number, color: Color): void {
+  paintRows(bitmap, rows, x, y, (cell) => (cell === "#" ? color : undefined));
+}
+
+function numberWidth(value: number): number {
+  return String(value).length * 4 - 1;
+}
+
+function drawNumber(bitmap: Bitmap, value: number, x: number, y: number, color: Color): void {
+  Array.from(String(value)).forEach((digit, index) =>
+    drawGlyph(bitmap, DIGITS[digit] ?? [], x + index * 4, y, color),
+  );
+}
+
+// A dark see-through panel with a violet rim, faded in by `shown`.
+function drawBoard(
+  bitmap: Bitmap,
+  box: { left: number; right: number; top: number; bottom: number },
+  shown: number,
+): void {
+  for (let y = box.top; y <= box.bottom; y += 1) {
+    for (let x = box.left; x <= box.right; x += 1) {
+      const isEdge = y === box.top || y === box.bottom || x === box.left || x === box.right;
+      const under = bitmap.pixels[y * bitmap.width + x] ?? 0x000000;
+      const color = isEdge
+        ? mixColors({ from: under, to: 0x8a6ad8, amount: shown })
+        : mixColors({ from: under, to: 0x0b0b1e, amount: 0.82 * shown });
+      setPixel({ bitmap, x, y, color });
+    }
+  }
+}
+
+// `/alien stats`: a board fades in, counts the total up from zero, then shows each creature
+// (and the boss) with its count, each popping in white with a hop.
+function drawStats(
+  bitmap: Bitmap,
+  alien: Alien,
+  stats: { tally: Tally; slain: number; bosses: number },
+  floor: number,
+): void {
+  if (alien.statsMs <= 0) return;
+  const elapsed = STATS_MS - alien.statsMs;
+  const left = Math.min(HOME_X + 20, bitmap.width - 30);
+  const right = bitmap.width - 2;
+  const top = 1;
+  const bottom = floor - 2;
+  const shown = Math.min(1, elapsed / 200, alien.statsMs / 250);
+  drawBoard(bitmap, { left, right, top, bottom }, shown);
+  if (shown < 1) return;
+  const centerX = (left + right) / 2;
+  const textY = Math.round((top + bottom) / 2 - 2);
+  if (elapsed < STATS_TOTAL_MS) {
+    const count = Math.round(stats.slain * Math.min(1, elapsed / (STATS_TOTAL_MS * 0.7)));
+    const x = Math.round(centerX - (7 + numberWidth(count)) / 2);
+    drawGlyph(bitmap, STAR, x, textY, Math.floor(elapsed / 150) % 2 === 0 ? 0xffe066 : 0xfff3b0);
+    drawNumber(bitmap, count, x + 7, textY, 0xffe066);
+    return;
+  }
+  const index = Math.min(4, Math.floor((elapsed - STATS_TOTAL_MS) / STATS_ENTRY_MS));
+  const local = elapsed - STATS_TOTAL_MS - index * STATS_ENTRY_MS;
+  const hop = local < 160 ? -Math.round(Math.sin((local / 160) * Math.PI) * 2) : 0;
+  const kind = STAT_KINDS[index];
+  const sprite = kind ? MONSTER_FRAMES[kind][0] : undefined;
+  const count = kind ? stats.tally[kind] : stats.bosses;
+  const iconWidth = sprite ? sprite.width : 5;
+  const iconHeight = sprite ? sprite.height : 5;
+  const x = Math.round(centerX - (iconWidth + 7 + numberWidth(count)) / 2);
+  const iconY = Math.round((top + bottom) / 2 - iconHeight / 2) + hop;
+  if (sprite) stamp({ target: bitmap, source: sprite, x, y: iconY, tint: local < 100 ? whiten : undefined });
+  else drawGlyph(bitmap, SKULL, x, iconY, local < 100 ? WHITE : 0xff8fa3);
+  drawGlyph(bitmap, TIMES, x + iconWidth + 2, textY, 0xa9b3d9);
+  drawNumber(bitmap, count, x + iconWidth + 6, textY, WHITE);
 }
 
 function drawOrb(bitmap: Bitmap, orb: Orb): void {
@@ -340,14 +482,18 @@ export function drawScene(options: {
   monsters: readonly Monster[];
   boss: Boss | undefined;
   orbs: readonly Orb[];
+  flyers: readonly Flyer[];
   effects: readonly Effect[];
+  stats: { tally: Tally; slain: number; bosses: number };
 }): void {
   const { bitmap, alien, floor } = options;
   drawSky({ bitmap, sky: options.sky, clockMs: alien.clockMs, floor });
+  options.flyers.forEach((flyer) => drawFlyer(bitmap, flyer));
   drawOutpost(bitmap, options.mode, alien.clockMs, floor);
   if (options.boss) drawBoss(bitmap, options.boss, floor);
   options.monsters.forEach((monster) => drawMonster(bitmap, monster, floor));
   drawBag(bitmap, alien, floor);
+  drawStats(bitmap, alien, options.stats, floor);
   drawAlien(bitmap, alien, floor);
   options.orbs.forEach((orb) => drawOrb(bitmap, orb));
   drawBeam(bitmap, alien, floor);

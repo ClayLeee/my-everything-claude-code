@@ -21,10 +21,14 @@ import {
   BOSS_SPEED_PIXELS_PER_SECOND,
   BOSS_STAND_OFFSET,
   CHEER_MS,
+  COMET_DROP,
   COOLDOWN_MS,
   DEATH_MS,
   FLASH_MS,
   floorOf,
+  FLYER_MAX_MS,
+  FLYER_MIN_MS,
+  FLYER_SPEEDS,
   HEAT_MS,
   HIT_STOP_MS,
   HOME_X,
@@ -49,6 +53,7 @@ import {
   RAGE_MS,
   SHAKE_MS,
   STAGE_ROWS,
+  STATS_MS,
   WAKE_MS,
 } from "./constants";
 import type {
@@ -56,6 +61,8 @@ import type {
   AlienMode,
   Boss,
   Effect,
+  Flyer,
+  FlyerKind,
   IdleActivity,
   Mode,
   Monster,
@@ -143,6 +150,8 @@ export function createWorld(options: { seed?: number } = {}) {
   let orbs: Orb[] = [];
   let freezeMs = 0;
   let killsAtCelebrate = 0;
+  let flyers: Flyer[] = [];
+  let flyerMs = FLYER_MIN_MS / 2;
   let shakeMs = 0;
   let nextId = 1;
   let readyIdleMs = 0;
@@ -156,7 +165,6 @@ export function createWorld(options: { seed?: number } = {}) {
   let skyFrom: SkyStyle = sky;
   let blendMs = PHASE_BLEND_MS;
   let tally: Tally = emptyTally();
-  let lifetime = 0;
   let slain = 0;
   let bossesSlain = 0;
   let lines: string[] = ["外星人鑽進睡袋呼呼大睡"];
@@ -175,6 +183,7 @@ export function createWorld(options: { seed?: number } = {}) {
     heatMs: 0,
     hurtMs: 0,
     bagMs: 0,
+    statsMs: 0,
   };
 
   function note(line: string): void {
@@ -222,7 +231,6 @@ export function createWorld(options: { seed?: number } = {}) {
   function recordKill(kind: MonsterKind, tool: string): void {
     tally = { ...tally, [kind]: tally[kind] + 1 };
     slain += 1;
-    lifetime += 1;
     note(`擊倒${MONSTER_NAMES[kind]}（${tool}）`);
   }
 
@@ -231,6 +239,7 @@ export function createWorld(options: { seed?: number } = {}) {
   }
 
   function action(): string {
+    if (alien.statsMs > 0) return `戰績：擊倒 ${slain} 隻 · BOSS ${bossesSlain}`;
     if (boss && boss.phase !== "dying")
       return `BOSS 戰：${boss.title} HP ${boss.hitsRemaining}/${boss.maxHits}`;
     const living = aliveMonsters();
@@ -273,7 +282,6 @@ export function createWorld(options: { seed?: number } = {}) {
         boss.phase = "dying";
         boss.phaseMs = 0;
         bossesSlain += 1;
-        lifetime += 1;
         shakeMs = SHAKE_MS;
         orbs = [];
         effects.push({ kind: "blast", x: boss.x + 10, y: floor - 8, ageMs: 0 });
@@ -349,6 +357,7 @@ export function createWorld(options: { seed?: number } = {}) {
     alien.heatMs = Math.max(0, alien.heatMs - dtMs);
     alien.hurtMs = Math.max(0, alien.hurtMs - dtMs);
     alien.bagMs = Math.max(0, alien.bagMs - dtMs);
+    alien.statsMs = Math.max(0, alien.statsMs - dtMs);
     const target = retarget();
     if (alien.mode === "idle") {
       if (hasThreat()) {
@@ -365,6 +374,8 @@ export function createWorld(options: { seed?: number } = {}) {
         enter("cheer");
         return;
       }
+      // Showing off the stats board holds the idle routine.
+      if (alien.statsMs > 0) return;
       alien.activityMs += dtMs;
       idleEffects(dtMs);
       if (alien.activityMs >= alien.activityLengthMs) nextActivity();
@@ -529,6 +540,36 @@ export function createWorld(options: { seed?: number } = {}) {
     });
   }
 
+  // In free mode something now and then crosses the night sky, high above the ridge.
+  function advanceFlyers(dtMs: number): void {
+    flyers = flyers.filter((flyer) => {
+      flyer.ageMs += dtMs;
+      const step = (FLYER_SPEEDS[flyer.kind] * dtMs) / 1000;
+      flyer.x += flyer.direction * step;
+      if (flyer.kind === "comet") flyer.y += step * COMET_DROP;
+      return flyer.x > -16 && flyer.x < columns + 16;
+    });
+    if (mode.kind !== "free") return;
+    flyerMs -= dtMs;
+    if (flyerMs > 0) return;
+    flyerMs = FLYER_MIN_MS + random() * (FLYER_MAX_MS - FLYER_MIN_MS);
+    const roll = random();
+    const kind: FlyerKind = roll < 0.5 ? "ufo" : roll < 0.85 ? "comet" : "satellite";
+    const direction = random() < 0.5 ? 1 : -1;
+    // A comet falls as it goes, so it starts at the top; in the tall pane the others pass
+    // below the planet and above the ridge.
+    const lane = floor - 15;
+    const y =
+      kind === "comet" || lane < 5 ? 1 + Math.floor(random() * 2) : lane + Math.floor(random() * 3);
+    flyers.push({
+      kind,
+      x: direction === 1 ? -12 : columns + 4,
+      y,
+      direction,
+      ageMs: 0,
+    });
+  }
+
   function currentSky(): SkyStyle {
     return blendSky(skyFrom, sky, blendMs / PHASE_BLEND_MS);
   }
@@ -556,11 +597,20 @@ export function createWorld(options: { seed?: number } = {}) {
       bitmap = createBitmap({ width: columns, height });
     },
 
-    restore(saved: { lifetime: number }): void {
-      lifetime = saved.lifetime;
+    // Kills count for this session only: cleared on session start and by `/alien reset`.
+    resetCounts(): void {
+      tally = emptyTally();
+      slain = 0;
+      bossesSlain = 0;
+      killsAtCelebrate = 0;
     },
 
-    lifetime: (): number => lifetime,
+    // `/alien stats`: the alien shows off a board that counts up the kills.
+    showStats(): void {
+      alien.statsMs = STATS_MS;
+      effects = effects.filter((effect) => effect.kind !== "bubble" && effect.kind !== "zee");
+    },
+
     slain: (): number => slain,
     bossesSlain: (): number => bossesSlain,
     tally: (): Tally => tally,
@@ -570,6 +620,7 @@ export function createWorld(options: { seed?: number } = {}) {
     boss: (): Boss | undefined => boss,
     monsters: (): readonly Monster[] => monsters,
     orbs: (): readonly Orb[] => orbs,
+    flyers: (): readonly Flyer[] => flyers,
     effects: (): readonly Effect[] => effects,
 
     setMode(next: Mode): void {
@@ -666,6 +717,7 @@ export function createWorld(options: { seed?: number } = {}) {
       if (freezeMs > 0) return;
       advanceMonsters(dtMs);
       advanceOrbs(dtMs);
+      advanceFlyers(dtMs);
       effects.forEach((effect) => {
         effect.ageMs += dtMs;
       });
@@ -676,7 +728,7 @@ export function createWorld(options: { seed?: number } = {}) {
 
     summary(): string {
       if (mode.kind === "free")
-        return `${action()} · 夜間巡邏 · 本次擊倒 ${slain} · 累計 ${lifetime}`;
+        return `${action()} · 夜間巡邏 · 擊倒 ${slain}`;
       const progress =
         mode.phase === "dawn" ? `文件 ${mode.docs}/6` : `任務 ${mode.done}/${mode.total}`;
       const others = mode.others > 0 ? ` · 另有 ${mode.others} 個 change` : "";
@@ -685,7 +737,19 @@ export function createWorld(options: { seed?: number } = {}) {
 
     frame(): Bitmap {
       clearBitmap(bitmap);
-      drawScene({ bitmap, floor, sky: currentSky(), mode, alien, monsters, boss, orbs, effects });
+      drawScene({
+        bitmap,
+        floor,
+        sky: currentSky(),
+        mode,
+        alien,
+        monsters,
+        boss,
+        orbs,
+        flyers,
+        effects,
+        stats: { tally, slain, bosses: bossesSlain },
+      });
       shake();
       return bitmap;
     },

@@ -6,9 +6,9 @@ import { configureStage, installStage, isStageShown } from "./shared/pixel/stage
 import { FRAME_MS, MAX_COLUMNS, MIN_COLUMNS, STAGE_ROWS, TALL_ROWS } from "./sim/constants";
 import type { MonsterKind } from "./sim/types";
 import { createWorld } from "./sim/world";
-import type { World } from "./sim/world";
 
-const LIFETIME_KEY = "lifetimeKills";
+// Versions before 0.4.0 kept a lifetime kill count here; kills now last one session.
+const OLD_LIFETIME_KEY = "lifetimeKills";
 const POLL_MS = 3000;
 
 async function projectRoot($: EngineInterface): Promise<string> {
@@ -21,23 +21,10 @@ async function projectRoot($: EngineInterface): Promise<string> {
   }
 }
 
-// Writes the lifetime count only when it moved since the last write that went through.
-async function saveLifetime(
-  $: EngineInterface,
-  world: World,
-  saved: { lifetime: number },
-): Promise<void> {
-  const lifetime = world.lifetime();
-  if (lifetime === saved.lifetime) return;
-  await $.store.set(LIFETIME_KEY, lifetime);
-  saved.lifetime = lifetime;
-}
-
 export const register: Register = (on) => {
   const world = createWorld();
   let isPolling = false;
   let isWatching = false;
-  const saved = { lifetime: 0 };
 
   function report(): string[] {
     const tally = world.tally();
@@ -46,8 +33,7 @@ export const register: Register = (on) => {
       .join("，");
     return [
       world.summary(),
-      `本次擊倒：${kinds}，BOSS ${world.bossesSlain()}`,
-      `累計擊倒：${world.lifetime()}`,
+      `本次擊倒 ${world.slain()} 隻：${kinds}，BOSS ${world.bossesSlain()}`,
     ];
   }
 
@@ -56,8 +42,18 @@ export const register: Register = (on) => {
     title: "Alien",
     command: {
       name: "alien",
-      description: "顯示或隱藏外星防衛畫面（on、off、stats）",
+      description: "顯示或隱藏外星防衛畫面（on、off、stats、reset）",
       report,
+      actions: {
+        stats: () => {
+          world.showStats();
+          return report();
+        },
+        reset: () => {
+          world.resetCounts();
+          return ["擊倒數已歸零。"];
+        },
+      },
     },
     rows: STAGE_ROWS,
     tallRows: TALL_ROWS,
@@ -76,8 +72,9 @@ export const register: Register = (on) => {
   installStage(on);
 
   on("session.start", async ($, e, next) => {
-    saved.lifetime = Number((await $.store.get(LIFETIME_KEY)) ?? 0);
-    world.restore({ lifetime: saved.lifetime });
+    // Kills count per session, so a new session (a restart or /clear) starts from zero.
+    world.resetCounts();
+    await $.store.delete(OLD_LIFETIME_KEY).catch(() => undefined);
     const top = await projectRoot($);
     const poll = async (): Promise<void> => {
       if (isPolling) return;
@@ -93,7 +90,6 @@ export const register: Register = (on) => {
     if (!isWatching) {
       isWatching = true;
       $.clock.every(POLL_MS, () => {
-        void saveLifetime($, world, saved).catch(() => undefined);
         // A hidden pane catches up on the stage when it shows again.
         if (isStageShown()) void poll();
       });
@@ -115,12 +111,6 @@ export const register: Register = (on) => {
 
   on("turn.complete", async ($, e, next) => {
     world.celebrate();
-    await saveLifetime($, world, saved);
-    return next(e);
-  });
-
-  on("session.end", async ($, e, next) => {
-    await saveLifetime($, world, saved);
     return next(e);
   });
 };
