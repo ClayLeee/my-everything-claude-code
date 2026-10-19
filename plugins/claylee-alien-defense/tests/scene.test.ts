@@ -61,22 +61,30 @@ test("the stats party hangs a UFO over the alien and stands a robot beside it", 
   expect(changedIn(layout.robotX, layout.robotX + 7, floor - 10, floor)).toBeGreaterThan(20);
 });
 
-test("the stats party sparks on each high-five and ends on fireworks", async () => {
+test("the stats party kicks up dust, sparks and holds on each high-five, and ends on fireworks", async () => {
   const world = createWorld();
   world.resize(MAX_COLUMNS, TALL_ROWS);
   world.showStats();
+  let dust = 0;
   let sparks = 0;
   let fireworks = 0;
-  for (let elapsed = 0; elapsed < 6000; elapsed += FRAME_MS) {
+  let held = 0;
+  for (let elapsed = 0; elapsed < 7000; elapsed += FRAME_MS) {
     const seen = new Set(world.effects());
+    const before = world.alien().statsMs;
     world.tick(FRAME_MS);
+    // A held tick leaves the clock where it was.
+    if (before > 0 && world.alien().statsMs === before) held += 1;
     world.effects().forEach((effect) => {
       if (seen.has(effect)) return;
+      if (effect.kind === "dust") dust += 1;
       if (effect.kind === "sparkle") sparks += 1;
       if (effect.kind === "firework") fireworks += 1;
     });
   }
+  expect(dust).toBe(1);
   expect(sparks).toBe(5);
+  expect(held).toBeGreaterThanOrEqual(5);
   expect(fireworks).toBe(2);
 });
 

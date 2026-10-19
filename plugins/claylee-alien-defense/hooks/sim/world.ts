@@ -2,7 +2,7 @@ import { clearBitmap, createBitmap } from "../shared/pixel/bitmap";
 import type { Bitmap } from "../shared/pixel/bitmap";
 import { BOSS_TITLES } from "../art/boss";
 import { MONSTER_NAMES } from "../art/monsters";
-import { EFFECT_LIFE_MS } from "../draw/effects";
+import { EFFECT_LIFE_MS, FIREWORK_REACH } from "../draw/effects";
 import { boardLeft, drawScene, isPresenting, muzzleOf, partyLayout } from "../draw/scene";
 import { blendSky, skyFor } from "../draw/sky";
 import type { SkyStyle } from "../draw/sky";
@@ -390,26 +390,33 @@ export function createWorld(options: { seed?: number } = {}) {
     idleBeat = beat;
   }
 
-  // A spark where the hands meet on each high-five, and two fireworks over the alien at the finale.
+  // Dust as the robot lands; on each high-five a spark where the hands meet and the scene holds
+  // for a beat, like a landed shot; at the finale two fireworks shot off the UFO's rim.
   function partyEffects(): void {
     if (!isPresenting(alien)) return;
     const pose = partyPose(STATS_MS - alien.statsMs);
     const layout = partyLayout(floor);
+    const landing = pose.isLanding ? "landing" : "";
     const slap = pose.isSlap ? `slap:${pose.entry}` : "";
     const finale = pose.isFinale ? "finale" : "";
-    if (slap && !partyBeat.includes(slap)) effects.push({ kind: "sparkle", ...layout.slap, ageMs: 0 });
-    // Only where there is sky over the alien to burst in (the short pane has none), left of the
-    // UFO and clear of the board by a firework's reach.
-    if (finale && !partyBeat.includes(finale) && layout.hoverY >= 0) {
-      const reach = 7;
-      [
-        { x: layout.ufoX - 4, y: layout.hoverY },
-        { x: layout.ufoX - 10, y: layout.hoverY - 2 },
-      ]
-        .filter((spot) => spot.x + reach < boardLeft(columns))
-        .forEach((spot) => effects.push({ kind: "firework", ...spot, ageMs: 0 }));
+    if (landing && !partyBeat.includes(landing))
+      effects.push({ kind: "dust", x: layout.robotX + 3, y: floor - 1, ageMs: 0 });
+    if (slap && !partyBeat.includes(slap)) {
+      effects.push({ kind: "sparkle", ...layout.slap, ageMs: 0 });
+      freezeMs = HIT_STOP_MS;
     }
-    partyBeat = `${slap} ${finale}`;
+    // Only where there is sky over the alien to burst in (the short pane has none), and clear
+    // of the board by a firework's reach. The second goes up a moment after the first.
+    if (finale && !partyBeat.includes(finale) && layout.hoverY >= 0) {
+      const from = { x: layout.ufoX, y: layout.hoverY + 2 };
+      [
+        { x: layout.ufoX - 6, y: layout.hoverY - 1, direction: 1, ageMs: 0 },
+        { x: layout.ufoX - 11, y: layout.hoverY + 1, direction: -1, ageMs: -180 },
+      ]
+        .filter((shot) => shot.x + FIREWORK_REACH + 1 < boardLeft(columns))
+        .forEach((shot) => effects.push({ kind: "firework", from, ...shot }));
+    }
+    partyBeat = `${landing} ${slap} ${finale}`;
   }
 
   function advanceAlien(dtMs: number): void {

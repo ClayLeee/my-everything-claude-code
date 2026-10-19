@@ -83,7 +83,8 @@ export type EffectKind =
   | "distant"
   | "portal"
   | "combo"
-  | "firework";
+  | "firework"
+  | "dust";
 
 export type Effect = {
   kind: EffectKind;
@@ -93,6 +94,8 @@ export type Effect = {
   direction?: number;
   // The combo count a `combo` effect shows.
   value?: number;
+  // Where a `firework` launches from; it bursts at (x, y).
+  from?: { x: number; y: number };
 };
 
 export type Tally = Record<MonsterKind, number>;

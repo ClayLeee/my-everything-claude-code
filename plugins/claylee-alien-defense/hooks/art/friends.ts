@@ -46,11 +46,30 @@ const ROBOT_HIGH_FIVE_ROWS = [
   ".oo.oo.",
 ];
 
-// Head and three eyes poking out of the hatch; the rest of it stays inside.
-export const FURBALL_ROWS = [".f.F.f.", "fFfffFf", "fwfwfwf", "fkfkfkf"];
+// The arm cocked back by the head before the slap.
+const ROBOT_WINDUP_ROWS = [
+  "...r...",
+  "...o...",
+  ".ooooo.",
+  "LoSSSo.",
+  "SoeSeo.",
+  "SoSmSo.",
+  "S.ooo..",
+  "SoBcBoS",
+  ".oBBBoS",
+  ".oo.oo.",
+];
+
+// Squashed on take-off and landing: the neck (row 6) folds away.
+const crouched = (rows: readonly string[]): string[] => rows.filter((_, row) => row !== 6);
+
+// Head and three eyes poking out of the top hatch; the rest of it stays inside.
+export const FURBALL_ROWS = [".f.fFf.f.", "fFfffffFf", "ffwfwfwff", "ffkfkfkff"];
+export const FURBALL_BLINK_ROWS = [".f.fFf.f.", "fFfffffFf", "fffffffff", "ffFfFfFff"];
+export const FURBALL_WIDTH = 9;
 
 // Bigger than the UFO that crosses the sky, with a top hatch for the furball and a belly
-// hatch (`h`) that lights up while the beam runs. `L` cells are rim lights the scene recolors.
+// hatch (`h`) the scene opens from the middle out. `L` cells are rim lights it recolors.
 export const PARTY_UFO_ROWS = [
   "...ddddddd...",
   "..dGGGGGGGd..",
@@ -68,5 +87,7 @@ const parse = (rows: readonly string[]): Bitmap => parsePixelMap({ rows, palette
 
 export const ROBOT = {
   idle: parse(ROBOT_ROWS),
+  crouch: parse(crouched(ROBOT_ROWS)),
+  windup: parse(crouched(ROBOT_WINDUP_ROWS)),
   highFive: parse(ROBOT_HIGH_FIVE_ROWS),
 };

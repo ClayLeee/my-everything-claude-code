@@ -21,7 +21,13 @@ test("every pose variant differs from the frame it was cut from", () => {
   expect(sameBitmap(ALIEN.sleep, ALIEN.sleepAway)).toBe(false);
   expect(sameBitmap(ALIEN.sleepBreath, ALIEN.sleepAwayBreath)).toBe(false);
   expect(sameBitmap(ALIEN.cheer, ALIEN.cheerWave)).toBe(false);
+  expect(sameBitmap(ALIEN.cheer, ALIEN.cheerUp)).toBe(false);
+  expect(sameBitmap(ALIEN.cheerWave, ALIEN.cheerWaveUp)).toBe(false);
+  expect(sameBitmap(ALIEN.highFive, ALIEN.windup)).toBe(false);
+  expect(ALIEN.cheerCrouch.height).toBe(ALIEN.cheer.height - 1);
   expect(sameBitmap(ROBOT.idle, ROBOT.highFive)).toBe(false);
+  expect(sameBitmap(ROBOT.crouch, ROBOT.windup)).toBe(false);
+  expect(ROBOT.crouch.height).toBe(ROBOT.idle.height - 1);
 });
 
 test("the stats party lands the robot before the first line and high-fives on every line", () => {
@@ -37,13 +43,43 @@ test("the stats party lands the robot before the first line and high-fives on ev
   const finale = poses.filter((pose) => pose.isFinale);
   expect(finale.length).toBeGreaterThan(0);
   expect(finale.every((pose) => pose.entry === 4)).toBe(true);
-  expect(partyPose(STATS_TOTAL_MS + 4 * STATS_ENTRY_MS).isFinale).toBe(true);
+  expect(partyPose(STATS_TOTAL_MS + 4 * STATS_ENTRY_MS + 200).isFinale).toBe(true);
   // The UFO comes down, takes the robot back and is gone as the board fades.
   expect(partyPose(0).ufo).toBe(0);
   const last = partyPose(STATS_MS - 1);
   expect(last.robot).toBeUndefined();
   expect(last.ufo).toBeLessThan(0.1);
-  expect(poses.some((pose) => pose.phase === "lift" && pose.isBeamOn)).toBe(true);
+  expect(poses.some((pose) => pose.phase === "lift" && pose.beam > 0)).toBe(true);
+});
+
+test("each party move comes in beats: hatch, beam, drop; windup, slap, recoil; crouch, air, land", () => {
+  const poses = sample(partyPose, STATS_MS, 10);
+  const firstAt = (match: (pose: ReturnType<typeof partyPose>) => boolean): number =>
+    poses.findIndex(match);
+  // The hatch opens before the beam reaches out, and the beam is down before the robot leaves.
+  expect(firstAt((pose) => pose.hatch > 0)).toBeLessThan(firstAt((pose) => pose.beam > 0));
+  expect(firstAt((pose) => pose.beam === 1)).toBeLessThanOrEqual(
+    firstAt((pose) => pose.robot !== undefined),
+  );
+  expect(poses.some((pose) => pose.phase === "beam" && pose.robotSway !== 0)).toBe(true);
+  expect(poses.some((pose) => pose.isLanding && pose.robotHop.isCrouched)).toBe(true);
+  // Every line runs windup, slap, recoil in that order, the alien crouched on the windup.
+  const order = poses.map((pose) => pose.five).filter((five, index, all) => five && five !== all[index - 1]);
+  expect(order.join(",")).toBe(Array(5).fill("windup,slap,recoil").join(","));
+  expect(poses.filter((pose) => pose.five === "windup").every((pose) => pose.alien.isCrouched)).toBe(true);
+  // Hops start and end in a crouch, and the two take turns rather than jump together.
+  const party = poses.filter((pose) => pose.phase === "party" && !pose.five && !pose.isFinale);
+  expect(party.some((pose) => pose.alien.isCrouched)).toBe(true);
+  expect(party.some((pose) => pose.alien.lift > 0 && pose.robotHop.lift === 0)).toBe(true);
+  expect(party.some((pose) => pose.robotHop.lift > 0 && pose.alien.lift === 0)).toBe(true);
+  // At the finale they jump together, higher than any hop.
+  const hopHeight = Math.max(...party.map((pose) => pose.alien.lift));
+  const finale = poses.filter((pose) => pose.isFinale && pose.alien.lift > 0);
+  expect(finale.every((pose) => pose.robotHop.lift === pose.alien.lift)).toBe(true);
+  expect(Math.max(...finale.map((pose) => pose.alien.lift))).toBeGreaterThan(hopHeight);
+  // The alien watches the UFO come in, then stops looking up once the robot is down.
+  expect(partyPose(300).isLookingUp).toBe(true);
+  expect(partyPose(STATS_TOTAL_MS).isLookingUp).toBe(false);
 });
 
 test("a lift grinds up slower than it comes down and rests after a set", () => {
