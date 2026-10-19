@@ -9,7 +9,7 @@
       "name": "claylee-core",
       "source": "./plugins/claylee-core",
       "description": "Behavioral contract rule + a Stop hook that flags console.log in git-changed files + a push-guard mod for projects with .claude/push-checks.json",
-      "version": "0.2.2"
+      "version": "0.2.3"
     },
     {
       "name": "claylee-e2e-testing",
@@ -33,7 +33,19 @@
       "name": "claylee-alien-defense",
       "source": "./plugins/claylee-alien-defense",
       "description": "Pixel-art pane mod: an alien lasers down the creatures each tool call brings; in OpenSpec projects the sky follows the change's stage from dawn to night and a boss appears at each stage change. Toggle with /alien.",
-      "version": "0.2.5"
+      "version": "0.2.6"
+    },
+    {
+      "name": "cicd-watch",
+      "source": "./plugins/cicd-watch",
+      "description": "Pane mod: watch GitLab projects' latest commit and pipeline progress live. /cicd add <project> to start; the GitLab host is yours to set.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "prompt-nav",
+      "source": "./plugins/prompt-nav",
+      "description": "Pane mod: search and jump to the prompts you sent, including ones sent while Claude was working, plus a band naming the prompt the transcript is at. Toggle with /prompts.",
+      "version": "0.1.0"
     }
   ]
 }

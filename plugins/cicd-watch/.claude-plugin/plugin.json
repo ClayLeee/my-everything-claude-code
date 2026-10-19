@@ -1,0 +1,30 @@
+{
+  "name": "cicd-watch",
+  "version": "0.1.0",
+  "description": "Watch GitLab projects: latest commit and pipeline progress, live in a pane",
+  "author": {
+    "name": "ClayLeee",
+    "url": "https://github.com/ClayLeee"
+  },
+  "repository": "https://github.com/ClayLeee/my-everything-claude-code",
+  "license": "MIT",
+  "keywords": [
+    "mod",
+    "gitlab",
+    "ci-cd"
+  ],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "defaultHost": {
+      "type": "string",
+      "title": "Default GitLab host",
+      "description": "Host used when a project is given as group/project; leave empty to always give the host or a URL"
+    },
+    "pollSeconds": {
+      "type": "number",
+      "title": "Poll interval (seconds)",
+      "description": "How often each watched project is checked",
+      "default": 20
+    }
+  }
+}

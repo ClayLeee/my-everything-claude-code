@@ -4,7 +4,7 @@ Personal Claude Code plugin — shared hooks, skills, commands, and agents for a
 
 ## Install
 
-This repo is a **Claude Code marketplace** with 5 plugins. Install only the ones you need.
+This repo is a **Claude Code marketplace** with 7 plugins. Install only the ones you need.
 
 ```bash
 # Add marketplace
@@ -16,6 +16,8 @@ This repo is a **Claude Code marketplace** with 5 plugins. Install only the ones
 /plugin install claylee-code-quality-agents@ClayLeee-my-everything-claude-code
 /plugin install claylee-openspec@ClayLeee-my-everything-claude-code
 /plugin install claylee-alien-defense@ClayLeee-my-everything-claude-code
+/plugin install cicd-watch@ClayLeee-my-everything-claude-code
+/plugin install prompt-nav@ClayLeee-my-everything-claude-code
 ```
 
 ## Plugins
@@ -27,12 +29,14 @@ This repo is a **Claude Code marketplace** with 5 plugins. Install only the ones
 | **claylee-code-quality-agents** | 4 sub-agents (code-review, build-error-resolver, security-reviewer, refactor-cleaner) | Want specialist agents for code review/cleanup |
 | **claylee-openspec** | OpenSpec workflow injection (conditional — only fires when project has `openspec/` dir or `.claude/openspec-enabled` marker) + `retro-doc-sync` skill | Working with OpenSpec-style projects |
 | **claylee-alien-defense** | Pixel-art pane: an alien lasers down a creature per tool call; in OpenSpec projects the sky runs dawn → night with the change's stage and a boss appears at each stage change. `/alien` toggles it | Want a game to watch while Claude works |
+| **cicd-watch** | Pane: the latest commit and pipeline progress of the GitLab projects you add with `/cicd add`. No default host: set `defaultHost` in the plugin's options, or give each project as a URL | Want to watch CI without leaving Claude Code |
+| **prompt-nav** | Pane to search and jump to the prompts you sent (ones sent while Claude was working too), and a band naming the prompt the transcript is at. `/prompts` toggles it | Long sessions where you scroll back to earlier asks |
 
 ## Structure
 
 ```
 .claude-plugin/
-└── marketplace.json              # Lists all 4 plugins
+└── marketplace.json              # Lists all 7 plugins
 plugins/
 ├── claylee-core/
 │   ├── .claude-plugin/plugin.json
@@ -53,10 +57,20 @@ plugins/
 │   ├── config/                   # OpenSpec workflow docs
 │   ├── scripts/hooks/            # 2 OpenSpec hooks
 │   └── skills/retro-doc-sync/    # backfill specs/docs/tests for merged code
-└── claylee-alien-defense/
+├── claylee-alien-defense/
+│   ├── .claude-plugin/plugin.json
+│   ├── hooks/                    # register.tsx, sim/, draw/, art/, shared/ (pixel engine, MIT)
+│   └── tests/                    # claude plugin test
+├── cicd-watch/
+│   ├── .claude-plugin/plugin.json  # userConfig: defaultHost, pollSeconds
+│   ├── hooks/                    # register.tsx, gitlab.ts
+│   ├── types/                    # $.state contract
+│   └── tests/
+└── prompt-nav/
     ├── .claude-plugin/plugin.json
-    ├── hooks/                    # register.tsx, sim/, draw/, art/, shared/ (pixel engine, MIT)
-    └── tests/                    # claude plugin test
+    ├── hooks/                    # register.tsx, prompts.ts, transcript.py
+    ├── types/                    # $.state contract
+    └── tests/
 ```
 
 ## Development Workflow

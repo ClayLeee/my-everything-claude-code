@@ -38,9 +38,15 @@ async function passedOf($: $, top: string): Promise<Passed> {
   return ((await $.store.get(storeKey(top))) as Passed | undefined) ?? {};
 }
 
-function ranChecks(command: string, checks: string[]): string[] {
-  if (/[|;]/.test(command)) return [];
-  const parts = command.split("&&").map((part) => part.trim().replace(/\s+/g, " "));
+// A check counts as a whole && part, or (where pipefail can be set) as the first stage of a pipe.
+function ranChecks(command: string, checks: string[], pipes: boolean): string[] {
+  if (/;|\|\|/.test(command) || (!pipes && command.includes("|"))) return [];
+  const parts = command.split("&&").map((part) =>
+    (part.split("|")[0] ?? "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/ 2>&1$/, ""),
+  );
   return checks.filter((check) => parts.includes(check));
 }
 
@@ -71,7 +77,8 @@ async function missingFor($: $, top: string, checks: string[]): Promise<string[]
 async function guard<R extends ToolCallResult<string>>(
   $: $,
   command: string,
-  run: () => Promise<R>,
+  pipes: boolean,
+  run: (command: string) => Promise<R>,
 ): Promise<R | Denied> {
   const push = PUSH.exec(command);
 
@@ -86,27 +93,27 @@ async function guard<R extends ToolCallResult<string>>(
           deny: [
             `push-guard：${CONFIG} 規定這些檢查要在這次 push 的內容上通過：`,
             ...missing.map((check) => `  - ${check}`),
-            "執行 /push-checks run，或把每項檢查單獨執行（可以用 && 串接，不能用 pipe 或 ;），再重新 push。",
+            "執行 /push-checks run，或把每項檢查單獨執行（可以用 && 串接；Bash 可以接 pipe，PowerShell 不行；不能用 || 或 ;），再重新 push。",
           ].join("\n"),
         };
       }
     }
-    return run();
+    return run(command);
   }
-
-  const ran = await run();
-  if (ran.deny !== undefined || ran.isError === true) return ran;
-  const result = ran.result as { interrupted?: boolean; backgroundTaskId?: string } | undefined;
-  if (result?.interrupted || result?.backgroundTaskId) return ran;
 
   const top = await git($, await dirOf($, command, command.length), [
     "rev-parse",
     "--show-toplevel",
   ]);
   const checks = top ? await checksOf($, top) : null;
-  if (!top || !checks) return ran;
-  const done = ranChecks(command, checks);
-  if (done.length === 0) return ran;
+  const done = top && checks ? ranChecks(command, checks, pipes) : [];
+  // Without pipefail a piped check exits with the last stage's status, not its own.
+  const piped = done.length > 0 && command.includes("|");
+  const ran = await run(piped ? `set -o pipefail; ${command}` : command);
+  if (!top || done.length === 0) return ran;
+  if (ran.deny !== undefined || ran.isError === true) return ran;
+  const result = ran.result as { interrupted?: boolean; backgroundTaskId?: string } | undefined;
+  if (result?.interrupted || result?.backgroundTaskId) return ran;
 
   const tree = await workTree($, top);
   if (tree) {
@@ -207,11 +214,15 @@ async function statusText($: $, top: string, checks: string[]): Promise<string> 
 const failed: Denied = { deny: "push-guard：檢查程式本身出錯，這次 push 沒有放行。" };
 
 export const register: Register = (on) => {
-  on("tool.call", { tool: "Bash" }, ($, e, next) => guard($, e.command, () => next(e))).catch(
+  on("tool.call", { tool: "Bash" }, ($, e, next) =>
+    guard($, e.command, true, (command) => next({ ...e, command })),
+  ).catch(
     ($, e, next) => (next.called ? next(e) : failed),
   );
 
-  on("tool.call", { tool: "PowerShell" }, ($, e, next) => guard($, e.command, () => next(e))).catch(
+  on("tool.call", { tool: "PowerShell" }, ($, e, next) =>
+    guard($, e.command, false, (command) => next({ ...e, command })),
+  ).catch(
     ($, e, next) => (next.called ? next(e) : failed),
   );
 
