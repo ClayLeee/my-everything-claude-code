@@ -39,7 +39,7 @@
       "name": "cicd-watch",
       "source": "./plugins/cicd-watch",
       "description": "Pane mod: watch GitLab projects' latest commit and pipeline progress live, with a watch list per workspace. /cicd add <project URL> to start.",
-      "version": "0.2.0"
+      "version": "0.2.1"
     },
     {
       "name": "prompt-nav",
