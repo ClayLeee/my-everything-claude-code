@@ -426,6 +426,12 @@ function drawFlyer(bitmap: Bitmap, flyer: Flyer): void {
   );
 }
 
+// The stats board's left rim: clear of the robot and the UFO beside the alien, where the pane
+// is wide enough. The party keeps its confetti and fireworks left of it.
+export function boardLeft(width: number): number {
+  return Math.min(HOME_X + 25, width - 30);
+}
+
 // The stats party plays while the alien is free to present the board.
 export function isPresenting(alien: Alien): boolean {
   return (
@@ -466,14 +472,18 @@ function drawTractorBeam(bitmap: Bitmap, centerX: number, top: number, floor: nu
   }
 }
 
-// Tossed up out of the hatch to either side, then falling to the ground.
+// Tossed up out of the hatch to either side, then falling to the ground; a piece that would
+// land on the board drops out of sight behind its rim.
 function drawConfetti(bitmap: Bitmap, ms: number, x: number, y: number, floor: number): void {
+  const edge = boardLeft(bitmap.width) - 1;
   for (let piece = 0; piece < 6; piece += 1) {
     const t = ((ms + piece * 230) % 1400) / 1400;
     const side = piece % 2 === 0 ? -1 : 1;
+    const pieceX = Math.round(x + side * (2 + t * 8 + (piece % 3)));
+    if (pieceX >= edge) continue;
     setPixel({
       bitmap,
-      x: x + side * (2 + t * 8 + (piece % 3)),
+      x: pieceX,
       y: y - 3 * Math.sin(t * Math.PI) + t * t * (floor - y),
       color: CONFETTI[piece % CONFETTI.length] ?? WHITE,
     });
@@ -576,8 +586,7 @@ function drawStats(
 ): void {
   if (alien.statsMs <= 0) return;
   const elapsed = STATS_MS - alien.statsMs;
-  // Clear of the robot and the UFO beside the alien, where the pane is wide enough.
-  const left = Math.min(HOME_X + 25, bitmap.width - 30);
+  const left = boardLeft(bitmap.width);
   const right = bitmap.width - 2;
   const top = 1;
   const bottom = floor - 2;

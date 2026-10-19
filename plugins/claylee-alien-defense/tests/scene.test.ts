@@ -1,6 +1,6 @@
 import { expect, test } from "claude-code/testing";
 
-import { partyLayout } from "../hooks/draw/scene";
+import { boardLeft, partyLayout } from "../hooks/draw/scene";
 import { FRAME_MS, floorOf, MAX_COLUMNS, STAGE_ROWS, TALL_ROWS } from "../hooks/sim/constants";
 import type { Mode } from "../hooks/sim/types";
 import { createWorld } from "../hooks/sim/world";
@@ -78,6 +78,29 @@ test("the stats party sparks on each high-five and ends on fireworks", async () 
   }
   expect(sparks).toBe(5);
   expect(fireworks).toBe(2);
+});
+
+// Inside its rim the board is a dark panel; confetti or a firework there would be bright.
+test("the stats party keeps its confetti and fireworks off the board", async () => {
+  const world = createWorld();
+  world.resize(MAX_COLUMNS, TALL_ROWS);
+  world.showStats();
+  const floor = floorOf(TALL_ROWS * 2);
+  const left = boardLeft(MAX_COLUMNS);
+  let brightest = 0;
+  for (let elapsed = 0; elapsed < 5600; elapsed += FRAME_MS) {
+    world.tick(FRAME_MS);
+    if (elapsed < 300) continue;
+    const { pixels, width } = world.frame();
+    for (let y = 2; y < floor - 3; y += 1) {
+      // The strip inside the left rim, short of the counts in the middle.
+      for (let x = left + 1; x < left + 9; x += 1) {
+        const color = pixels[y * width + x] ?? 0;
+        brightest = Math.max(brightest, (color >> 16) & 255, (color >> 8) & 255, color & 255);
+      }
+    }
+  }
+  expect(brightest).toBeLessThan(0x80);
 });
 
 test("a creature on the field is drawn where it stands", async () => {
