@@ -118,6 +118,10 @@ const SLEEP_BREATH_ROWS = replaceRows({
     ".oLGGGGo....oooooooo..": ".oLGGGGo...oqqqqqqqo..",
   },
 });
+
+// Rolled over in the bag: the back of the head, no face and no bubble.
+const facingAway = (rows: readonly string[]): string[] =>
+  replaceRows({ rows, replacements: { "oLGooGooGo.oqqYqqqqqo.": "oLGGGGGGDo.oqqYqqqqqo." } });
 const LIFT_UP_ROWS = [
   "PP...........PP",
   "PpBBBBBBBBBBBpP",
@@ -151,6 +155,101 @@ const LIFT_DOWN_ROWS = [
   "..os......so...",
   ".obb......bbo..",
 ];
+// The bar bends under the plates for a beat when it locks out.
+const LIFT_BOUNCE_ROWS = [
+  "...............",
+  "PP.BBBBBBBBB.PP",
+  "PpBGs.....sGBpP",
+  "PP.os.....so.PP",
+  ...LIFT_UP_ROWS.slice(4),
+];
+
+// Halfway up the bar passes the brow, elbows out.
+const LIFT_PRESS_ROWS = [
+  "...............",
+  "...............",
+  ".......a.......",
+  ".......A.......",
+  "PP.ooooooooo.PP",
+  "PpBBBBBBBBBBBpP",
+  "PPGoGwwGwwGoGPP",
+  "..GoGwkGwkGoG..",
+  "..GoDGGGGGDoG..",
+  "...soDDDDDos...",
+  ...LIFT_UP_ROWS.slice(10),
+];
+
+const LIFT_STRAIN_ROWS = replaceRows({
+  rows: LIFT_PRESS_ROWS,
+  replacements: {
+    "PPGoGwwGwwGoGPP": "PPGoGGGGGGGoGPP",
+    "..GoGwkGwkGoG..": "..GoGooGooGoG..",
+    "..GoDGGGGGDoG..": "..GoDGwwwGDoG..",
+  },
+});
+
+// Standing with the arms hanging and no gun, for the breaths between flex poses.
+const STAND_BARE_ROWS = [
+  ".......a.......",
+  ".......A.......",
+  ".....ooooo.....",
+  "....oLLGGGo....",
+  "...oLGGGGGGo...",
+  "...oGwwGwwGo...",
+  "...oGwkGwkGo...",
+  "...oDGGGGGDo...",
+  "....oDDDDDo....",
+  "...GoTTSSoG....",
+  "...GoTSSSoG....",
+  "...GosSSsoG....",
+  "....os.os......",
+  "...obb.obb.....",
+];
+
+// The bar set down in front between sets, mouth open while catching breath.
+const LIFT_REST_ROWS = [
+  ...STAND_BARE_ROWS.slice(0, 11),
+  "PP.GosSSsoG..PP",
+  "PpBBBBBBBBBBBpP",
+  "PP.obb.obb...PP",
+];
+
+const LIFT_PANT_ROWS = replaceRows({
+  rows: LIFT_REST_ROWS,
+  replacements: { "...oDGGGGGDo...": "...oDGGoGGDo..." },
+});
+
+// Front double biceps: both fists up, head between them.
+const FLEX_FRONT_ROWS = [
+  ".........a.........",
+  ".........A.........",
+  "ooo....ooooo....ooo",
+  "oGLo..oLLGGGo..oLGo",
+  "oGGo.oLGGGGGGo.oGGo",
+  "oGGo.oGwwGwwGo.oGGo",
+  "oGGo.oGwkGwkGo.oGGo",
+  "oGGo.oDGGGGGDo.oGGo",
+  "oGGGGGoDDDDDoGGGGGo",
+  ".ooooooTTSSSoooooo.",
+  "......oTSSSSo......",
+  "......osSSso.......",
+  "......os.os........",
+  ".....obb.obb.......",
+];
+
+// Under tension the biceps peak catches the light, eyes squeeze and the alien grins.
+const FLEX_FRONT_PUMP_ROWS = replaceRows({
+  rows: FLEX_FRONT_ROWS,
+  replacements: {
+    "oGGo.oLGGGGGGo.oGGo": "oLLo.oLGGGGGGo.oLLo",
+    "oGGo.oGwwGwwGo.oGGo": "oGLo.oGGGGGGGo.oLGo",
+    "oGGo.oGwkGwkGo.oGGo": "oLGo.oGooGooGo.oGLo",
+    "oGGo.oDGGGGGDo.oGGo": "oGGo.oDGwwwGDo.oGGo",
+  },
+});
+
+export const FLEX_FRONT_SHIFT_X = -2;
+
 // The sleeping bag left on the ground after the alien jumps out of it.
 const BAG_ROWS = ["..ooooooooo..", ".oqqqqYqqqqo.", "oQQQQQYQQQQQo"];
 
@@ -175,7 +274,17 @@ export const ALIEN = {
   flexLeftPump: parse(mirror(FLEX_RIGHT_LUNGE_ROWS)),
   sleep: parse(SLEEP_ROWS),
   sleepBreath: parse(SLEEP_BREATH_ROWS),
+  sleepAway: parse(facingAway(SLEEP_ROWS)),
+  sleepAwayBreath: parse(facingAway(SLEEP_BREATH_ROWS)),
   liftUp: parse(LIFT_UP_ROWS),
   liftDown: parse(LIFT_DOWN_ROWS),
+  liftBounce: parse(LIFT_BOUNCE_ROWS),
+  liftPress: parse(LIFT_PRESS_ROWS),
+  liftStrain: parse(LIFT_STRAIN_ROWS),
+  liftRest: parse(LIFT_REST_ROWS),
+  liftPant: parse(LIFT_PANT_ROWS),
+  standBare: parse(STAND_BARE_ROWS),
+  flexFront: parse(FLEX_FRONT_ROWS),
+  flexFrontPump: parse(FLEX_FRONT_PUMP_ROWS),
   bag: parse(BAG_ROWS),
 };

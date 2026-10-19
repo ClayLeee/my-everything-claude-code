@@ -7,6 +7,7 @@ import { drawScene, muzzleOf } from "../draw/scene";
 import { blendSky, skyFor } from "../draw/sky";
 import type { SkyStyle } from "../draw/sky";
 import { phaseRank } from "../openspec";
+import { flexPose, liftPose, sleepPose } from "./routines";
 import {
   AIM_MS,
   BAG_MS,
@@ -38,9 +39,6 @@ import {
   IMPACT_PROGRESS,
   KNOCKBACK_MS,
   KNOCKBACK_PIXELS,
-  FLEX_SIDE_MS,
-  FLEX_RELAX_MS,
-  LIFT_CYCLE_MS,
   LOG_LIMIT,
   LONG_CALL_MS,
   MAX_ALIVE_MONSTERS,
@@ -155,10 +153,8 @@ export function createWorld(options: { seed?: number } = {}) {
   let shakeMs = 0;
   let nextId = 1;
   let readyIdleMs = 0;
-  let idleBeatMs = 0;
-  let wasLiftUp = false;
-  let lifts = 0;
-  let wasPumped = false;
+  // The idle routine's last keyframe, so effects fire once as a new one starts.
+  let idleBeat = "";
   let mode: Mode = { kind: "free" };
   let hasMode = false;
   let sky: SkyStyle = skyFor(mode);
@@ -200,7 +196,7 @@ export function createWorld(options: { seed?: number } = {}) {
     alien.activity = choices[Math.floor(random() * choices.length)] ?? ACTIVITIES[0];
     alien.activityMs = 0;
     alien.activityLengthMs = IDLE_MIN_MS + random() * (IDLE_MAX_MS - IDLE_MIN_MS);
-    idleBeatMs = 0;
+    idleBeat = "";
     note(`外星人${ACTIVITY_LINES[alien.activity]}`);
   }
 
@@ -316,39 +312,45 @@ export function createWorld(options: { seed?: number } = {}) {
     );
   }
 
-  function idleEffects(dtMs: number): void {
-    idleBeatMs += dtMs;
+  function sweat(isLeft: boolean, y: number): void {
+    effects.push({
+      kind: "sweat",
+      x: HOME_X + (isLeft ? 4 : 11),
+      y,
+      ageMs: 0,
+      direction: isLeft ? -1 : 1,
+    });
+  }
+
+  // Effects land on keyframe edges of the shared routine timelines.
+  function idleEffects(): void {
     if (alien.activity === "sleep") {
-      if (idleBeatMs >= 1200) {
-        idleBeatMs = 0;
+      const pose = sleepPose(alien.activityMs);
+      const beat = `${pose.breath}:${pose.isExhaling}`;
+      if (beat !== idleBeat && pose.isExhaling)
         effects.push({ kind: "zee", x: HOME_X + 4, y: floor - 10, ageMs: 0 });
-      }
-      if (!effects.some((effect) => effect.kind === "bubble"))
-        effects.push({ kind: "bubble", x: HOME_X + 9, y: floor - 5, ageMs: 0 });
+      idleBeat = beat;
       return;
     }
     if (alien.activity === "workout") {
-      const isUp = alien.activityMs % LIFT_CYCLE_MS >= LIFT_CYCLE_MS / 2;
-      if (isUp && !wasLiftUp) {
-        lifts += 1;
-        const isLeft = lifts % 2 === 1;
-        effects.push({
-          kind: "sweat",
-          x: HOME_X + (isLeft ? 4 : 11),
-          y: floor - 10,
-          ageMs: 0,
-          direction: isLeft ? -1 : 1,
-        });
+      const pose = liftPose(alien.activityMs);
+      const beat = `${pose.rep}:${pose.phase}`;
+      if (beat !== idleBeat && pose.phase === "bounce") sweat(pose.rep % 2 === 0, floor - 10);
+      if (beat !== idleBeat && pose.phase === "rest") {
+        sweat(true, floor - 9);
+        sweat(false, floor - 9);
       }
-      wasLiftUp = isUp;
+      idleBeat = beat;
       return;
     }
-    const isPumped = alien.activityMs % FLEX_SIDE_MS >= FLEX_RELAX_MS;
-    if (isPumped && !wasPumped) {
-      const isRight = Math.floor(alien.activityMs / FLEX_SIDE_MS) % 2 === 0;
-      effects.push({ kind: "sparkle", x: HOME_X + (isRight ? 12 : 1), y: floor - 11, ageMs: 0 });
+    const pose = flexPose(alien.activityMs);
+    const beat = `${pose.pose}:${pose.phase}`;
+    if (beat !== idleBeat && pose.phase === "hit") {
+      const spots =
+        pose.shot === "front" ? [HOME_X - 1, HOME_X + 14] : [HOME_X + (pose.shot === "right" ? 12 : 1)];
+      spots.forEach((x) => effects.push({ kind: "sparkle", x, y: floor - 11, ageMs: 0 }));
     }
-    wasPumped = isPumped;
+    idleBeat = beat;
   }
 
   function advanceAlien(dtMs: number): void {
@@ -362,7 +364,7 @@ export function createWorld(options: { seed?: number } = {}) {
     if (alien.mode === "idle") {
       if (hasThreat()) {
         if (alien.activity === "sleep") alien.bagMs = BAG_MS;
-        effects = effects.filter((effect) => effect.kind !== "bubble" && effect.kind !== "zee");
+        effects = effects.filter((effect) => effect.kind !== "zee");
         const onlyBoss =
           boss !== undefined && !monsters.some((monster) => monster.phase === "alive");
         note(onlyBoss ? "BOSS 來襲，外星人起身迎戰" : "異形來襲，外星人起身迎戰");
@@ -377,7 +379,7 @@ export function createWorld(options: { seed?: number } = {}) {
       // Showing off the stats board holds the idle routine.
       if (alien.statsMs > 0) return;
       alien.activityMs += dtMs;
-      idleEffects(dtMs);
+      idleEffects();
       if (alien.activityMs >= alien.activityLengthMs) nextActivity();
       return;
     }
@@ -608,7 +610,7 @@ export function createWorld(options: { seed?: number } = {}) {
     // `/alien stats`: the alien shows off a board that counts up the kills.
     showStats(): void {
       alien.statsMs = STATS_MS;
-      effects = effects.filter((effect) => effect.kind !== "bubble" && effect.kind !== "zee");
+      effects = effects.filter((effect) => effect.kind !== "zee");
     },
 
     slain: (): number => slain,

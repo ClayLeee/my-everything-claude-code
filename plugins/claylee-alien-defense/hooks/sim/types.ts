@@ -75,7 +75,6 @@ export type EffectKind =
   | "sparkle"
   | "sweat"
   | "zee"
-  | "bubble"
   | "debris"
   | "smoke"
   | "splash"
