@@ -332,7 +332,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         {list.length === 0 && (
           <Text color={DIM} wrap="wrap">
-            NO SIGNAL · /cicd add &lt;project&gt;
+            NO SIGNAL · /cicd add &lt;url&gt;
           </Text>
         )}
         {list.map((p) => {
