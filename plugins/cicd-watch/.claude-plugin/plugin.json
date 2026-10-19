@@ -1,6 +1,6 @@
 {
   "name": "cicd-watch",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Watch GitLab projects: latest commit and pipeline progress, live in a pane",
   "author": {
     "name": "ClayLeee",
@@ -15,11 +15,6 @@
   ],
   "types": "./types/index.d.ts",
   "userConfig": {
-    "defaultHost": {
-      "type": "string",
-      "title": "Default GitLab host",
-      "description": "Host used when a project is given as group/project; leave empty to always give the host or a URL"
-    },
     "pollSeconds": {
       "type": "number",
       "title": "Poll interval (seconds)",

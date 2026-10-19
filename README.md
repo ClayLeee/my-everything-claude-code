@@ -29,7 +29,7 @@ This repo is a **Claude Code marketplace** with 7 plugins. Install only the ones
 | **claylee-code-quality-agents** | 4 sub-agents (code-review, build-error-resolver, security-reviewer, refactor-cleaner) | Want specialist agents for code review/cleanup |
 | **claylee-openspec** | OpenSpec workflow injection (conditional — only fires when project has `openspec/` dir or `.claude/openspec-enabled` marker) + `retro-doc-sync` skill | Working with OpenSpec-style projects |
 | **claylee-alien-defense** | Pixel-art pane: an alien lasers down a creature per tool call; in OpenSpec projects the sky runs dawn → night with the change's stage and a boss appears at each stage change. `/alien` toggles it | Want a game to watch while Claude works |
-| **cicd-watch** | Pane: the latest commit and pipeline progress of the GitLab projects you add with `/cicd add`. No default host: set `defaultHost` in the plugin's options, or give each project as a URL | Want to watch CI without leaving Claude Code |
+| **cicd-watch** | Pane: the latest commit and pipeline progress of the GitLab projects you add with `/cicd add`. Give each project as its full URL (`https://host/group/project`, optional `@branch`) | Want to watch CI without leaving Claude Code |
 | **prompt-nav** | Pane to search and jump to the prompts you sent (ones sent while Claude was working too), and a band naming the prompt the transcript is at. `/prompts` toggles it | Long sessions where you scroll back to earlier asks |
 
 ## Structure
@@ -62,7 +62,7 @@ plugins/
 │   ├── hooks/                    # register.tsx, sim/, draw/, art/, shared/ (pixel engine, MIT)
 │   └── tests/                    # claude plugin test
 ├── cicd-watch/
-│   ├── .claude-plugin/plugin.json  # userConfig: defaultHost, pollSeconds
+│   ├── .claude-plugin/plugin.json  # userConfig: pollSeconds
 │   ├── hooks/                    # register.tsx, gitlab.ts
 │   ├── types/                    # $.state contract
 │   └── tests/

@@ -46,7 +46,6 @@ const SPIN_MS = 250;
 
 type $ = EngineInterface;
 
-let defaultHost = "";
 let pollMs = 20000;
 const tokens = new Map<string, string | null>();
 let polling = false;
@@ -235,11 +234,9 @@ async function save($: $, list: WatchedProject[]) {
 }
 
 async function add($: $, input: string): Promise<string> {
-  const p = parseTarget(input, defaultHost);
+  const p = parseTarget(input);
   if (!p)
-    return defaultHost
-      ? `看不懂「${input}」：請輸入 group/project、host/group/project 或專案 URL，可加 @branch`
-      : `看不懂「${input}」：還沒設定預設 GitLab host，請輸入 host/group/project 或專案 URL，可加 @branch`;
+    return `看不懂「${input}」：請輸入完整專案 URL（https://host/group/project），可加 @branch`;
   const list = await read($, projects);
   if (list.some((x) => x.id === p.id)) return `${p.id} 已在清單中`;
   await save($, [...list, p]);
@@ -261,7 +258,7 @@ async function remove($: $, target: string): Promise<string> {
 const HELP = [
   "/cicd                     開啟 CI/CD pane",
   "/cicd close               關閉 pane",
-  "/cicd add <project>       加入專案（group/project、host/group/project 或 URL）",
+  "/cicd add <url>           加入專案（完整 URL：https://host/group/project）",
   "                          不加 @branch：盯全專案最新 1 條 pipeline；加 @branch：只看該分支",
   "/cicd rm <project>        移除專案（完整 id 或專案短名）",
   "/cicd list                列出觀察中的專案",
@@ -271,7 +268,6 @@ const HELP = [
 ].join("\n");
 
 export const register: Register = (on, options) => {
-  defaultHost = String(options.defaultHost ?? "").trim();
   pollMs = Math.max(5, Number(options.pollSeconds ?? 20)) * 1000;
   polling = false;
   timer = null;

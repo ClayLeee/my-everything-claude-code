@@ -38,8 +38,8 @@
     {
       "name": "cicd-watch",
       "source": "./plugins/cicd-watch",
-      "description": "Pane mod: watch GitLab projects' latest commit and pipeline progress live. /cicd add <project> to start; the GitLab host is yours to set.",
-      "version": "0.1.0"
+      "description": "Pane mod: watch GitLab projects' latest commit and pipeline progress live. /cicd add <project URL> to start.",
+      "version": "0.1.1"
     },
     {
       "name": "prompt-nav",
