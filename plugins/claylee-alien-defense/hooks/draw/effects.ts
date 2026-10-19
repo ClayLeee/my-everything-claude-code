@@ -1,7 +1,7 @@
 import { DIGITS, TIMES } from "../art/digits";
 import { setPixel } from "../shared/pixel/bitmap";
 import type { Bitmap, Color } from "../shared/pixel/bitmap";
-import { toRadians } from "../shared/pixel/colors";
+import { toRadians, WHITE } from "../shared/pixel/colors";
 import type { Effect, EffectKind } from "../sim/types";
 
 type Burst = {
@@ -58,13 +58,6 @@ const BURSTS: Partial<Record<EffectKind, Burst>> = {
     angles: [0, 90, 180, 270],
     hasFlash: true,
   },
-  firework: {
-    durationMs: 900,
-    reach: 6,
-    colors: [0xffffff, 0xffe066, 0xff6ad5, 0x6fd6ff, 0x7a3db8],
-    angles: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330],
-    hasFlash: true,
-  },
 };
 
 export const EFFECT_LIFE_MS: Record<EffectKind, number> = {
@@ -80,8 +73,18 @@ export const EFFECT_LIFE_MS: Record<EffectKind, number> = {
   distant: 520,
   portal: 900,
   combo: 900,
-  firework: 900,
+  firework: 1300,
+  dust: 420,
 };
+
+const FIREWORK_RISE_MS = 350;
+// How far a firework's sparks fly from where it bursts, in pixels.
+export const FIREWORK_REACH = 5;
+// The pair bursts in two colors; `direction` picks the shell.
+const FIREWORK_SHELLS: readonly (readonly Color[])[] = [
+  [0xffffff, 0xffb3ec, 0xff6ad5, 0x9b2d7a],
+  [0xffffff, 0xb3ecff, 0x6fd6ff, 0x2d6a9b],
+];
 
 const Z_SMALL = ["##", ".#", "##"];
 const Z_BIG = ["###", "..#", ".#.", "#..", "###"];
@@ -156,6 +159,62 @@ function drawCombo(bitmap: Bitmap, effect: Effect): void {
   );
 }
 
+// A shell climbs from its launch point trailing sparks, then bursts: the sparks fly out fast,
+// slow down, sag under gravity, flicker and fade.
+function drawFirework(bitmap: Bitmap, effect: Effect): void {
+  // A shell queued behind the first starts below zero.
+  if (effect.ageMs < 0) return;
+  const from = effect.from ?? { x: effect.x, y: effect.y };
+  if (effect.ageMs < FIREWORK_RISE_MS) {
+    const t = effect.ageMs / FIREWORK_RISE_MS;
+    const head = 1 - (1 - t) * (1 - t);
+    [0xfff3b0, 0xffa64d, 0x7a3db8].forEach((color, back) => {
+      const along = Math.max(0, head - back * 0.12);
+      setPixel({
+        bitmap,
+        x: from.x + (effect.x - from.x) * along,
+        y: from.y + (effect.y - from.y) * along,
+        color,
+      });
+    });
+    return;
+  }
+  const shell = FIREWORK_SHELLS[(effect.direction ?? 1) > 0 ? 0 : 1] ?? [WHITE];
+  const progress = (effect.ageMs - FIREWORK_RISE_MS) / (EFFECT_LIFE_MS.firework - FIREWORK_RISE_MS);
+  const spread = 1 - (1 - progress) ** 3;
+  const sag = progress * progress * 3;
+  const color = shell[Math.min(shell.length - 1, Math.floor(progress * shell.length))] ?? WHITE;
+  const tick = Math.floor(effect.ageMs / 60);
+  for (let spark = 0; spark < 10; spark += 1) {
+    if (progress > 0.6 && (spark + tick) % 3 === 0) continue;
+    const radians = toRadians(spark * 36 + 18);
+    const radius = 1 + spread * FIREWORK_REACH;
+    const x = effect.x + Math.cos(radians) * radius;
+    const y = effect.y + Math.sin(radians) * radius * 0.7 + sag;
+    setPixel({ bitmap, x, y, color });
+    if (progress < 0.4) {
+      setPixel({
+        bitmap,
+        x: effect.x + Math.cos(radians) * radius * 0.55,
+        y: effect.y + Math.sin(radians) * radius * 0.4 + sag,
+        color: shell[1] ?? color,
+      });
+    }
+  }
+  if (progress < 0.1) setPixel({ bitmap, x: effect.x, y: effect.y, color: WHITE });
+}
+
+// Two puffs kicked out along the ground on a landing.
+function drawDust(bitmap: Bitmap, effect: Effect): void {
+  const progress = effect.ageMs / EFFECT_LIFE_MS.dust;
+  const color = progress < 0.4 ? 0xb8b0c8 : progress < 0.75 ? 0x7a7490 : 0x4a4660;
+  [-1, 1].forEach((side) => {
+    const x = effect.x + side * (1 + progress * 4);
+    setPixel({ bitmap, x, y: effect.y, color });
+    if (progress < 0.5) setPixel({ bitmap, x: x + side, y: effect.y - 1, color });
+  });
+}
+
 // A tall oval that opens, swirls while the creature steps through, and closes.
 function drawPortal(bitmap: Bitmap, effect: Effect): void {
   const progress = effect.ageMs / EFFECT_LIFE_MS.portal;
@@ -184,6 +243,8 @@ export function drawEffect(options: { bitmap: Bitmap; effect: Effect }): void {
   if (effect.kind === "zee") return drawZee(bitmap, effect);
   if (effect.kind === "sweat") return drawSweat(bitmap, effect);
   if (effect.kind === "debris") return drawDebris(bitmap, effect);
+  if (effect.kind === "firework") return drawFirework(bitmap, effect);
+  if (effect.kind === "dust") return drawDust(bitmap, effect);
   const burst = BURSTS[effect.kind];
   if (!burst) return;
   const progress = effect.ageMs / burst.durationMs;

@@ -145,64 +145,180 @@ export function flexPose(ms: number): FlexPose {
 }
 
 export type PartyPhase = "descend" | "beam" | "party" | "lift" | "leave";
+// A high-five: the arm cocks back with a crouch, the hands meet (the scene holds for a beat),
+// then the two bounce apart.
+export type FivePhase = "windup" | "slap" | "recoil";
 
-// `/alien stats`: a UFO drops in over the alien and beams a robot down beside it before the
-// board's first line; the two high-five as each line shows, the boss line is the finale, and
-// the UFO takes the robot back and leaves as the board fades.
+export interface Hop {
+  // Pixels off the ground.
+  lift: number;
+  // Squashed while pushing off and while landing.
+  isCrouched: boolean;
+}
+
+// `/alien stats`: a UFO drops in over the alien, opens its belly hatch and beams a robot down
+// beside it before the board's first line; the two high-five as each line shows and hop in
+// turns between, the boss line ends in a big jump all together, and the UFO takes the robot
+// back and leaves as the board fades.
 const DESCEND_MS = 600;
-const DROP_MS = 600;
+const HATCH_MS = 120;
+const BEAM_GROW_MS = 120;
+const LANDED_MS = 1200;
+const DROP_AT_MS = DESCEND_MS + HATCH_MS + BEAM_GROW_MS;
+const LANDING_MS = 100;
 const LIFT_MS = 250;
 const LEAVE_MS = 250;
-const HIGH_FIVE_MS = 350;
-// The hands meet partway into the swing.
-const SLAP_AT_MS = 120;
-const FINALE_MS = 400;
-const LANDED_MS = DESCEND_MS + DROP_MS;
 const LIFT_AT_MS = STATS_MS - LIFT_MS - LEAVE_MS;
+const WINDUP_MS = 140;
+const SLAP_MS = 80;
+const RECOIL_MS = 160;
+const FINALE_JUMP_AT_MS = WINDUP_MS + SLAP_MS + RECOIL_MS;
+const FINALE_END_MS = 900;
+// Each hops on its own beat, half a hop apart, like a call and its answer.
+const HOP_MS = 640;
+const CROUCH_MS = 80;
 const BOSS_ENTRY = 4;
 
 export interface PartyPose {
   phase: PartyPhase;
   // 0 above the pane, 1 hovering over the alien.
   ufo: number;
+  // How far open the belly hatch is, 0..1.
+  hatch: number;
+  // How far the beam reaches from the hatch to the ground, 0..1.
+  beam: number;
   // 0 at the hatch, 1 on the ground; undefined while aboard.
   robot: number | undefined;
-  isBeamOn: boolean;
+  // The robot sways in the beam, less as it nears the ground.
+  robotSway: number;
   // The board line showing: -1 while the total counts up, then each creature and the boss.
   entry: number;
+  five: FivePhase | undefined;
   isHighFive: boolean;
   // The hands are touching.
   isSlap: boolean;
   isFinale: boolean;
+  alien: Hop;
+  robotHop: Hop;
+  // The robot has just touched down.
+  isLanding: boolean;
+  // The alien looks up at the UFO coming in.
+  isLookingUp: boolean;
 }
 
+const GROUNDED: Hop = { lift: 0, isCrouched: false };
+
 const easeOut = (t: number): number => 1 - (1 - t) * (1 - t);
+const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
+
+// Crouch, rise and fall over `airMs`, crouch again on landing.
+function jump(at: number, height: number, airMs: number): Hop {
+  if (at < 0) return GROUNDED;
+  if (at < CROUCH_MS) return { lift: 0, isCrouched: true };
+  if (at < CROUCH_MS + airMs)
+    return { lift: Math.round(height * Math.sin(((at - CROUCH_MS) / airMs) * Math.PI)), isCrouched: false };
+  if (at < CROUCH_MS * 2 + airMs) return { lift: 0, isCrouched: true };
+  return GROUNDED;
+}
+
+const hop = (ms: number): Hop => jump(ms % HOP_MS, 2, 400);
 
 export function partyPose(ms: number): PartyPose {
   const entry =
     ms < STATS_TOTAL_MS ? -1 : Math.min(BOSS_ENTRY, Math.floor((ms - STATS_TOTAL_MS) / STATS_ENTRY_MS));
-  const quiet = { entry, isHighFive: false, isSlap: false, isFinale: false };
+  const quiet = {
+    entry,
+    five: undefined,
+    isHighFive: false,
+    isSlap: false,
+    isFinale: false,
+    robotSway: 0,
+    alien: GROUNDED,
+    robotHop: GROUNDED,
+    isLanding: false,
+    isLookingUp: false,
+  };
   if (ms < DESCEND_MS)
-    return { ...quiet, phase: "descend", ufo: easeOut(ms / DESCEND_MS), robot: undefined, isBeamOn: false };
+    return {
+      ...quiet,
+      phase: "descend",
+      ufo: easeOut(ms / DESCEND_MS),
+      hatch: 0,
+      beam: 0,
+      robot: undefined,
+      isLookingUp: true,
+    };
   if (ms < LANDED_MS) {
-    const t = (ms - DESCEND_MS) / DROP_MS;
-    return { ...quiet, phase: "beam", ufo: 1, robot: t * t * (3 - 2 * t), isBeamOn: true };
+    const at = ms - DESCEND_MS;
+    // Still aboard until the beam reaches the ground.
+    const robot = ms < DROP_AT_MS ? undefined : easeOut((ms - DROP_AT_MS) / (LANDED_MS - DROP_AT_MS));
+    return {
+      ...quiet,
+      phase: "beam",
+      ufo: 1,
+      hatch: clamp01(at / HATCH_MS),
+      beam: clamp01((at - HATCH_MS) / BEAM_GROW_MS),
+      robot,
+      robotSway: robot === undefined ? 0 : Math.round(Math.sin(ms / 80) * 1.4 * (1 - robot)),
+      isLookingUp: true,
+    };
   }
   if (ms < LIFT_AT_MS) {
     const local = entry < 0 ? Infinity : ms - STATS_TOTAL_MS - entry * STATS_ENTRY_MS;
+    const five: FivePhase | undefined =
+      local < WINDUP_MS
+        ? "windup"
+        : local < WINDUP_MS + SLAP_MS
+          ? "slap"
+          : local < FINALE_JUMP_AT_MS
+            ? "recoil"
+            : undefined;
+    const isFinale = entry === BOSS_ENTRY && local >= WINDUP_MS && local < FINALE_END_MS;
+    const isLanding = ms < LANDED_MS + LANDING_MS;
+    let alien = five === "windup" ? { lift: 0, isCrouched: true } : five ? GROUNDED : hop(ms);
+    let robotHop =
+      five === "windup" || isLanding ? { lift: 0, isCrouched: true } : five ? GROUNDED : hop(ms + HOP_MS / 2);
+    if (isFinale && !five) {
+      alien = jump(local - FINALE_JUMP_AT_MS, 4, 360);
+      robotHop = alien;
+    }
     return {
+      ...quiet,
       phase: "party",
       ufo: 1,
+      hatch: clamp01(1 - (ms - LANDED_MS) / HATCH_MS),
+      beam: 0,
       robot: 1,
-      isBeamOn: false,
-      entry,
-      isHighFive: local < HIGH_FIVE_MS,
-      isSlap: local >= SLAP_AT_MS && local < HIGH_FIVE_MS,
-      isFinale: entry === BOSS_ENTRY && local < FINALE_MS,
+      five,
+      isHighFive: five !== undefined,
+      isSlap: five === "slap",
+      isFinale,
+      alien,
+      robotHop,
+      isLanding,
     };
   }
-  if (ms < LIFT_AT_MS + LIFT_MS)
-    return { ...quiet, phase: "lift", ufo: 1, robot: 1 - (ms - LIFT_AT_MS) / LIFT_MS, isBeamOn: true };
-  const t = Math.min(1, (ms - LIFT_AT_MS - LIFT_MS) / LEAVE_MS);
-  return { ...quiet, phase: "leave", ufo: 1 - t * t, robot: undefined, isBeamOn: false };
+  if (ms < LIFT_AT_MS + LIFT_MS) {
+    const at = ms - LIFT_AT_MS;
+    const riseAt = HATCH_MS / 2 + BEAM_GROW_MS / 2;
+    const t = clamp01((at - riseAt) / (LIFT_MS - riseAt));
+    return {
+      ...quiet,
+      phase: "lift",
+      ufo: 1,
+      hatch: clamp01(at / (HATCH_MS / 2)),
+      beam: clamp01((at - HATCH_MS / 2) / (BEAM_GROW_MS / 2)),
+      robot: 1 - t * t,
+    };
+  }
+  const at = ms - LIFT_AT_MS - LIFT_MS;
+  const t = clamp01(at / LEAVE_MS);
+  return {
+    ...quiet,
+    phase: "leave",
+    ufo: 1 - t * t,
+    hatch: clamp01(1 - at / (HATCH_MS / 2)),
+    beam: 0,
+    robot: undefined,
+  };
 }

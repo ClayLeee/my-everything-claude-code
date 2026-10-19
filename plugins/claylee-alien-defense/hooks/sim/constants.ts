@@ -58,8 +58,10 @@ export const COMET_DROP = 0.08;
 export const LOG_LIMIT = 8;
 export const STATS_TOTAL_MS = 1400;
 export const STATS_ENTRY_MS = 900;
+// The boss line stays up longer for the party's finale.
+export const STATS_FINALE_MS = 600;
 // The total, then each creature kind and the boss.
-export const STATS_MS = STATS_TOTAL_MS + 5 * STATS_ENTRY_MS;
+export const STATS_MS = STATS_TOTAL_MS + 5 * STATS_ENTRY_MS + STATS_FINALE_MS;
 
 export function floorOf(height: number): number {
   return height - (height > 16 ? 4 : 2);
