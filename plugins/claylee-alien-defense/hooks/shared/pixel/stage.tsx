@@ -27,7 +27,7 @@ export type StageOptions = {
 
 const POLL_MS = 1000;
 const REMOUNT_MS = 250;
-const PANE_COLUMNS = 62;
+const PANE_COLUMNS = 46;
 const ACTIVE_FILE = ".claude/mods/active-game";
 
 let stage: StageOptions | undefined;
