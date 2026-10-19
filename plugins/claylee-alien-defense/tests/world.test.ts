@@ -199,6 +199,51 @@ test("a turn is cheered only when it brought kills", async () => {
   expect(busy.alien().mode).toBe("cheer");
 });
 
+test("in free mode things cross the night sky, but not during an OpenSpec change", async () => {
+  const free = createWorld();
+  free.setMode({ kind: "free" });
+  const kinds = new Set<string>();
+  for (let step = 0; step < 6000; step += 1) {
+    free.tick(FRAME_MS);
+    free.flyers().forEach((flyer) => kinds.add(flyer.kind));
+  }
+  expect(kinds.size).toBeGreaterThan(1);
+  const busy = createWorld();
+  busy.setMode(openspec("noon"));
+  let sawFlyer = false;
+  for (let step = 0; step < 1500; step += 1) {
+    busy.tick(FRAME_MS);
+    sawFlyer ||= busy.flyers().length > 0;
+  }
+  expect(sawFlyer).toBe(false);
+});
+
+test("kills count for the session and reset clears them", async () => {
+  const world = createWorld();
+  world.setMode({ kind: "free" });
+  world.defeat({ id: world.spawn("Read"), isFailure: false });
+  run(world, 6000);
+  expect(world.slain()).toBe(1);
+  expect(world.tally().eyeworm).toBe(1);
+  world.resetCounts();
+  expect(world.slain()).toBe(0);
+  expect(world.tally().eyeworm).toBe(0);
+  expect(world.bossesSlain()).toBe(0);
+});
+
+test("stats puts up a board the alien shows off, then takes it down", async () => {
+  const world = createWorld();
+  world.setMode({ kind: "free" });
+  world.showStats();
+  expect(world.summary().startsWith("戰績：擊倒 0 隻")).toBe(true);
+  run(world, 3000);
+  expect(world.alien().statsMs).toBeGreaterThan(0);
+  expect(world.alien().mode).toBe("idle");
+  run(world, 4000);
+  expect(world.alien().statsMs).toBe(0);
+  expect(world.summary().startsWith("戰績")).toBe(false);
+});
+
 test("a failed call makes the monster blink red", async () => {
   const world = createWorld();
   world.setMode({ kind: "free" });

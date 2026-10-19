@@ -19,11 +19,13 @@ import {
   pulseColor,
   shortName,
   statusLook,
+  storeKeyFor,
   wrapText,
 } from "./gitlab";
 
 const PANE = "cicd";
-const STORE_KEY = "projects";
+// Before 0.2.0 one list served every workspace under this key.
+const LEGACY_STORE_KEY = "projects";
 const PANE_COLUMNS = 46;
 const PRIMARY = "#f3ae35";
 const RED = "#f38ba8";
@@ -47,6 +49,7 @@ const SPIN_MS = 250;
 type $ = EngineInterface;
 
 let pollMs = 20000;
+let storeKey = LEGACY_STORE_KEY;
 const tokens = new Map<string, string | null>();
 let polling = false;
 let timer: { cancel: () => void } | null = null;
@@ -209,9 +212,31 @@ async function pollAll($: $) {
   }
 }
 
+async function workspaceKey($: $): Promise<string> {
+  const cwd = await $.session.cwd();
+  try {
+    const ran = await $.process.run(["git", "rev-parse", "--show-toplevel"], { cwd });
+    return storeKeyFor(ran.exitCode === 0 ? ran.stdout : cwd);
+  } catch {
+    return storeKeyFor(cwd);
+  }
+}
+
+// The list for this workspace; the first workspace opened after upgrading takes over the
+// old shared list, and the others start empty.
+async function loadList($: $): Promise<WatchedProject[]> {
+  storeKey = await workspaceKey($);
+  const stored = await $.store.get(storeKey);
+  if (Array.isArray(stored)) return stored as WatchedProject[];
+  const legacy = await $.store.get(LEGACY_STORE_KEY);
+  if (!Array.isArray(legacy)) return [];
+  await $.store.set(storeKey, legacy);
+  await $.store.delete(LEGACY_STORE_KEY);
+  return legacy as WatchedProject[];
+}
+
 async function boot($: $): Promise<number> {
-  const stored = await $.store.get(STORE_KEY);
-  const list = Array.isArray(stored) ? (stored as WatchedProject[]) : [];
+  const list = await loadList($);
   await update($, projects, () => list);
   timer?.cancel();
   timer = $.clock.every(pollMs, () => void pollAll($));
@@ -230,7 +255,7 @@ async function start($: $) {
 
 async function save($: $, list: WatchedProject[]) {
   await update($, projects, () => list);
-  await $.store.set(STORE_KEY, list);
+  await $.store.set(storeKey, list);
 }
 
 async function add($: $, input: string): Promise<string> {
@@ -265,6 +290,7 @@ const HELP = [
   "/cicd refresh             立即重新檢查",
   "/cicd reload              從 store 讀回專案並重啟輪詢（/clear 後卡片消失時用）",
   "/cicd help                顯示這份說明",
+  "清單依目前的專案（git repo 根目錄）分開保存，只有這個專案會輪詢與顯示它的清單",
 ].join("\n");
 
 export const register: Register = (on, options) => {
@@ -304,7 +330,9 @@ export const register: Register = (on, options) => {
       case "list": {
         const list = await read($, projects);
         return {
-          text: list.length ? list.map((p) => `- ${p.id}`).join("\n") : "尚未觀察任何專案",
+          text: list.length
+            ? list.map((p) => `- ${p.id}`).join("\n")
+            : "這個專案尚未觀察任何 GitLab 專案",
         };
       }
       case "reload":

@@ -33,6 +33,10 @@ export type Monster = {
 
 export type Orb = { x: number; y: number; ageMs: number };
 
+export type FlyerKind = "ufo" | "comet" | "satellite";
+
+export type Flyer = { kind: FlyerKind; x: number; y: number; direction: 1 | -1; ageMs: number };
+
 export type Boss = {
   x: number;
   hitsRemaining: number;
@@ -61,6 +65,7 @@ export type Alien = {
   heatMs: number;
   hurtMs: number;
   bagMs: number;
+  statsMs: number;
 };
 
 export type EffectKind =

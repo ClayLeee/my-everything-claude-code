@@ -33,13 +33,13 @@
       "name": "claylee-alien-defense",
       "source": "./plugins/claylee-alien-defense",
       "description": "Pixel-art pane mod: an alien lasers down the creatures each tool call brings; in OpenSpec projects the sky follows the change's stage from dawn to night and a boss appears at each stage change. Toggle with /alien.",
-      "version": "0.3.0"
+      "version": "0.4.0"
     },
     {
       "name": "cicd-watch",
       "source": "./plugins/cicd-watch",
-      "description": "Pane mod: watch GitLab projects' latest commit and pipeline progress live. /cicd add <project URL> to start.",
-      "version": "0.1.2"
+      "description": "Pane mod: watch GitLab projects' latest commit and pipeline progress live, with a watch list per workspace. /cicd add <project URL> to start.",
+      "version": "0.2.0"
     },
     {
       "name": "prompt-nav",
