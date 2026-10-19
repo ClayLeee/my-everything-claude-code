@@ -12,6 +12,7 @@ export const DIGITS: Readonly<Record<string, readonly string[]>> = {
   "9": ["###", "#.#", "###", "..#", "###"],
 };
 
+export const QUESTION = ["###", "..#", ".##", "...", ".#."];
 export const TIMES = ["...", "#.#", ".#.", "#.#", "..."];
 export const STAR = ["..#..", "#####", ".###.", ".#.#.", "#...#"];
 export const SKULL = [".###.", "#.#.#", "#####", ".###.", ".#.#."];

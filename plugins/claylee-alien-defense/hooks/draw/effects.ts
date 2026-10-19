@@ -1,3 +1,4 @@
+import { DIGITS, TIMES } from "../art/digits";
 import { setPixel } from "../shared/pixel/bitmap";
 import type { Bitmap, Color } from "../shared/pixel/bitmap";
 import { toRadians } from "../shared/pixel/colors";
@@ -71,6 +72,7 @@ export const EFFECT_LIFE_MS: Record<EffectKind, number> = {
   splash: 380,
   distant: 520,
   portal: 900,
+  combo: 900,
 };
 
 const Z_SMALL = ["##", ".#", "##"];
@@ -134,6 +136,18 @@ function drawSmoke(bitmap: Bitmap, effect: Effect): void {
   }
 }
 
+// "×N" pops up over the kill, drifts up a little and cools from white to gold.
+function drawCombo(bitmap: Bitmap, effect: Effect): void {
+  const progress = effect.ageMs / EFFECT_LIFE_MS.combo;
+  const x = Math.round(effect.x);
+  const y = Math.round(effect.y + 1 - progress * 2);
+  const color = progress < 0.2 ? 0xffffff : progress < 0.7 ? 0xffd84a : 0xc0812a;
+  drawGlyph(bitmap, TIMES, x, y, color);
+  Array.from(String(effect.value ?? 0)).forEach((digit, index) =>
+    drawGlyph(bitmap, DIGITS[digit] ?? [], x + 4 + index * 4, y, color),
+  );
+}
+
 // A tall oval that opens, swirls while the creature steps through, and closes.
 function drawPortal(bitmap: Bitmap, effect: Effect): void {
   const progress = effect.ageMs / EFFECT_LIFE_MS.portal;
@@ -157,6 +171,7 @@ function drawPortal(bitmap: Bitmap, effect: Effect): void {
 export function drawEffect(options: { bitmap: Bitmap; effect: Effect }): void {
   const { bitmap, effect } = options;
   if (effect.kind === "portal") return drawPortal(bitmap, effect);
+  if (effect.kind === "combo") return drawCombo(bitmap, effect);
   if (effect.kind === "smoke") return drawSmoke(bitmap, effect);
   if (effect.kind === "zee") return drawZee(bitmap, effect);
   if (effect.kind === "sweat") return drawSweat(bitmap, effect);
