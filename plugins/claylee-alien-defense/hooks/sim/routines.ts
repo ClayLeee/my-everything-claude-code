@@ -1,5 +1,7 @@
-// Keyframe timelines for the idle routines. Pure functions of the routine's elapsed time,
-// shared by the world (which emits effects on phase edges) and the scene (which picks sprites).
+// Keyframe timelines for the idle routines and the stats party. Pure functions of the elapsed
+// time, shared by the world (which emits effects on phase edges) and the scene (which picks sprites).
+
+import { STATS_ENTRY_MS, STATS_MS, STATS_TOTAL_MS } from "./constants";
 
 export type LiftPhase = "rack" | "press" | "strain" | "bounce" | "lockout" | "lower" | "rest";
 
@@ -140,4 +142,67 @@ export function flexPose(ms: number): FlexPose {
     return { shot, phase: "hit", pose, dipY: 0, shakeX };
   }
   return { shot, phase: "relax", pose, dipY: 0, shakeX: 0 };
+}
+
+export type PartyPhase = "descend" | "beam" | "party" | "lift" | "leave";
+
+// `/alien stats`: a UFO drops in over the alien and beams a robot down beside it before the
+// board's first line; the two high-five as each line shows, the boss line is the finale, and
+// the UFO takes the robot back and leaves as the board fades.
+const DESCEND_MS = 600;
+const DROP_MS = 600;
+const LIFT_MS = 250;
+const LEAVE_MS = 250;
+const HIGH_FIVE_MS = 350;
+// The hands meet partway into the swing.
+const SLAP_AT_MS = 120;
+const FINALE_MS = 400;
+const LANDED_MS = DESCEND_MS + DROP_MS;
+const LIFT_AT_MS = STATS_MS - LIFT_MS - LEAVE_MS;
+const BOSS_ENTRY = 4;
+
+export interface PartyPose {
+  phase: PartyPhase;
+  // 0 above the pane, 1 hovering over the alien.
+  ufo: number;
+  // 0 at the hatch, 1 on the ground; undefined while aboard.
+  robot: number | undefined;
+  isBeamOn: boolean;
+  // The board line showing: -1 while the total counts up, then each creature and the boss.
+  entry: number;
+  isHighFive: boolean;
+  // The hands are touching.
+  isSlap: boolean;
+  isFinale: boolean;
+}
+
+const easeOut = (t: number): number => 1 - (1 - t) * (1 - t);
+
+export function partyPose(ms: number): PartyPose {
+  const entry =
+    ms < STATS_TOTAL_MS ? -1 : Math.min(BOSS_ENTRY, Math.floor((ms - STATS_TOTAL_MS) / STATS_ENTRY_MS));
+  const quiet = { entry, isHighFive: false, isSlap: false, isFinale: false };
+  if (ms < DESCEND_MS)
+    return { ...quiet, phase: "descend", ufo: easeOut(ms / DESCEND_MS), robot: undefined, isBeamOn: false };
+  if (ms < LANDED_MS) {
+    const t = (ms - DESCEND_MS) / DROP_MS;
+    return { ...quiet, phase: "beam", ufo: 1, robot: t * t * (3 - 2 * t), isBeamOn: true };
+  }
+  if (ms < LIFT_AT_MS) {
+    const local = entry < 0 ? Infinity : ms - STATS_TOTAL_MS - entry * STATS_ENTRY_MS;
+    return {
+      phase: "party",
+      ufo: 1,
+      robot: 1,
+      isBeamOn: false,
+      entry,
+      isHighFive: local < HIGH_FIVE_MS,
+      isSlap: local >= SLAP_AT_MS && local < HIGH_FIVE_MS,
+      isFinale: entry === BOSS_ENTRY && local < FINALE_MS,
+    };
+  }
+  if (ms < LIFT_AT_MS + LIFT_MS)
+    return { ...quiet, phase: "lift", ufo: 1, robot: 1 - (ms - LIFT_AT_MS) / LIFT_MS, isBeamOn: true };
+  const t = Math.min(1, (ms - LIFT_AT_MS - LIFT_MS) / LEAVE_MS);
+  return { ...quiet, phase: "leave", ufo: 1 - t * t, robot: undefined, isBeamOn: false };
 }

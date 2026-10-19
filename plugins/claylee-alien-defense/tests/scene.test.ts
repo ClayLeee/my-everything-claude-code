@@ -1,6 +1,7 @@
 import { expect, test } from "claude-code/testing";
 
-import { FRAME_MS, floorOf, STAGE_ROWS } from "../hooks/sim/constants";
+import { partyLayout } from "../hooks/draw/scene";
+import { FRAME_MS, floorOf, MAX_COLUMNS, STAGE_ROWS, TALL_ROWS } from "../hooks/sim/constants";
 import type { Mode } from "../hooks/sim/types";
 import { createWorld } from "../hooks/sim/world";
 
@@ -34,6 +35,49 @@ test("each stage paints a sky of its own, and the night stage a ground of its ow
   const days: Mode[] = [{ kind: "free" }, stage("dawn"), stage("noon"), stage("dusk")];
   expect(new Set(days.map((mode) => frameOf(mode).sky)).size).toBe(days.length);
   expect(frameOf(stage("night")).ground).not.toBe(frameOf({ kind: "free" }).ground);
+});
+
+test("the stats party hangs a UFO over the alien and stands a robot beside it", async () => {
+  const quiet = createWorld();
+  const party = createWorld();
+  [quiet, party].forEach((world) => world.resize(MAX_COLUMNS, TALL_ROWS));
+  party.showStats();
+  run(quiet, 2000);
+  run(party, 2000);
+  const before = quiet.frame().pixels.slice();
+  const { pixels, width } = party.frame();
+  const floor = floorOf(TALL_ROWS * 2);
+  const layout = partyLayout(floor);
+  const changedIn = (left: number, right: number, top: number, bottom: number): number => {
+    let changed = 0;
+    for (let y = top; y < bottom; y += 1) {
+      for (let x = left; x < right; x += 1) {
+        if (before[y * width + x] !== pixels[y * width + x]) changed += 1;
+      }
+    }
+    return changed;
+  };
+  expect(changedIn(layout.ufoX, layout.ufoX + 13, layout.hoverY, layout.hoverY + 5)).toBeGreaterThan(20);
+  expect(changedIn(layout.robotX, layout.robotX + 7, floor - 10, floor)).toBeGreaterThan(20);
+});
+
+test("the stats party sparks on each high-five and ends on fireworks", async () => {
+  const world = createWorld();
+  world.resize(MAX_COLUMNS, TALL_ROWS);
+  world.showStats();
+  let sparks = 0;
+  let fireworks = 0;
+  for (let elapsed = 0; elapsed < 6000; elapsed += FRAME_MS) {
+    const seen = new Set(world.effects());
+    world.tick(FRAME_MS);
+    world.effects().forEach((effect) => {
+      if (seen.has(effect)) return;
+      if (effect.kind === "sparkle") sparks += 1;
+      if (effect.kind === "firework") fireworks += 1;
+    });
+  }
+  expect(sparks).toBe(5);
+  expect(fireworks).toBe(2);
 });
 
 test("a creature on the field is drawn where it stands", async () => {

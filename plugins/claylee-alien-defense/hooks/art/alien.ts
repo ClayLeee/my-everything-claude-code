@@ -253,6 +253,49 @@ export const FLEX_FRONT_SHIFT_X = -2;
 // The sleeping bag left on the ground after the alien jumps out of it.
 const BAG_ROWS = ["..ooooooooo..", ".oqqqqYqqqqo.", "oQQQQQYQQQQQo"];
 
+// Both arms up and grinning, for the stats party.
+const CHEER_ROWS = [
+  ".......a.......",
+  ".L.....A.....L.",
+  ".G...ooooo...G.",
+  ".G..oLLGGGo..G.",
+  "..GoLGGGGGGoG..",
+  "..GoGwwGwwGoG..",
+  "..GoGwkGwkGoG..",
+  "..GoDGwwwGDoG..",
+  "...GoDDDDDoG...",
+  "....oTTSSo.....",
+  "....oTSSSo.....",
+  "....osSSso.....",
+  "....os.os......",
+  "...obb.obb.....",
+];
+
+// The hands swing out on the other beat of the wave.
+const CHEER_WAVE_ROWS = replaceRows({
+  rows: CHEER_ROWS,
+  replacements: { ".L.....A.....L.": "L......A......L" },
+});
+
+// The right hand up and out to slap the robot's, at sprite (14, 3).
+const HIGH_FIVE_ROWS = [
+  ".......a.......",
+  ".......A.......",
+  ".....ooooo.....",
+  "....oLLGGGo...L",
+  "...oLGGGGGGo.LG",
+  "...oGwwGwwGo.G.",
+  "...oGwkGwkGoG..",
+  "...oDGwwwGDoG..",
+  "....oDDDDDoG...",
+  "...GoTTSSoG....",
+  "...GoTSSSo.....",
+  "...GosSSso.....",
+  "....os.os......",
+  "...obb.obb.....",
+];
+export const HIGH_FIVE_HAND = { x: 14, y: 3 };
+
 const parse = (rows: readonly string[]): Bitmap => parsePixelMap({ rows, palette: ALIEN_PALETTE });
 
 export const MUZZLE_X = 17;
@@ -286,5 +329,8 @@ export const ALIEN = {
   standBare: parse(STAND_BARE_ROWS),
   flexFront: parse(FLEX_FRONT_ROWS),
   flexFrontPump: parse(FLEX_FRONT_PUMP_ROWS),
+  cheer: parse(CHEER_ROWS),
+  cheerWave: parse(CHEER_WAVE_ROWS),
+  highFive: parse(HIGH_FIVE_ROWS),
   bag: parse(BAG_ROWS),
 };

@@ -4,9 +4,19 @@ import {
   FLEX_SHIFT_X,
   GUN_CELLS,
   GUN_TIP,
+  HIGH_FIVE_HAND,
   MUZZLE_X,
   MUZZLE_Y,
 } from "../art/alien";
+import {
+  CONFETTI,
+  FRIEND_PALETTE,
+  FURBALL_ROWS,
+  PARTY_UFO_ROWS,
+  PARTY_UFO_WIDTH,
+  ROBOT,
+  ROBOT_LAMP,
+} from "../art/friends";
 import { BOSS_CORE, BOSS_FRAMES, BOSS_WIDTH } from "../art/boss";
 import { DIGITS, QUESTION, SKULL, STAR, TIMES } from "../art/digits";
 import { COMET_TAIL, FLYER_COLORS, SATELLITE_ROWS, UFO_LIGHTS, UFO_ROWS } from "../art/flyers";
@@ -43,7 +53,7 @@ import type {
   Orb,
   Tally,
 } from "../sim/types";
-import { flexPose, liftPose, sleepPose } from "../sim/routines";
+import { flexPose, liftPose, partyPose, sleepPose } from "../sim/routines";
 import type { LiftPhase, SleepPose } from "../sim/routines";
 import { drawEffect } from "./effects";
 import { drawSky } from "./sky";
@@ -326,13 +336,16 @@ function drawGun(bitmap: Bitmap, alien: Alien, x: number, y: number): void {
 function drawAlien(bitmap: Bitmap, alien: Alien, floor: number): void {
   for (let dx = 1; dx < 12; dx += 1)
     setPixel({ bitmap, x: HOME_X + dx, y: floor, color: 0x120c1e });
-  const isPresenting =
-    alien.statsMs > 0 &&
-    (alien.mode === "idle" || alien.mode === "ready" || alien.mode === "cheer");
-  if (isPresenting) {
-    const hop = Math.round(1.5 * Math.abs(Math.sin(alien.statsMs / 180)));
-    // Always the right arm, pointing at the board; the left one would leave the pane.
-    drawFlex(bitmap, (STATS_MS - alien.statsMs) % FLEX_SIDE_MS, HOME_X, floor - hop);
+  if (isPresenting(alien)) {
+    const ms = STATS_MS - alien.statsMs;
+    const pose = partyPose(ms);
+    const sprite = pose.isHighFive
+      ? ALIEN.highFive
+      : Math.floor(ms / 200) % 2 === 0
+        ? ALIEN.cheer
+        : ALIEN.cheerWave;
+    const hop = pose.isHighFive ? 0 : Math.round(1.5 * Math.abs(Math.sin(ms / 180)));
+    stamp({ target: bitmap, source: sprite, x: HOME_X, y: floor - sprite.height - hop });
     return;
   }
   if (alien.mode === "idle") {
@@ -413,6 +426,104 @@ function drawFlyer(bitmap: Bitmap, flyer: Flyer): void {
   );
 }
 
+// The stats party plays while the alien is free to present the board.
+export function isPresenting(alien: Alien): boolean {
+  return (
+    alien.statsMs > 0 &&
+    (alien.mode === "idle" || alien.mode === "ready" || alien.mode === "cheer")
+  );
+}
+
+// The robot lands just past the alien's raised hand and the UFO hovers over the robot, as low
+// as the sky over the alien's head allows; in the short pane that is above the top edge, so
+// only the beam and the robot dropping out of it show.
+export function partyLayout(floor: number): {
+  robotX: number;
+  ufoX: number;
+  hoverY: number;
+  slap: { x: number; y: number };
+} {
+  const alienTop = floor - ALIEN_HEIGHT;
+  const robotX = HOME_X + HIGH_FIVE_HAND.x + 1;
+  return {
+    robotX,
+    ufoX: robotX + Math.floor(ROBOT.idle.width / 2) - Math.floor(PARTY_UFO_WIDTH / 2),
+    hoverY: alienTop - PARTY_UFO_ROWS.length - 1,
+    slap: { x: HOME_X + HIGH_FIVE_HAND.x, y: alienTop + HIGH_FIVE_HAND.y },
+  };
+}
+
+// A shimmering cone of light from the belly hatch to the ground.
+function drawTractorBeam(bitmap: Bitmap, centerX: number, top: number, floor: number, ms: number): void {
+  for (let y = Math.max(0, top); y < floor; y += 1) {
+    const spread = 2 + Math.round(((y - top) / Math.max(1, floor - top)) * 2);
+    for (let dx = -spread; dx <= spread; dx += 1) {
+      const under = bitmap.pixels[y * bitmap.width + centerX + dx] ?? 0x000000;
+      const isRipple = (y + Math.floor(ms / 70)) % 4 === 0;
+      const amount = Math.abs(dx) === spread ? 0.25 : isRipple ? 0.55 : 0.35;
+      setPixel({ bitmap, x: centerX + dx, y, color: mixColors({ from: under, to: 0xfff3b0, amount }) });
+    }
+  }
+}
+
+// Tossed up out of the hatch to either side, then falling to the ground.
+function drawConfetti(bitmap: Bitmap, ms: number, x: number, y: number, floor: number): void {
+  for (let piece = 0; piece < 6; piece += 1) {
+    const t = ((ms + piece * 230) % 1400) / 1400;
+    const side = piece % 2 === 0 ? -1 : 1;
+    setPixel({
+      bitmap,
+      x: x + side * (2 + t * 8 + (piece % 3)),
+      y: y - 3 * Math.sin(t * Math.PI) + t * t * (floor - y),
+      color: CONFETTI[piece % CONFETTI.length] ?? WHITE,
+    });
+  }
+}
+
+// `/alien stats`: the UFO with the furball in its top hatch, the beam, and the robot.
+function drawParty(bitmap: Bitmap, alien: Alien, floor: number): void {
+  if (!isPresenting(alien)) return;
+  const ms = STATS_MS - alien.statsMs;
+  const pose = partyPose(ms);
+  const layout = partyLayout(floor);
+  const startY = -PARTY_UFO_ROWS.length - FURBALL_ROWS.length;
+  const ufoY = Math.round(startY + (layout.hoverY - startY) * pose.ufo);
+  const hatchY = ufoY + PARTY_UFO_ROWS.length;
+  const centerX = layout.ufoX + Math.floor(PARTY_UFO_WIDTH / 2);
+  if (pose.isBeamOn) drawTractorBeam(bitmap, centerX, hatchY, floor, ms);
+  // Drawn before the UFO, so it is still half inside the hatch as the beam starts.
+  if (pose.robot !== undefined) {
+    const sprite = pose.isHighFive ? ROBOT.highFive : ROBOT.idle;
+    const fromY = hatchY - 3;
+    const groundY = floor - sprite.height;
+    const hop =
+      pose.phase === "party" && !pose.isHighFive
+        ? Math.round(1.5 * Math.abs(Math.sin(ms / 180 + 1)))
+        : 0;
+    const y = Math.round(fromY + (groundY - fromY) * pose.robot) - hop;
+    stamp({ target: bitmap, source: sprite, x: layout.robotX, y });
+    if (Math.floor(ms / 300) % 2 === 1)
+      setPixel({ bitmap, x: layout.robotX + ROBOT_LAMP.x, y: y + ROBOT_LAMP.y, color: 0x5a1a2a });
+  }
+  const lit = Math.floor(ms / 120);
+  const flash = Math.floor(ms / 80) % 2 === 0 ? WHITE : (UFO_LIGHTS[lit % UFO_LIGHTS.length] ?? WHITE);
+  paintRows(bitmap, PARTY_UFO_ROWS, layout.ufoX, ufoY, (cell, column) => {
+    if (cell === "L") return pose.isFinale ? flash : UFO_LIGHTS[(column + lit) % UFO_LIGHTS.length];
+    if (cell === "h") return pose.isBeamOn ? 0xfff3b0 : FLYER_COLORS.d;
+    return FLYER_COLORS[cell];
+  });
+  const furX = layout.ufoX + Math.floor((PARTY_UFO_WIDTH - (FURBALL_ROWS[0]?.length ?? 0)) / 2);
+  const furY = ufoY - 2;
+  paintRows(bitmap, FURBALL_ROWS, furX, furY, (cell) => FRIEND_PALETTE[cell]);
+  // It waves an arm over the rim once the robot is down.
+  if (pose.phase === "party") {
+    const isUp = Math.floor(ms / 220) % 2 === 0;
+    setPixel({ bitmap, x: furX + 7, y: furY + (isUp ? 0 : 1), color: FRIEND_PALETTE.f ?? WHITE });
+    setPixel({ bitmap, x: furX + 7, y: furY + 2, color: FRIEND_PALETTE.f ?? WHITE });
+    drawConfetti(bitmap, ms, centerX, furY, floor);
+  }
+}
+
 export const QUESTION_COLOR = 0xffd84a;
 
 // Waiting on the person: a question mark beside the head, where the short pane has room.
@@ -465,7 +576,8 @@ function drawStats(
 ): void {
   if (alien.statsMs <= 0) return;
   const elapsed = STATS_MS - alien.statsMs;
-  const left = Math.min(HOME_X + 20, bitmap.width - 30);
+  // Clear of the robot and the UFO beside the alien, where the pane is wide enough.
+  const left = Math.min(HOME_X + 25, bitmap.width - 30);
   const right = bitmap.width - 2;
   const top = 1;
   const bottom = floor - 2;
@@ -577,6 +689,7 @@ export function drawScene(options: {
   options.monsters.forEach((monster) => drawMonster(bitmap, monster, floor));
   drawBag(bitmap, alien, floor);
   drawStats(bitmap, alien, options.stats, floor);
+  drawParty(bitmap, alien, floor);
   drawAlien(bitmap, alien, floor);
   drawAsk(bitmap, alien, floor);
   options.orbs.forEach((orb) => drawOrb(bitmap, orb));
