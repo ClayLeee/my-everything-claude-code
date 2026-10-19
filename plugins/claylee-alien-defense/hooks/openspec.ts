@@ -25,24 +25,54 @@ export function phaseRank(phase: Phase): number {
   return PHASE_ORDER.indexOf(phase);
 }
 
-async function listDirs($: $, path: string): Promise<string[]> {
+const DATED = /^(\d{4}-\d{2}-\d{2})/;
+
+export function latestArchiveDate(names: readonly string[]): string | undefined {
+  const dates = names
+    .map((name) => DATED.exec(name)?.[1])
+    .filter((date): date is string => date !== undefined)
+    .sort();
+  return dates[dates.length - 1];
+}
+
+// Superpowers docs are written before the change folder exists, so a doc belongs to the
+// current change when it is dated no earlier than the last archived change.
+export function isCurrentDoc(name: string, lastArchived: string | undefined): boolean {
+  if (!name.endsWith(".md")) return false;
+  const date = DATED.exec(name)?.[1];
+  return lastArchived === undefined || date === undefined || date >= lastArchived;
+}
+
+export function pickChange(
+  changes: readonly { name: string; touchedMs: number }[],
+): string | undefined {
+  return [...changes].sort(
+    (first, second) => second.touchedMs - first.touchedMs || first.name.localeCompare(second.name),
+  )[0]?.name;
+}
+
+async function listEntries($: $, path: string): Promise<Awaited<ReturnType<$["fs"]["list"]>>> {
   try {
-    return (await $.fs.list(path))
-      .filter((entry) => entry.kind === "dir")
-      .map((entry) => entry.name);
+    return await $.fs.list(path);
   } catch {
     return [];
   }
 }
 
-async function hasMarkdown($: $, path: string): Promise<boolean> {
-  try {
-    return (await $.fs.list(path)).some(
-      (entry) => entry.kind === "file" && entry.name.endsWith(".md"),
-    );
-  } catch {
-    return false;
-  }
+async function listDirs($: $, path: string): Promise<string[]> {
+  return (await listEntries($, path))
+    .filter((entry) => entry.kind === "dir")
+    .map((entry) => entry.name);
+}
+
+async function hasCurrentDoc(
+  $: $,
+  path: string,
+  lastArchived: string | undefined,
+): Promise<boolean> {
+  return (await listEntries($, path)).some(
+    (entry) => entry.kind === "file" && isCurrentDoc(entry.name, lastArchived),
+  );
 }
 
 async function exists($: $, path: string): Promise<boolean> {
@@ -53,14 +83,28 @@ async function exists($: $, path: string): Promise<boolean> {
   }
 }
 
-export async function readMode($: $, top: string): Promise<Mode> {
-  const changes = (await listDirs($, `${top}/openspec/changes`))
-    .filter((name) => name !== "archive")
-    .sort();
-  const change = changes[0];
+// Keeps following `current` while it is active, so editing two changes in turn does not
+// read as one finishing; otherwise follows the change touched last.
+export async function readMode($: $, top: string, current?: string): Promise<Mode> {
+  const root = `${top}/openspec/changes`;
+  const changes = (await listDirs($, root)).filter((name) => name !== "archive");
+  const change =
+    current !== undefined && changes.includes(current)
+      ? current
+      : pickChange(
+          await Promise.all(
+            changes.map(async (name) => ({
+              name,
+              touchedMs: Math.max(
+                0,
+                ...(await listEntries($, `${root}/${name}`)).map((entry) => entry.mtimeMs),
+              ),
+            })),
+          ),
+        );
   if (!change) return { kind: "free" };
 
-  const base = `${top}/openspec/changes/${change}`;
+  const base = `${root}/${change}`;
   let docs = 0;
   for (const file of ["proposal.md", "design.md", "tasks.md"]) {
     if (await exists($, `${base}/${file}`)) docs += 1;
@@ -71,8 +115,9 @@ export async function readMode($: $, top: string): Promise<Mode> {
       break;
     }
   }
-  if (await hasMarkdown($, `${top}/docs/superpowers/specs`)) docs += 1;
-  if (await hasMarkdown($, `${top}/docs/superpowers/plans`)) docs += 1;
+  const lastArchived = latestArchiveDate(await listDirs($, `${root}/archive`));
+  if (await hasCurrentDoc($, `${top}/docs/superpowers/specs`, lastArchived)) docs += 1;
+  if (await hasCurrentDoc($, `${top}/docs/superpowers/plans`, lastArchived)) docs += 1;
 
   let tasks = { done: 0, total: 0 };
   try {
@@ -86,5 +131,6 @@ export async function readMode($: $, top: string): Promise<Mode> {
     phase: phaseOf({ docs, ...tasks }),
     docs,
     ...tasks,
+    others: changes.length - 1,
   };
 }

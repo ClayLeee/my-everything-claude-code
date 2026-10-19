@@ -46,8 +46,8 @@ export const BOSS_FRAMES: FrameSet = [
 ];
 
 export const BOSS_TITLES: Record<Phase, string> = {
-  dawn: "規格吞噬者",
-  noon: "任務蠶食母巢",
-  dusk: "驗證幽影王",
-  night: "歸檔深淵獸",
+  dawn: "吞噬者",
+  noon: "母巢",
+  dusk: "幽影王",
+  night: "深淵獸",
 };

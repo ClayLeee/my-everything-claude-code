@@ -4,7 +4,15 @@ export type Phase = "dawn" | "noon" | "dusk" | "night";
 
 export type Mode =
   | { kind: "free" }
-  | { kind: "openspec"; change: string; phase: Phase; docs: number; done: number; total: number };
+  | {
+      kind: "openspec";
+      change: string;
+      phase: Phase;
+      docs: number;
+      done: number;
+      total: number;
+      others: number;
+    };
 
 export type Monster = {
   id: number;
@@ -18,11 +26,17 @@ export type Monster = {
   phaseMs: number;
   flashMs: number;
   walkMs: number;
+  waitMs: number;
+  rageMs: number;
+  knockMs: number;
 };
+
+export type Orb = { x: number; y: number; ageMs: number };
 
 export type Boss = {
   x: number;
   hitsRemaining: number;
+  maxHits: number;
   phase: "enter" | "fight" | "dying";
   phaseMs: number;
   flashMs: number;
@@ -44,6 +58,9 @@ export type Alien = {
   targetX: number;
   hasStruck: boolean;
   isCheerRequested: boolean;
+  heatMs: number;
+  hurtMs: number;
+  bagMs: number;
 };
 
 export type EffectKind =
@@ -54,7 +71,11 @@ export type EffectKind =
   | "sweat"
   | "zee"
   | "bubble"
-  | "debris";
+  | "debris"
+  | "smoke"
+  | "splash"
+  | "distant"
+  | "portal";
 
 export type Effect = { kind: EffectKind; x: number; y: number; ageMs: number; direction?: number };
 
