@@ -180,7 +180,7 @@ export function createWorld(options: { seed?: number } = {}) {
   let bossesSlain = 0;
   let combo = 0;
   let lastKillMs = -Infinity;
-  let lines: string[] = ["外星人鑽進睡袋呼呼大睡"];
+  let lines: string[] = ["電子星人鑽進睡袋呼呼大睡"];
   const overflow = new Map<number, { kind: MonsterKind; tool: string }>();
 
   const alien: Alien = {
@@ -217,7 +217,7 @@ export function createWorld(options: { seed?: number } = {}) {
     alien.activityMs = 0;
     alien.activityLengthMs = IDLE_MIN_MS + random() * (IDLE_MAX_MS - IDLE_MIN_MS);
     idleBeat = "";
-    note(`外星人${ACTIVITY_LINES[alien.activity]}`);
+    note(`電子星人${ACTIVITY_LINES[alien.activity]}`);
   }
 
   function bossStandX(): number {
@@ -442,7 +442,7 @@ export function createWorld(options: { seed?: number } = {}) {
         effects = effects.filter((effect) => effect.kind !== "zee");
         const onlyBoss =
           boss !== undefined && !monsters.some((monster) => monster.phase === "alive");
-        note(onlyBoss ? "BOSS 來襲，外星人起身迎戰" : "異形來襲，外星人起身迎戰");
+        note(onlyBoss ? "BOSS 來襲，電子星人起身迎戰" : "異形來襲，電子星人起身迎戰");
         enter("wake");
         return;
       }
@@ -772,7 +772,7 @@ export function createWorld(options: { seed?: number } = {}) {
 
     // Claude puts a question to the person, and later has the answer.
     ask(): void {
-      if (asking === 0) note("外星人轉頭等你回覆");
+      if (asking === 0) note("電子星人轉頭等你回覆");
       asking += 1;
     },
 
