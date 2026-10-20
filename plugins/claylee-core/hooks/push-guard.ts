@@ -7,6 +7,8 @@ type Denied = { deny: string };
 const CONFIG = ".claude/push-checks.json";
 const PUSH = /(?:^|[;&|(\n])\s*git(?:\s+-C\s+("[^"]+"|'[^']+'|\S+))?\s+push\b/;
 const RUN_TIMEOUT_MS = 600_000;
+const TOOL = "push-checks";
+const TOOL_ID = "mcp__claylee-core__push-checks";
 const TAIL_LINES = 15;
 
 async function git($: $, cwd: string, args: string[]): Promise<string | null> {
@@ -93,7 +95,7 @@ async function guard<R extends ToolCallResult<string>>(
           deny: [
             `push-guard：${CONFIG} 規定這些檢查要在這次 push 的內容上通過：`,
             ...missing.map((check) => `  - ${check}`),
-            "執行 /push-checks run，或把每項檢查單獨執行（可以用 && 串接；Bash 可以接 pipe，PowerShell 不行；不能用 || 或 ;），再重新 push。",
+            `呼叫 ${TOOL} 工具（${TOOL_ID}），它會依序跑完並記錄結果，再重新 push；或把每項檢查單獨執行（可以用 && 串接；Bash 可以接 pipe，PowerShell 不行；不能用 || 或 ;）。`,
             "被中斷或移到背景的執行不算數。",
           ].join("\n"),
         };
@@ -196,6 +198,27 @@ async function runInBackground($: $, top: string, checks: string[]): Promise<voi
   }
 }
 
+// The model's way to run the checks: the guard runs them itself and waits, so they count
+// whatever shell the model would have reached for. Waiting on the processes costs no hook budget.
+async function runForModel($: $, cwd: string | undefined): Promise<string> {
+  const top = await git($, cwd ?? (await $.session.cwd()), ["rev-parse", "--show-toplevel"]);
+  const checks = top ? await checksOf($, top) : null;
+  if (!top || !checks) return `這個專案沒有 ${CONFIG}，push 不受保護，不需要跑檢查。`;
+  if (running) return "push-checks 已經在執行中，等它跑完再呼叫一次查看結果。";
+  running = top;
+  try {
+    const lastRun = await runChecks($, top, checks);
+    const failure = lastRun.results.find((result) => !result.ok);
+    const verdict = failure
+      ? `✗ ${failure.check} 失敗（exit ${failure.exitCode}），修好後再呼叫一次。`
+      : `✓ ${lastRun.results.length} 項全部通過，可以 push。`;
+    return `${verdict}\n\n${await statusText($, top, checks)}`;
+  } finally {
+    $.ui.status(undefined);
+    running = null;
+  }
+}
+
 function ago(ms: number): string {
   const minutes = Math.round(ms / 60_000);
   if (minutes < 1) return "剛剛";
@@ -239,8 +262,27 @@ export const register: Register = (on) => {
       description: "顯示 push 前檢查的狀態；加上 run 會在背景執行檢查",
       argumentHint: "[run]",
     });
+    await $.tool.register({
+      name: TOOL,
+      description: [
+        `在有 ${CONFIG} 的專案 git push 之前呼叫：依序執行檔案裡列出的每項檢查，等全部跑完（可能要好幾分鐘）並記錄哪些通過，push-guard 就會放行這次 push。`,
+        "用這個工具，不要自己用 Bash 或 PowerShell 跑那些檢查。結果附上每項耗時，失敗時附上最後幾行輸出。",
+      ].join(""),
+      inputSchema: {
+        type: "object",
+        properties: {
+          cwd: { type: "string", description: "要檢查的 repo 目錄（例如 worktree），預設是 session 的目錄" },
+        },
+      },
+      isDeferred: false,
+    });
     return next(e);
   });
+
+  on("tool.call", { tool: TOOL_ID }, async ($, e) => {
+    const cwd = "cwd" in e && typeof e.cwd === "string" ? e.cwd : undefined;
+    return { result: await runForModel($, cwd) };
+  }).catch(() => ({ deny: "push-checks 工具本身出錯，檢查沒有跑完，這次不算通過。" }));
 
   on("command.run", { command: "push-checks" }, async ($, e) => {
     const cwd = await $.session.cwd();

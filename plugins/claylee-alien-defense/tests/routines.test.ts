@@ -45,6 +45,16 @@ test("every pose wears twin green antennae and no pink one", () => {
   expect(top.filter((color) => color === ALIEN_PALETTE.L).length).toBe(2);
 });
 
+// The eyes are gray with a darker gray where the pupil was: no white of the eye, no black pupil.
+test("every pose has gray eyes and no black pupils", () => {
+  Object.entries(ALIEN).forEach(([name, sprite]) => {
+    expect([name, sprite.pixels.includes(ALIEN_PALETTE.k)]).toEqual([name, false]);
+  });
+  const count = (color: number) => ALIEN.stand.pixels.filter((pixel) => pixel === color).length;
+  expect([count(ALIEN_PALETTE.e), count(ALIEN_PALETTE.E)]).toEqual([6, 2]);
+  expect(sameBitmap(ALIEN.cheer, ALIEN.cheerUp)).toBe(false);
+});
+
 test("the stats party lands the robot before the first line and high-fives on every line", () => {
   const poses = sample(partyPose, STATS_MS);
   const landed = partyPose(STATS_TOTAL_MS);
