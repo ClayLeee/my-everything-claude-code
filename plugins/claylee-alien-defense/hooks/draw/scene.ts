@@ -304,10 +304,12 @@ function drawIdle(bitmap: Bitmap, alien: Alien, floor: number): void {
   stamp({ target: bitmap, source: sprite, x, y: floor - sprite.height });
 }
 
-const CELL_EMPTY: Color = 0x3a1430;
-const CELL_DIM: Color = 0x8a2a78;
-const CELL_LIT: Color = 0xff6ad5;
-const TIP_COLD: Color = 0x7a3d6e;
+// The energy cell burns orange-red.
+const CELL_EMPTY: Color = 0x3a1408;
+const CELL_DIM: Color = 0x8a2a14;
+const CELL_LIT: Color = 0xff5a2a;
+const CELL_AIM: Color = 0xffd8c0;
+const TIP_COLD: Color = 0x7a2e1e;
 
 // The gun tells the shot: the cell idles in a slow pulse, burns white while aiming, drains
 // back to front as the beam runs, then refills while the tip cools from orange to cold.
@@ -319,13 +321,13 @@ function drawGun(bitmap: Bitmap, alien: Alien, x: number, y: number): void {
   let cell = idleCell;
   let tip = heat > 0 ? mixColors({ from: TIP_COLD, to: 0xffa64d, amount: heat }) : TIP_COLD;
   if (alien.mode === "aim") {
-    cell = 0xffd6f5;
+    cell = CELL_AIM;
     tip = WHITE;
   } else if (alien.mode === "fire") {
     const progress = alien.modeMs / BEAM_MS;
     lit = GUN_CELLS.length - Math.floor(progress * GUN_CELLS.length);
     cell = CELL_LIT;
-    tip = progress < 0.75 ? WHITE : 0xffb3ec;
+    tip = progress < 0.75 ? WHITE : 0xffb38a;
   } else if (heat > 0) {
     lit = Math.round((1 - heat) * GUN_CELLS.length);
   }
@@ -703,19 +705,19 @@ function drawBeam(bitmap: Bitmap, alien: Alien, floor: number): void {
   const endX = startX + (alien.targetX - startX) * reach;
   const length = Math.max(1, endX - startX);
   const fading = progress > 0.75;
-  const core: Color = fading ? 0xd9a6ff : 0xffffff;
-  const edge: Color = fading ? 0x7a3db8 : 0xff6ad5;
+  const core: Color = fading ? 0xffc8a0 : 0xffffff;
+  const edge: Color = fading ? 0x8a2a14 : 0xff5a2a;
   for (let x = startX; x <= endX; x += 1) {
     const along = (x - startX) / length;
     const flicker = (x + Math.floor(alien.modeMs / 30)) % 4;
     setPixel({ bitmap, x, y: muzzle.y, color: core });
     if ((!fading || flicker === 0) && along < 0.85) {
-      setPixel({ bitmap, x, y: muzzle.y - 1, color: flicker === 0 ? 0xffb3ec : edge });
-      setPixel({ bitmap, x, y: muzzle.y + 1, color: flicker === 2 ? 0xffb3ec : edge });
+      setPixel({ bitmap, x, y: muzzle.y - 1, color: flicker === 0 ? 0xffb38a : edge });
+      setPixel({ bitmap, x, y: muzzle.y + 1, color: flicker === 2 ? 0xffb38a : edge });
     }
     if (!fading && along < 0.18) {
-      setPixel({ bitmap, x, y: muzzle.y - 2, color: 0x7a3db8 });
-      setPixel({ bitmap, x, y: muzzle.y + 2, color: 0x7a3db8 });
+      setPixel({ bitmap, x, y: muzzle.y - 2, color: 0x8a2a14 });
+      setPixel({ bitmap, x, y: muzzle.y + 2, color: 0x8a2a14 });
     }
   }
   if (!fading) {
@@ -731,7 +733,7 @@ function drawBeam(bitmap: Bitmap, alien: Alien, floor: number): void {
       [0, 2],
       [2, 0],
     ].forEach(([dx, dy]) =>
-      setPixel({ bitmap, x: endX + (dx ?? 0), y: muzzle.y + (dy ?? 0), color: 0xffd6f5 }),
+      setPixel({ bitmap, x: endX + (dx ?? 0), y: muzzle.y + (dy ?? 0), color: 0xffd8c0 }),
     );
   }
 }

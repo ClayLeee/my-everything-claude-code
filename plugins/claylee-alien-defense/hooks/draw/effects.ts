@@ -19,14 +19,14 @@ const BURSTS: Partial<Record<EffectKind, Burst>> = {
   hit: {
     durationMs: 280,
     reach: 7,
-    colors: [0xffffff, 0xff8be6, 0xb84dff],
+    colors: [0xffffff, 0xff8a4d, 0xd8402a],
     angles: ALL,
     hasFlash: true,
   },
   muzzle: {
     durationMs: 140,
     reach: 3,
-    colors: [0xffffff, 0xff8be6],
+    colors: [0xffffff, 0xff8a4d],
     angles: [-45, 0, 45],
     hasFlash: true,
   },
@@ -127,7 +127,7 @@ function drawDebris(bitmap: Bitmap, effect: Effect): void {
     const spread = (piece - 1) * 0.8;
     const x = effect.x + direction * progress * (4 + piece * 2);
     const y = effect.y + spread - progress * 4 + progress * progress * 9;
-    setPixel({ bitmap, x, y, color: piece === 0 ? 0xffffff : 0xff8be6 });
+    setPixel({ bitmap, x, y, color: piece === 0 ? 0xffffff : 0xff8a4d });
   }
 }
 

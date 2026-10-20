@@ -16,7 +16,7 @@ export const ALIEN_PALETTE = {
   b: 0x2a2f45,
   M: 0x6b7489,
   m: 0xd0d8e6,
-  c: 0xff6ad5,
+  c: 0xff5a2a,
   n: 0xe8eef8,
   N: 0xaab4c8,
   q: 0xd8505a,
@@ -320,7 +320,26 @@ const lookingUp = (rows: readonly string[]): string[] =>
 // Knees bent: the shins (row 12 of a standing sprite) fold away, so the alien stands a pixel lower.
 const crouched = (rows: readonly string[]): string[] => rows.filter((_, row) => row !== 12);
 
-const parse = (rows: readonly string[]): Bitmap => parsePixelMap({ rows, palette: ALIEN_PALETTE });
+// Twin green antennae: the single antenna drawn above the head (`a` tip over `A` stalk) splits
+// into a V, the stalks one pixel to either side and the tips two. Only rows above the head's
+// outline change, since `a` also paints the gun's emitter.
+function twinAntennae(rows: readonly string[]): string[] {
+  const head = rows.findIndex((row) => row.includes("o"));
+  return rows.map((row, index) => {
+    if (index >= head) return row;
+    const cells = Array.from(row.replace(/[aA]/g, "."));
+    Array.from(row).forEach((cell, column) => {
+      const spread = cell === "a" ? 2 : cell === "A" ? 1 : 0;
+      if (spread === 0) return;
+      for (const at of [column - spread, column + spread])
+        if (at >= 0 && at < cells.length) cells[at] = cell === "a" ? "L" : "G";
+    });
+    return cells.join("");
+  });
+}
+
+const parse = (rows: readonly string[]): Bitmap =>
+  parsePixelMap({ rows: twinAntennae(rows), palette: ALIEN_PALETTE });
 
 export const MUZZLE_X = 17;
 export const MUZZLE_Y = 10;
