@@ -111,6 +111,7 @@ export const register: Register = (on) => {
       name: "prompts",
       description:
         "Toggle a pane of the prompts you sent; press one to jump to it. /prompts reload re-reads the transcript",
+      argumentHint: "[on | off | reload]",
     });
     for (const p of await read($, prompts))
       if (p.id && !seen.some((s) => s.id === p.id)) seen.push({ id: p.id, text: p.text });
@@ -142,7 +143,11 @@ export const register: Register = (on) => {
           : "Prompts refreshed, but the transcript could not be read.",
       };
     }
-    if ((await $.ui.panes()).some((p) => p.id === PANE)) {
+    const arg = e.args.trim();
+    if (arg !== "" && arg !== "on" && arg !== "off")
+      return { text: "用法：/prompts [on | off | reload]" };
+    const isOpen = (await $.ui.panes()).some((p) => p.id === PANE);
+    if (arg === "off" || (arg === "" && isOpen)) {
       await $.ui.close({ id: PANE });
       return { text: "Prompt pane closed." };
     }

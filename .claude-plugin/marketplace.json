@@ -39,13 +39,13 @@
       "name": "cicd-watch",
       "source": "./plugins/cicd-watch",
       "description": "Pane mod: watch GitLab projects' latest commit and pipeline progress live, with a watch list per workspace. /cicd add <project URL> to start.",
-      "version": "0.2.1"
+      "version": "0.2.2"
     },
     {
       "name": "prompt-nav",
       "source": "./plugins/prompt-nav",
       "description": "Pane mod: search and jump to the prompts you sent, including ones sent while Claude was working, plus a band naming the prompt the transcript is at. Toggle with /prompts.",
-      "version": "0.1.2"
+      "version": "0.1.3"
     }
   ]
 }
