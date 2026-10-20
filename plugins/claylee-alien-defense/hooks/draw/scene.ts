@@ -4,24 +4,20 @@ import {
   FLEX_SHIFT_X,
   GUN_CELLS,
   GUN_TIP,
-  HIGH_FIVE_HAND,
   MUZZLE_X,
   MUZZLE_Y,
 } from "../art/alien";
-import {
-  CONFETTI,
-  FRIEND_PALETTE,
-  FURBALL_BLINK_ROWS,
-  FURBALL_ROWS,
-  FURBALL_WIDTH,
-  PARTY_UFO_ROWS,
-  PARTY_UFO_WIDTH,
-  ROBOT,
-  ROBOT_LAMP,
-} from "../art/friends";
 import { BOSS_CORE, BOSS_FRAMES, BOSS_WIDTH } from "../art/boss";
 import { DIGITS, QUESTION, SKULL, STAR, TIMES } from "../art/digits";
-import { COMET_TAIL, FLYER_COLORS, SATELLITE_ROWS, UFO_LIGHTS, UFO_ROWS } from "../art/flyers";
+import {
+  COMET_TAIL,
+  FLYER_COLORS,
+  SATELLITE_ROWS,
+  UFO_LIGHTS,
+  UFO_ROWS,
+  VISIT_UFO_ROWS,
+  VISIT_UFO_WIDTH,
+} from "../art/flyers";
 import { DEATH_GLOW, MONSTER_FRAMES } from "../art/monsters";
 import { setPixel, stamp } from "../shared/pixel/bitmap";
 import type { Bitmap, Color, Tint } from "../shared/pixel/bitmap";
@@ -55,8 +51,11 @@ import type {
   Orb,
   Tally,
 } from "../sim/types";
-import { flexPose, liftPose, partyPose, sleepPose } from "../sim/routines";
-import type { LiftPhase, PartyPose, SleepPose } from "../sim/routines";
+import { ARRIVE_MS, arrivePose, flexPose, liftPose, sleepPose, statsPose } from "../sim/routines";
+import type { LiftPhase, SleepPose, VisitPose } from "../sim/routines";
+
+// The middle of the alien's head in the arms-up sprites that ride the beam: where the UFO hangs.
+const ALIEN_HEAD_X = 7;
 import { drawEffect } from "./effects";
 import { drawSky } from "./sky";
 import type { SkyStyle } from "./sky";
@@ -337,26 +336,35 @@ function drawGun(bitmap: Bitmap, alien: Alien, x: number, y: number): void {
   GUN_TIP.forEach((spot) => setPixel({ bitmap, x: x + spot.x, y: y + spot.y, color: tip }));
 }
 
-// Arms up and waving (looking up while the UFO comes in), squashed on a hop's crouch, and
-// the high-five's windup, slap and recoil.
-function partyAlienSprite(pose: PartyPose, ms: number): Bitmap {
+// Arms up and waving (looking up while the UFO comes in), and squashed on touchdown.
+function visitAlienSprite(pose: VisitPose, ms: number): Bitmap {
   const isWaveBeat = Math.floor(ms / 200) % 2 === 1;
+  if (pose.isLanding) return ALIEN.cheerCrouch;
   if (pose.isLookingUp) return isWaveBeat ? ALIEN.cheerWaveUp : ALIEN.cheerUp;
-  if (pose.five === "windup") return ALIEN.windup;
-  if (pose.five) return ALIEN.highFive;
-  if (pose.alien.isCrouched) return ALIEN.cheerCrouch;
   return isWaveBeat ? ALIEN.cheerWave : ALIEN.cheer;
+}
+
+// Only the rows below `clipY`: the part of the alien not yet inside the hatch.
+function stampBelow(bitmap: Bitmap, sprite: Bitmap, x: number, y: number, clipY: number): void {
+  for (let row = Math.max(0, clipY - y); row < sprite.height; row += 1)
+    for (let column = 0; column < sprite.width; column += 1) {
+      const color = sprite.pixels[row * sprite.width + column];
+      if (color !== null && color !== undefined) setPixel({ bitmap, x: x + column, y: y + row, color });
+    }
 }
 
 function drawAlien(bitmap: Bitmap, alien: Alien, floor: number): void {
   for (let dx = 1; dx < 12; dx += 1)
     setPixel({ bitmap, x: HOME_X + dx, y: floor, color: 0x120c1e });
-  if (isPresenting(alien)) {
-    const ms = STATS_MS - alien.statsMs;
-    const pose = partyPose(ms);
-    const sprite = partyAlienSprite(pose, ms);
-    const x = HOME_X - (pose.five === "recoil" ? 1 : 0);
-    stamp({ target: bitmap, source: sprite, x, y: floor - sprite.height - pose.alien.lift });
+  const visit = visitOf(alien);
+  if (visit) {
+    const { pose, ms } = visit;
+    if (pose.rise === undefined) return;
+    const sprite = visitAlienSprite(pose, ms);
+    const hatchY = ufoTop(pose, ms, floor) + VISIT_UFO_ROWS.length;
+    const groundY = floor - sprite.height;
+    const y = Math.round(groundY + (hatchY - sprite.height - groundY) * pose.rise);
+    stampBelow(bitmap, sprite, HOME_X + pose.sway, y, hatchY);
     return;
   }
   if (alien.mode === "idle") {
@@ -437,8 +445,8 @@ function drawFlyer(bitmap: Bitmap, flyer: Flyer): void {
   );
 }
 
-// The stats board's left rim: clear of the robot and the UFO beside the alien, where the pane
-// is wide enough. The party keeps its confetti and fireworks left of it.
+// The stats board's left rim: clear of the UFO over the alien, where the pane is wide enough.
+// The fireworks burst left of it.
 export function boardLeft(width: number): number {
   return Math.min(HOME_X + 25, width - 30);
 }
@@ -451,23 +459,28 @@ export function isPresenting(alien: Alien): boolean {
   );
 }
 
-// The robot lands just past the alien's raised hand and the UFO hovers over the robot, as low
-// as the sky over the alien's head allows; in the short pane that is above the top edge, so
-// only the beam and the robot dropping out of it show.
-export function partyLayout(floor: number): {
-  robotX: number;
-  ufoX: number;
-  hoverY: number;
-  slap: { x: number; y: number };
-} {
+// The UFO hangs straight over the alien's head, as high as the pane lets it, so the beam has
+// room to carry the alien; in the short pane that is above the top edge, so only the beam and
+// the alien riding it show.
+export function visitLayout(floor: number): { ufoX: number; centerX: number; hoverY: number } {
   const alienTop = floor - ALIEN_HEIGHT;
-  const robotX = HOME_X + HIGH_FIVE_HAND.x + 1;
+  const centerX = HOME_X + ALIEN_HEAD_X;
   return {
-    robotX,
-    ufoX: robotX + Math.floor(ROBOT.idle.width / 2) - Math.floor(PARTY_UFO_WIDTH / 2),
-    hoverY: alienTop - PARTY_UFO_ROWS.length - 1,
-    slap: { x: HOME_X + HIGH_FIVE_HAND.x, y: alienTop + HIGH_FIVE_HAND.y },
+    ufoX: centerX - Math.floor(VISIT_UFO_WIDTH / 2),
+    centerX,
+    hoverY: Math.min(alienTop - VISIT_UFO_ROWS.length - 1, 3),
   };
+}
+
+// The UFO is visiting: bringing the alien in at session start, or taking it aboard for the stats.
+export function visitOf(alien: Alien): { pose: VisitPose; ms: number } | undefined {
+  if (alien.arriveMs > 0) {
+    const ms = ARRIVE_MS - alien.arriveMs;
+    return { pose: arrivePose(ms), ms };
+  }
+  if (!isPresenting(alien)) return undefined;
+  const ms = STATS_MS - alien.statsMs;
+  return { pose: statsPose(ms), ms };
 }
 
 // The beam reaches down from the belly hatch as `reach` grows, widening toward the ground,
@@ -495,104 +508,35 @@ function drawTractorBeam(
   }
 }
 
-const CONFETTI_THROW_MS = 350;
-const CONFETTI_LIFE_MS = 1400;
-// When the robot lands and the furball starts throwing.
-const PARTY_LANDED_MS = 1200;
-
-// The furball throws a handful on each arm swing, left and right in turn. Each piece arcs up,
-// flutters side to side as it falls and flips between its bright and dark side; a piece that
-// would land on the board drops out of sight behind its rim.
-function drawConfetti(
-  bitmap: Bitmap,
-  options: { ms: number; until: number; arms: { x: number; y: number }[]; floor: number },
-): void {
-  const { ms, until, arms, floor } = options;
-  const edge = boardLeft(bitmap.width) - 1;
-  const last = Math.floor((ms - PARTY_LANDED_MS) / CONFETTI_THROW_MS);
-  for (let toss = Math.max(0, last - 4); toss <= last; toss += 1) {
-    const thrownAt = PARTY_LANDED_MS + toss * CONFETTI_THROW_MS;
-    if (thrownAt >= until) continue;
-    const t = (ms - thrownAt) / CONFETTI_LIFE_MS;
-    if (t < 0 || t >= 1) continue;
-    const side = toss % 2 === 0 ? -1 : 1;
-    const arm = arms[toss % 2];
-    if (!arm) continue;
-    for (let piece = 0; piece < 3; piece += 1) {
-      const x = Math.round(
-        arm.x + side * (1 + t * (3 + piece * 2.5)) + Math.sin(t * 9 + piece * 2 + toss) * 0.9,
-      );
-      if (x >= edge) continue;
-      const y = arm.y + (floor - arm.y) * t * t - (2 + piece) * Math.sin(t * Math.PI) * 0.9;
-      const base = CONFETTI[(toss + piece) % CONFETTI.length] ?? WHITE;
-      const isFlipped = (Math.floor(ms / 100) + piece) % 2 === 0;
-      const color = isFlipped ? mixColors({ from: base, to: 0x000000, amount: 0.45 }) : base;
-      setPixel({ bitmap, x, y, color });
-    }
-  }
-}
-
-function partyRobotSprite(pose: PartyPose): Bitmap {
-  if (pose.phase !== "party") return ROBOT.idle;
-  if (pose.five === "windup") return ROBOT.windup;
-  if (pose.five) return ROBOT.highFive;
-  return pose.robotHop.isCrouched ? ROBOT.crouch : ROBOT.idle;
-}
-
-// `/alien stats`: the UFO bobbing over the alien with the furball in its top hatch, the belly
-// hatch opening from the middle out, the beam, and the robot.
-function drawParty(bitmap: Bitmap, alien: Alien, floor: number): void {
-  if (!isPresenting(alien)) return;
-  const ms = STATS_MS - alien.statsMs;
-  const pose = partyPose(ms);
-  const layout = partyLayout(floor);
-  const startY = -PARTY_UFO_ROWS.length - FURBALL_ROWS.length;
+// Where the UFO is now: dropping in from above the pane, then bobbing while it hovers.
+function ufoTop(pose: VisitPose, ms: number, floor: number): number {
+  const startY = -VISIT_UFO_ROWS.length - 1;
   const bob = pose.ufo === 1 ? Math.round(Math.sin(ms / 320)) : 0;
-  const ufoY = Math.round(startY + (layout.hoverY - startY) * pose.ufo) + bob;
-  const hatchY = ufoY + PARTY_UFO_ROWS.length;
-  const centerX = layout.ufoX + Math.floor(PARTY_UFO_WIDTH / 2);
-  if (pose.beam > 0) drawTractorBeam(bitmap, { centerX, top: hatchY, floor, reach: pose.beam, ms });
-  // Drawn before the UFO, so it comes out of the hatch rather than over it.
-  if (pose.robot !== undefined) {
-    const sprite = partyRobotSprite(pose);
-    const fromY = hatchY - 3;
-    const groundY = floor - ROBOT.idle.height;
-    const x = layout.robotX + pose.robotSway + (pose.five === "recoil" ? 1 : 0);
-    const y =
-      pose.phase === "party"
-        ? floor - sprite.height - pose.robotHop.lift
-        : Math.round(fromY + (groundY - fromY) * pose.robot);
-    stamp({ target: bitmap, source: sprite, x, y });
-    if (Math.floor(ms / 300) % 2 === 1)
-      setPixel({ bitmap, x: x + ROBOT_LAMP.x, y: y + ROBOT_LAMP.y, color: 0x5a1a2a });
-  }
+  return Math.round(startY + (visitLayout(floor).hoverY - startY) * pose.ufo) + bob;
+}
+
+// Drawn under the alien, so the alien rides inside the light.
+function drawVisitBeam(bitmap: Bitmap, alien: Alien, floor: number): void {
+  const visit = visitOf(alien);
+  if (!visit || visit.pose.beam <= 0) return;
+  const { pose, ms } = visit;
+  const top = ufoTop(pose, ms, floor) + VISIT_UFO_ROWS.length;
+  drawTractorBeam(bitmap, { centerX: visitLayout(floor).centerX, top, floor, reach: pose.beam, ms });
+}
+
+// Drawn over the alien, so it disappears into the hatch rather than passing over the hull.
+function drawVisitUfo(bitmap: Bitmap, alien: Alien, floor: number): void {
+  const visit = visitOf(alien);
+  if (!visit) return;
+  const { pose, ms } = visit;
   const lit = Math.floor(ms / 120);
   const flash = Math.floor(ms / 80) % 2 === 0 ? WHITE : (UFO_LIGHTS[lit % UFO_LIGHTS.length] ?? WHITE);
   const hatchOpen = pose.hatch > 0.66 ? 2 : pose.hatch > 0.2 ? 1 : 0;
-  paintRows(bitmap, PARTY_UFO_ROWS, layout.ufoX, ufoY, (cell, column) => {
-    if (cell === "L") return pose.isFinale ? flash : UFO_LIGHTS[(column + lit) % UFO_LIGHTS.length];
+  paintRows(bitmap, VISIT_UFO_ROWS, visitLayout(floor).ufoX, ufoTop(pose, ms, floor), (cell, column) => {
+    if (cell === "L") return pose.isFlash ? flash : UFO_LIGHTS[(column + lit) % UFO_LIGHTS.length];
     if (cell === "h") return Math.abs(column - 6) < hatchOpen ? 0xfff3b0 : FLYER_COLORS.d;
     return FLYER_COLORS[cell];
   });
-  const furX = layout.ufoX + Math.floor((PARTY_UFO_WIDTH - FURBALL_WIDTH) / 2);
-  const furY = ufoY - 3 - (pose.isFinale && pose.alien.lift > 0 ? 1 : 0);
-  const rows = ms % 2300 < 130 ? FURBALL_BLINK_ROWS : FURBALL_ROWS;
-  paintRows(bitmap, rows, furX, furY, (cell) => FRIEND_PALETTE[cell]);
-  // Both arms rest on the rim; once the robot is down they swing up in turn to throw.
-  const fur = FRIEND_PALETTE.f ?? WHITE;
-  const arms = [
-    { x: furX - 1, y: furY + 1 },
-    { x: furX + FURBALL_WIDTH, y: furY + 1 },
-  ];
-  const swing = Math.floor((ms - PARTY_LANDED_MS) / CONFETTI_THROW_MS);
-  const swingMs = (ms - PARTY_LANDED_MS) % CONFETTI_THROW_MS;
-  arms.forEach((arm, index) => {
-    const isUp = pose.phase === "party" && swing % 2 === index && swingMs < 160;
-    const out = index === 0 ? -1 : 1;
-    setPixel({ bitmap, x: arm.x, y: furY + 2, color: fur });
-    setPixel({ bitmap, x: arm.x + (isUp ? 0 : out), y: isUp ? furY : furY + 3, color: fur });
-  });
-  drawConfetti(bitmap, { ms, until: STATS_MS - 500, arms, floor });
 }
 
 export const QUESTION_COLOR = 0xffd84a;
@@ -759,8 +703,9 @@ export function drawScene(options: {
   options.monsters.forEach((monster) => drawMonster(bitmap, monster, floor));
   drawBag(bitmap, alien, floor);
   drawStats(bitmap, alien, options.stats, floor);
-  drawParty(bitmap, alien, floor);
+  drawVisitBeam(bitmap, alien, floor);
   drawAlien(bitmap, alien, floor);
+  drawVisitUfo(bitmap, alien, floor);
   drawAsk(bitmap, alien, floor);
   options.orbs.forEach((orb) => drawOrb(bitmap, orb));
   drawBeam(bitmap, alien, floor);

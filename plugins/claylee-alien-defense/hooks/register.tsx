@@ -128,6 +128,13 @@ export const register: Register = (on) => {
     return next(e);
   });
 
+  // A new session (a launch, a resume, a /clear) brings the alien down from the UFO; a plugin
+  // reload runs session.start again but not this, so it does not replay.
+  on("classic.SessionStart", async ($, e, next) => {
+    if (e.source !== "compact") world.arriveByUfo();
+    return next(e);
+  });
+
   on("turn.complete", async ($, e, next) => {
     world.celebrate();
     return next(e);

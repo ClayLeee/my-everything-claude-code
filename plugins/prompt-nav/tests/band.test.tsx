@@ -137,7 +137,7 @@ const PANE = (rows: number) => ({
   },
 });
 
-test("the pane shows the current prompt in full below the list", async ($, on) => {
+test("the pane shows the current prompt in full above the list", async ($, on) => {
   const long = "第一行很長的 prompt 內容，需要換行才能完整顯示出來，最後一句是結尾";
   const clock = session(on, ["short ask", long]);
   await $.ui.mount(BAND);
@@ -148,7 +148,7 @@ test("the pane shows the current prompt in full below the list", async ($, on) =
   expect((await pane.find({ key: "full" }))?.text).toContain("最後一句是結尾");
 });
 
-test("the pane list keeps the current prompt in view above the full box", async ($, on) => {
+test("the pane lists every prompt, so the arrow keys have the whole list to scroll", async ($, on) => {
   const texts = Array.from({ length: 30 }, (_, i) => `ask number ${i + 1}`);
   const clock = session(on, texts);
   await $.ui.mount(BAND);
@@ -156,7 +156,24 @@ test("the pane list keeps the current prompt in view above the full box", async 
 
   const pane = await $.ui.mount(PANE(16));
   expect(await pane.find({ key: "p-29" })).toBeDefined();
-  expect(await pane.find({ key: "p-0" })).toBeUndefined();
+  expect(await pane.find({ key: "p-0" })).toBeDefined();
+});
+
+// Scrolling the current prompt into view needs a real pane; where it cannot, the pane still opens.
+test("the pane opens even where it cannot scroll to the current prompt", async ($, on) => {
+  const clock = session(on, ["first ask", "second ask"]);
+  on("ui.panes", () => ({ value: [] }));
+  on("ui.open", () => ({ value: { isPlaced: true } }));
+  await $.ui.mount(BAND);
+  await clock.advance(200);
+
+  const opened = await $.command.run({
+    command: "prompts",
+    args: "",
+    origin: { kind: "composer" },
+    presentation: { isFullscreen: true, columns: 160 },
+  });
+  expect(opened.text).toBe("Prompt pane opened.");
 });
 
 test("a prompt never drawn jumps by the id read from the transcript", async ($, on) => {

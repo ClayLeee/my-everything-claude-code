@@ -66,6 +66,8 @@ export type Alien = {
   hurtMs: number;
   bagMs: number;
   statsMs: number;
+  // Time left riding the UFO's beam down at session start; 0 once it has arrived.
+  arriveMs: number;
   // How long Claude has been waiting on the person; 0 when it is not.
   askMs: number;
 };
