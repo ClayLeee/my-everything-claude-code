@@ -273,6 +273,69 @@ test("a second /push-checks run while one is going is refused", async ($, on) =>
   await finished;
 });
 
+const TOOL = "mcp__claylee-core__push-checks";
+const callTool = async ($: Engine, cwd?: string) => {
+  const ran = await $.tool.call({ tool: TOOL, ...(cwd ? { cwd } : {}) });
+  return String(ran.result ?? ran.deny);
+};
+
+test("the model gets a push-checks tool, listed up front", async ($, on) => {
+  engine(on, { headTree: "t1", workTree: "t1", config });
+  const registered: { name: string; isDeferred?: boolean }[] = [];
+  on("session.start", (_, e) => ({ cwd: e.cwd }));
+  on("tool.register", ($, event) => {
+    registered.push(event);
+    return { value: { tool: `mcp__claylee-core__${event.name}` } };
+  });
+  await $.session.start({ cwd: REPO, surface: "terminal", isInteractive: true });
+  expect(registered.find((tool) => tool.name === "push-checks")?.isDeferred).toBe(false);
+});
+
+test("the push-checks tool waits for every check and then lets the push through", async ($, on) => {
+  const repo: Repo = { headTree: "t1", workTree: "t1", config, shell: [] };
+  const { screen } = engine(on, repo);
+  const denied = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(denied.deny).toContain(TOOL);
+  const text = await callTool($);
+  expect(repo.shell).toEqual(["pnpm lint", "pnpm test"]);
+  expect(text).toContain("2 項全部通過");
+  expect(text).toContain("✓ pnpm test");
+  expect(screen.statuses.at(-1)).toBeUndefined();
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toBeUndefined();
+});
+
+test("the push-checks tool stops at the first failure and returns its output", async ($, on) => {
+  const repo: Repo = {
+    headTree: "t1",
+    workTree: "t1",
+    config: JSON.stringify({ checks: ["pnpm fail-lint", "pnpm test"] }),
+    shell: [],
+  };
+  engine(on, repo);
+  const text = await callTool($);
+  expect(repo.shell).toEqual(["pnpm fail-lint"]);
+  expect(text).toContain("pnpm fail-lint 失敗");
+  expect(text).toContain("1 test failed");
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toContain("pnpm fail-lint");
+});
+
+test("the push-checks tool runs nothing in a repo without push-checks.json", async ($, on) => {
+  const repo: Repo = { headTree: "t1", workTree: "t1", shell: [] };
+  engine(on, repo);
+  expect(await callTool($)).toContain("不需要跑檢查");
+  expect(repo.shell).toEqual([]);
+});
+
+test("the push-checks tool judges the repo its cwd names", async ($, on) => {
+  // The session's repo has checks; the worktree named by cwd resolves to one that has none.
+  const repo: Repo = { headTree: "t1", workTree: "t1", config, shell: [] };
+  engine(on, repo);
+  expect(await callTool($, "C:/other/wt")).toContain("不需要跑檢查");
+  expect(repo.shell).toEqual([]);
+});
+
 test("/push-checks with no argument shows the status", async ($, on) => {
   engine(on, { headTree: "t1", workTree: "t1", config });
   const result = await run($, "");
