@@ -243,7 +243,7 @@ async function start($: $) {
   await $.command.register({
     name: "cicd",
     description: "Watch GitLab commits and pipelines (/cicd help for all subcommands)",
-    argumentHint: "[help | add | rm | list | refresh | reload | close]",
+    argumentHint: "[on | off | help | add | rm | list | refresh | reload]",
   });
   void boot($);
 }
@@ -276,8 +276,8 @@ async function remove($: $, target: string): Promise<string> {
 }
 
 const HELP = [
-  "/cicd                     開啟 CI/CD pane",
-  "/cicd close               關閉 pane",
+  "/cicd                     顯示或隱藏 CI/CD pane",
+  "/cicd on | off            開啟／關閉 pane",
   "/cicd add <url>           加入專案（完整 URL：https://host/group/project）",
   "                          不加 @branch：盯全專案最新 1 條 pipeline；加 @branch：只看該分支",
   "/cicd rm <project>        移除專案（完整 id 或專案短名）",
@@ -308,12 +308,19 @@ export const register: Register = (on, options) => {
   on("command.run", { command: "cicd" }, async ($, e) => {
     const [verb = "", ...rest] = e.args.trim().split(/\s+/);
     const arg = rest.join(" ");
+    const isOpen = async () => (await $.ui.panes()).some((p) => p.id === PANE);
     switch (verb) {
       case "":
+      case "on":
       case "open":
+        if (verb === "" && (await isOpen())) {
+          await $.ui.close({ id: PANE });
+          return { text: "CI/CD pane closed." };
+        }
         await $.ui.open({ id: PANE, title: "CI/CD", columns: PANE_COLUMNS });
         void boot($);
         return { text: "CI/CD pane opened." };
+      case "off":
       case "close":
         await $.ui.close({ id: PANE });
         return { text: "CI/CD pane closed." };

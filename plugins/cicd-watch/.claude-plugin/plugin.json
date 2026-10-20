@@ -1,6 +1,6 @@
 {
   "name": "cicd-watch",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Watch GitLab projects: latest commit and pipeline progress, live in a pane",
   "author": {
     "name": "ClayLeee",
