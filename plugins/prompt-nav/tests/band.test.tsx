@@ -59,6 +59,43 @@ test("the band follows the scroll to the next prompt", async ($, on) => {
   expect(await band.find({ text: "❯ 2/2 " })).toBeDefined();
 });
 
+const send = ($: Parameters<Parameters<typeof test>[1]>[0], uuid: string, text: string, door: "prompt" | "attachment") =>
+  $.session.append({
+    message: { type: door === "prompt" ? "user" : "attachment", content: [{ type: "text", text }] },
+    door,
+    origin: { kind: "composer" },
+    uuid,
+  } as never);
+
+// A row pushed off screen by a burst of output, or unmounted, may never report `onScreen: null`,
+// so it would stay "on screen" and, being the topmost, keep the band on it.
+test("sending a prompt moves the band to it past a row stuck on screen", async ($, on) => {
+  const texts = ["first ask"];
+  const clock = session(on, texts);
+  await $.ui.mount(row("u1", "first ask", { first: 0, last: 1, of: 2 }));
+  await clock.advance(200);
+  texts.push("second ask");
+  await send($, "u2", "second ask", "prompt");
+  await clock.advance(200);
+
+  const band = await $.ui.mount(BAND);
+  expect(await band.find({ text: "❯ 2/2 " })).toBeDefined();
+});
+
+test("a prompt sent mid-turn moves the band to it past a row stuck on screen", async ($, on) => {
+  const notice = "The user sent a new message while you were working:\nsent mid-turn\n\nThis is how Claude Code surfaces messages";
+  const texts = ["first ask"];
+  const clock = session(on, texts);
+  await $.ui.mount(row("u1", "first ask", { first: 0, last: 1, of: 2 }));
+  await clock.advance(200);
+  texts.push("sent mid-turn");
+  await send($, "a1", notice, "attachment");
+  await clock.advance(200);
+
+  const band = await $.ui.mount(BAND);
+  expect(await band.find({ text: "❯ 2/2 " })).toBeDefined();
+});
+
 test("the band stays out of the way with no prompts", async ($, on) => {
   const clock = session(on, []);
   await clock.advance(200);

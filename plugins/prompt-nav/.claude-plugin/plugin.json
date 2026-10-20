@@ -1,6 +1,6 @@
 {
   "name": "prompt-nav",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Prompt history: a pane to search and jump to your prompts, and a boxed band naming the prompt the transcript is at",
   "author": {
     "name": "ClayLeee",

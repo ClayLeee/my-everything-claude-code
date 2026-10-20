@@ -45,7 +45,7 @@
       "name": "prompt-nav",
       "source": "./plugins/prompt-nav",
       "description": "Pane mod: search and jump to the prompts you sent, including ones sent while Claude was working, plus a band naming the prompt the transcript is at. Toggle with /prompts.",
-      "version": "0.1.0"
+      "version": "0.1.1"
     }
   ]
 }

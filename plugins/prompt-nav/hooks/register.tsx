@@ -168,6 +168,14 @@ export const register: Register = (on) => {
         const texts = typedText !== undefined ? [typedText] : midTurnPrompts(body);
         for (const text of texts)
           if (!seen.some((s) => s.id === stored.uuid)) seen.push({ id: stored.uuid, text });
+        // Sending brings the transcript back to the bottom. A row pushed off by a burst of output
+        // or unmounted may never have said `onScreen: null`, and as the topmost "shown" it would
+        // hold the band; start over at the newest prompt and let the rows on screen report again.
+        if (texts.length > 0) {
+          shown.clear();
+          left = undefined;
+          await update($, current, () => null);
+        }
       }
       later($, "refresh");
     }
