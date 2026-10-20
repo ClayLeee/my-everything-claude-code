@@ -202,8 +202,6 @@ export interface PartyPose {
   robotHop: Hop;
   // The robot has just touched down.
   isLanding: boolean;
-  // The alien looks up at the UFO coming in.
-  isLookingUp: boolean;
 }
 
 const GROUNDED: Hop = { lift: 0, isCrouched: false };
@@ -236,7 +234,6 @@ export function partyPose(ms: number): PartyPose {
     alien: GROUNDED,
     robotHop: GROUNDED,
     isLanding: false,
-    isLookingUp: false,
   };
   if (ms < DESCEND_MS)
     return {
@@ -246,7 +243,6 @@ export function partyPose(ms: number): PartyPose {
       hatch: 0,
       beam: 0,
       robot: undefined,
-      isLookingUp: true,
     };
   if (ms < LANDED_MS) {
     const at = ms - DESCEND_MS;
@@ -260,7 +256,6 @@ export function partyPose(ms: number): PartyPose {
       beam: clamp01((at - HATCH_MS) / BEAM_GROW_MS),
       robot,
       robotSway: robot === undefined ? 0 : Math.round(Math.sin(ms / 80) * 1.4 * (1 - robot)),
-      isLookingUp: true,
     };
   }
   if (ms < LIFT_AT_MS) {

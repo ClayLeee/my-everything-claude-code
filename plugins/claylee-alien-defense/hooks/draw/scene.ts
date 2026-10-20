@@ -337,11 +337,9 @@ function drawGun(bitmap: Bitmap, alien: Alien, x: number, y: number): void {
   GUN_TIP.forEach((spot) => setPixel({ bitmap, x: x + spot.x, y: y + spot.y, color: tip }));
 }
 
-// Arms up and waving (looking up while the UFO comes in), squashed on a hop's crouch, and
-// the high-five's windup, slap and recoil.
+// Arms up and waving, squashed on a hop's crouch, and the high-five's windup, slap and recoil.
 function partyAlienSprite(pose: PartyPose, ms: number): Bitmap {
   const isWaveBeat = Math.floor(ms / 200) % 2 === 1;
-  if (pose.isLookingUp) return isWaveBeat ? ALIEN.cheerWaveUp : ALIEN.cheerUp;
   if (pose.five === "windup") return ALIEN.windup;
   if (pose.five) return ALIEN.highFive;
   if (pose.alien.isCrouched) return ALIEN.cheerCrouch;
