@@ -1,6 +1,6 @@
 import { expect, test } from "claude-code/testing";
 
-import { ALIEN } from "../hooks/art/alien";
+import { ALIEN, ALIEN_PALETTE } from "../hooks/art/alien";
 import { ROBOT } from "../hooks/art/friends";
 import type { Bitmap } from "../hooks/shared/pixel/bitmap";
 import { STATS_ENTRY_MS, STATS_MS, STATS_TOTAL_MS } from "../hooks/sim/constants";
@@ -28,6 +28,21 @@ test("every pose variant differs from the frame it was cut from", () => {
   expect(sameBitmap(ROBOT.idle, ROBOT.highFive)).toBe(false);
   expect(sameBitmap(ROBOT.crouch, ROBOT.windup)).toBe(false);
   expect(ROBOT.crouch.height).toBe(ROBOT.idle.height - 1);
+});
+
+// Pink stays on the gun's emitter only; over the head every pose wears two green antennae.
+test("every pose wears twin green antennae and no pink one", () => {
+  const pink = new Set<number>([ALIEN_PALETTE.a, ALIEN_PALETTE.A]);
+  Object.entries(ALIEN).forEach(([name, sprite]) => {
+    const rows = Array.from({ length: sprite.height }, (_, y) =>
+      sprite.pixels.slice(y * sprite.width, (y + 1) * sprite.width),
+    );
+    const head = rows.findIndex((row) => row.includes(ALIEN_PALETTE.o));
+    const above = rows.slice(0, head).flat();
+    expect([name, above.some((color) => color !== null && pink.has(color))]).toEqual([name, false]);
+  });
+  const top = ALIEN.stand.pixels.slice(0, ALIEN.stand.width);
+  expect(top.filter((color) => color === ALIEN_PALETTE.L).length).toBe(2);
 });
 
 test("the stats party lands the robot before the first line and high-fives on every line", () => {
