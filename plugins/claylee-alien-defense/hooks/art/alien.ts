@@ -11,7 +11,6 @@ export const ALIEN_PALETTE = {
   w: 0xf4fff6,
   k: 0x10202a,
   e: 0x7a8296,
-  E: 0x434958,
   S: 0x7d8bb0,
   T: 0xb5c3e0,
   s: 0x4a5578,
@@ -309,15 +308,6 @@ const WINDUP_ROWS = replaceRows({
   },
 });
 
-// Pupils up, watching the UFO come in.
-const lookingUp = (rows: readonly string[]): string[] =>
-  replaceRows({
-    rows,
-    replacements: {
-      "..GoGwwGwwGoG..": "..GoGwkGwkGoG..",
-      "..GoGwkGwkGoG..": "..GoGwwGwwGoG..",
-    },
-  });
 
 // Knees bent: the shins (row 12 of a standing sprite) fold away, so the alien stands a pixel lower.
 const crouched = (rows: readonly string[]): string[] => rows.filter((_, row) => row !== 12);
@@ -340,10 +330,9 @@ function twinAntennae(rows: readonly string[]): string[] {
   });
 }
 
-// Gray eyes, no white or pupil: each eye is the 2×2 block around a pupil `k`, the white beside
-// it (either side, as mirrored poses flip it) and the row of white over it (under it when looking
-// up). The block turns gray (`e`) and the pupil's cell a darker gray (`E`), so the gaze still
-// reads. The grin's teeth (`w`) stay white.
+// Solid gray eyes, no white and no pupil: each eye is the 2×2 block around a pupil `k`, the white
+// beside it (either side, as mirrored poses flip it) and the row of white over it (under it when
+// looking up), and the whole block turns gray (`e`). The grin's teeth (`w`) stay white.
 function grayEyes(rows: readonly string[]): string[] {
   const cells = rows.map((row) => Array.from(row));
   rows.forEach((row, y) => {
@@ -354,7 +343,6 @@ function grayEyes(rows: readonly string[]): string[] {
       const other = rows[y - 1]?.slice(left, left + 2) === "ww" ? y - 1 : y + 1;
       if (rows[other]?.slice(left, left + 2) !== "ww") return;
       for (const at of [y, other]) for (const column of [left, left + 1]) cells[at]![column] = "e";
-      cells[y]![x] = "E";
     });
   });
   return cells.map((row) => row.join(""));
@@ -397,8 +385,6 @@ export const ALIEN = {
   cheer: parse(CHEER_ROWS),
   cheerWave: parse(CHEER_WAVE_ROWS),
   cheerCrouch: parse(crouched(CHEER_ROWS)),
-  cheerUp: parse(lookingUp(CHEER_ROWS)),
-  cheerWaveUp: parse(lookingUp(CHEER_WAVE_ROWS)),
   highFive: parse(HIGH_FIVE_ROWS),
   windup: parse(crouched(WINDUP_ROWS)),
   bag: parse(BAG_ROWS),

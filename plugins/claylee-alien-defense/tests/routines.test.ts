@@ -21,8 +21,6 @@ test("every pose variant differs from the frame it was cut from", () => {
   expect(sameBitmap(ALIEN.sleep, ALIEN.sleepAway)).toBe(false);
   expect(sameBitmap(ALIEN.sleepBreath, ALIEN.sleepAwayBreath)).toBe(false);
   expect(sameBitmap(ALIEN.cheer, ALIEN.cheerWave)).toBe(false);
-  expect(sameBitmap(ALIEN.cheer, ALIEN.cheerUp)).toBe(false);
-  expect(sameBitmap(ALIEN.cheerWave, ALIEN.cheerWaveUp)).toBe(false);
   expect(sameBitmap(ALIEN.highFive, ALIEN.windup)).toBe(false);
   expect(ALIEN.cheerCrouch.height).toBe(ALIEN.cheer.height - 1);
   expect(sameBitmap(ROBOT.idle, ROBOT.highFive)).toBe(false);
@@ -45,14 +43,12 @@ test("every pose wears twin green antennae and no pink one", () => {
   expect(top.filter((color) => color === ALIEN_PALETTE.L).length).toBe(2);
 });
 
-// The eyes are gray with a darker gray where the pupil was: no white of the eye, no black pupil.
-test("every pose has gray eyes and no black pupils", () => {
+// The eyes are solid gray: no white of the eye and no pupil.
+test("every pose has solid gray eyes with no pupils", () => {
   Object.entries(ALIEN).forEach(([name, sprite]) => {
     expect([name, sprite.pixels.includes(ALIEN_PALETTE.k)]).toEqual([name, false]);
   });
-  const count = (color: number) => ALIEN.stand.pixels.filter((pixel) => pixel === color).length;
-  expect([count(ALIEN_PALETTE.e), count(ALIEN_PALETTE.E)]).toEqual([6, 2]);
-  expect(sameBitmap(ALIEN.cheer, ALIEN.cheerUp)).toBe(false);
+  expect(ALIEN.stand.pixels.filter((pixel) => pixel === ALIEN_PALETTE.e).length).toBe(8);
 });
 
 test("the stats party lands the robot before the first line and high-fives on every line", () => {
@@ -102,9 +98,6 @@ test("each party move comes in beats: hatch, beam, drop; windup, slap, recoil; c
   const finale = poses.filter((pose) => pose.isFinale && pose.alien.lift > 0);
   expect(finale.every((pose) => pose.robotHop.lift === pose.alien.lift)).toBe(true);
   expect(Math.max(...finale.map((pose) => pose.alien.lift))).toBeGreaterThan(hopHeight);
-  // The alien watches the UFO come in, then stops looking up once the robot is down.
-  expect(partyPose(300).isLookingUp).toBe(true);
-  expect(partyPose(STATS_TOTAL_MS).isLookingUp).toBe(false);
 });
 
 test("a lift grinds up slower than it comes down and rests after a set", () => {
