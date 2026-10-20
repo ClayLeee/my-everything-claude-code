@@ -4,6 +4,17 @@ import type { Color } from "../shared/pixel/bitmap";
 export const UFO_ROWS = ["...ddd...", "..dGGGd..", "oMMMMMMMo", ".oLoLoLo."];
 export const SATELLITE_ROWS = ["pp.r.pp", "ppoMopp", "pp...pp"];
 
+// The same UFO up close, when it visits the alien (session start, `/alien stats`): a size up,
+// with a belly hatch (`h`) the scene opens from the middle out.
+export const VISIT_UFO_ROWS = [
+  "...ddddddd...",
+  "..dGGGGGGGd..",
+  "oMMMMMMMMMMMo",
+  ".oLoLoLoLoLo.",
+  "....ohhho....",
+];
+export const VISIT_UFO_WIDTH = 13;
+
 export const FLYER_COLORS: Readonly<Record<string, Color>> = {
   o: 0x1a1e2c,
   d: 0x5d6684,

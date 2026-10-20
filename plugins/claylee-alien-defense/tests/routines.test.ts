@@ -1,10 +1,18 @@
 import { expect, test } from "claude-code/testing";
 
 import { ALIEN, ALIEN_PALETTE } from "../hooks/art/alien";
-import { ROBOT } from "../hooks/art/friends";
 import type { Bitmap } from "../hooks/shared/pixel/bitmap";
 import { STATS_ENTRY_MS, STATS_MS, STATS_TOTAL_MS } from "../hooks/sim/constants";
-import { BREATH_MS, flexPose, liftPose, partyPose, sleepPose } from "../hooks/sim/routines";
+import {
+  ARRIVE_MS,
+  arrivePose,
+  BREATH_MS,
+  flexPose,
+  liftPose,
+  sleepPose,
+  statsPose,
+} from "../hooks/sim/routines";
+import type { VisitPose } from "../hooks/sim/routines";
 
 const sample = <T>(pose: (ms: number) => T, untilMs: number, stepMs = 20): T[] => {
   const poses: T[] = [];
@@ -23,15 +31,11 @@ test("every pose variant differs from the frame it was cut from", () => {
   expect(sameBitmap(ALIEN.cheer, ALIEN.cheerWave)).toBe(false);
   expect(sameBitmap(ALIEN.cheer, ALIEN.cheerUp)).toBe(false);
   expect(sameBitmap(ALIEN.cheerWave, ALIEN.cheerWaveUp)).toBe(false);
-  expect(sameBitmap(ALIEN.highFive, ALIEN.windup)).toBe(false);
   expect(ALIEN.cheerCrouch.height).toBe(ALIEN.cheer.height - 1);
-  expect(sameBitmap(ROBOT.idle, ROBOT.highFive)).toBe(false);
-  expect(sameBitmap(ROBOT.crouch, ROBOT.windup)).toBe(false);
-  expect(ROBOT.crouch.height).toBe(ROBOT.idle.height - 1);
 });
 
-// Pink stays on the gun's emitter only; over the head every pose wears two green antennae.
-test("every pose wears twin green antennae and no pink one", () => {
+// Pink stays on the gun's emitter only; over the head every pose wears one green antenna.
+test("every pose wears one green antenna and no pink one", () => {
   const pink = new Set<number>([ALIEN_PALETTE.a, ALIEN_PALETTE.A]);
   Object.entries(ALIEN).forEach(([name, sprite]) => {
     const rows = Array.from({ length: sprite.height }, (_, y) =>
@@ -42,7 +46,7 @@ test("every pose wears twin green antennae and no pink one", () => {
     expect([name, above.some((color) => color !== null && pink.has(color))]).toEqual([name, false]);
   });
   const top = ALIEN.stand.pixels.slice(0, ALIEN.stand.width);
-  expect(top.filter((color) => color === ALIEN_PALETTE.L).length).toBe(2);
+  expect(top.filter((color) => color === ALIEN_PALETTE.L).length).toBe(1);
 });
 
 // The eyes are gray with a darker gray where the pupil was: no white of the eye, no black pupil.
@@ -55,56 +59,44 @@ test("every pose has gray eyes and no black pupils", () => {
   expect(sameBitmap(ALIEN.cheer, ALIEN.cheerUp)).toBe(false);
 });
 
-test("the stats party lands the robot before the first line and high-fives on every line", () => {
-  const poses = sample(partyPose, STATS_MS);
-  const landed = partyPose(STATS_TOTAL_MS);
-  expect(landed.phase).toBe("party");
-  expect(landed.robot).toBe(1);
-  // One slap per board line: four creatures and the boss.
-  const slaps = poses.filter((pose, index) => pose.isSlap && !poses[index - 1]?.isSlap);
-  expect(slaps.length).toBe(5);
-  expect(slaps.every((pose) => pose.isHighFive)).toBe(true);
+test("the stats visit takes the alien up the beam, flashes on every line and shoots it back down", () => {
+  const poses = sample(statsPose, STATS_MS, 10);
+  const firstAt = (match: (pose: VisitPose) => boolean): number => poses.findIndex(match);
+  // It watches the UFO come in; the hatch opens before the beam reaches out, and the beam is
+  // all the way down before the alien leaves the ground.
+  expect(statsPose(300).isLookingUp).toBe(true);
+  expect(firstAt((pose) => pose.hatch > 0)).toBeLessThan(firstAt((pose) => pose.beam > 0));
+  expect(firstAt((pose) => pose.beam === 1)).toBeLessThanOrEqual(firstAt((pose) => (pose.rise ?? 1) > 0));
+  expect(poses.some((pose) => pose.phase === "carry" && pose.sway !== 0)).toBe(true);
+  // Aboard while the board's lines come up: a flash at the start of each of the five.
+  expect(statsPose(STATS_TOTAL_MS).rise).toBeUndefined();
+  const flashes = poses.filter((pose, index) => pose.isFlash && !poses[index - 1]?.isFlash);
+  expect(flashes.length).toBe(5);
   // The finale comes with the boss line only.
   const finale = poses.filter((pose) => pose.isFinale);
   expect(finale.length).toBeGreaterThan(0);
   expect(finale.every((pose) => pose.entry === 4)).toBe(true);
-  expect(partyPose(STATS_TOTAL_MS + 4 * STATS_ENTRY_MS + 200).isFinale).toBe(true);
-  // The UFO comes down, takes the robot back and is gone as the board fades.
-  expect(partyPose(0).ufo).toBe(0);
-  const last = partyPose(STATS_MS - 1);
-  expect(last.robot).toBeUndefined();
-  expect(last.ufo).toBeLessThan(0.1);
-  expect(poses.some((pose) => pose.phase === "lift" && pose.beam > 0)).toBe(true);
+  expect(statsPose(STATS_TOTAL_MS + 4 * STATS_ENTRY_MS + 200).isFinale).toBe(true);
+  // Shot back out after it boards, landing crouched where it stood, and the UFO is gone as
+  // the board fades.
+  const spat = firstAt((pose) => pose.phase === "spit" && pose.rise !== undefined);
+  expect(spat).toBeGreaterThan(firstAt((pose) => pose.phase === "aboard"));
+  expect(poses.slice(spat).some((pose) => pose.isLanding && pose.rise === 0)).toBe(true);
+  expect(statsPose(0).ufo).toBe(0);
+  expect(statsPose(STATS_MS - 1).ufo).toBeLessThan(0.1);
+  expect(statsPose(STATS_MS - 1).rise).toBe(0);
 });
 
-test("each party move comes in beats: hatch, beam, drop; windup, slap, recoil; crouch, air, land", () => {
-  const poses = sample(partyPose, STATS_MS, 10);
-  const firstAt = (match: (pose: ReturnType<typeof partyPose>) => boolean): number =>
-    poses.findIndex(match);
-  // The hatch opens before the beam reaches out, and the beam is down before the robot leaves.
-  expect(firstAt((pose) => pose.hatch > 0)).toBeLessThan(firstAt((pose) => pose.beam > 0));
-  expect(firstAt((pose) => pose.beam === 1)).toBeLessThanOrEqual(
-    firstAt((pose) => pose.robot !== undefined),
-  );
-  expect(poses.some((pose) => pose.phase === "beam" && pose.robotSway !== 0)).toBe(true);
-  expect(poses.some((pose) => pose.isLanding && pose.robotHop.isCrouched)).toBe(true);
-  // Every line runs windup, slap, recoil in that order, the alien crouched on the windup.
-  const order = poses.map((pose) => pose.five).filter((five, index, all) => five && five !== all[index - 1]);
-  expect(order.join(",")).toBe(Array(5).fill("windup,slap,recoil").join(","));
-  expect(poses.filter((pose) => pose.five === "windup").every((pose) => pose.alien.isCrouched)).toBe(true);
-  // Hops start and end in a crouch, and the two take turns rather than jump together.
-  const party = poses.filter((pose) => pose.phase === "party" && !pose.five && !pose.isFinale);
-  expect(party.some((pose) => pose.alien.isCrouched)).toBe(true);
-  expect(party.some((pose) => pose.alien.lift > 0 && pose.robotHop.lift === 0)).toBe(true);
-  expect(party.some((pose) => pose.robotHop.lift > 0 && pose.alien.lift === 0)).toBe(true);
-  // At the finale they jump together, higher than any hop.
-  const hopHeight = Math.max(...party.map((pose) => pose.alien.lift));
-  const finale = poses.filter((pose) => pose.isFinale && pose.alien.lift > 0);
-  expect(finale.every((pose) => pose.robotHop.lift === pose.alien.lift)).toBe(true);
-  expect(Math.max(...finale.map((pose) => pose.alien.lift))).toBeGreaterThan(hopHeight);
-  // The alien watches the UFO come in, then stops looking up once the robot is down.
-  expect(partyPose(300).isLookingUp).toBe(true);
-  expect(partyPose(STATS_TOTAL_MS).isLookingUp).toBe(false);
+test("a new session brings the alien down the beam and the UFO leaves", () => {
+  const poses = sample(arrivePose, ARRIVE_MS, 10);
+  // Aboard while the UFO comes in, then carried down from the hatch to the ground.
+  expect(arrivePose(300).rise).toBeUndefined();
+  const carried = poses.filter((pose) => pose.phase === "carry").map((pose) => pose.rise ?? 0);
+  expect(carried[0]).toBeGreaterThan(0.9);
+  expect(carried.every((rise, index) => index === 0 || rise <= (carried[index - 1] ?? 1))).toBe(true);
+  expect(poses.some((pose) => pose.isLanding)).toBe(true);
+  expect(arrivePose(ARRIVE_MS - 1).ufo).toBeLessThan(0.1);
+  expect(arrivePose(ARRIVE_MS - 1).rise).toBe(0);
 });
 
 test("a lift grinds up slower than it comes down and rests after a set", () => {

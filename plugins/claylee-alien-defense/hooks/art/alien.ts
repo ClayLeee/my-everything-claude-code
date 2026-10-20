@@ -279,36 +279,6 @@ const CHEER_WAVE_ROWS = replaceRows({
   replacements: { ".L.....A.....L.": "L......A......L" },
 });
 
-// The right hand up and out to slap the robot's, at sprite (14, 3).
-const HIGH_FIVE_ROWS = [
-  ".......a.......",
-  ".......A.......",
-  ".....ooooo.....",
-  "....oLLGGGo...L",
-  "...oLGGGGGGo.LG",
-  "...oGwwGwwGo.G.",
-  "...oGwkGwkGoG..",
-  "...oDGwwwGDoG..",
-  "....oDDDDDoG...",
-  "...GoTTSSoG....",
-  "...GoTSSSo.....",
-  "...GosSSso.....",
-  "....os.os......",
-  "...obb.obb.....",
-];
-export const HIGH_FIVE_HAND = { x: 14, y: 3 };
-
-// Cocked back before the slap, hand by the cheek.
-const WINDUP_ROWS = replaceRows({
-  rows: HIGH_FIVE_ROWS,
-  replacements: {
-    "....oLLGGGo...L": "....oLLGGGo....",
-    "...oLGGGGGGo.LG": "...oLGGGGGGo...",
-    "...oGwwGwwGo.G.": "...oGwwGwwGo.L.",
-    "...oGwkGwkGoG..": "...oGwkGwkGoGG.",
-  },
-});
-
 // Pupils up, watching the UFO come in.
 const lookingUp = (rows: readonly string[]): string[] =>
   replaceRows({
@@ -322,22 +292,11 @@ const lookingUp = (rows: readonly string[]): string[] =>
 // Knees bent: the shins (row 12 of a standing sprite) fold away, so the alien stands a pixel lower.
 const crouched = (rows: readonly string[]): string[] => rows.filter((_, row) => row !== 12);
 
-// Twin green antennae: the single antenna drawn above the head (`a` tip over `A` stalk) splits
-// into a V, the stalks one pixel to either side and the tips two. Only rows above the head's
-// outline change, since `a` also paints the gun's emitter.
-function twinAntennae(rows: readonly string[]): string[] {
+// A green antenna: the one drawn above the head (`a` tip over `A` stalk) takes the skin's light
+// and base greens. Only rows above the head's outline change, since `a` also paints the gun's emitter.
+function greenAntenna(rows: readonly string[]): string[] {
   const head = rows.findIndex((row) => row.includes("o"));
-  return rows.map((row, index) => {
-    if (index >= head) return row;
-    const cells = Array.from(row.replace(/[aA]/g, "."));
-    Array.from(row).forEach((cell, column) => {
-      const spread = cell === "a" ? 2 : cell === "A" ? 1 : 0;
-      if (spread === 0) return;
-      for (const at of [column - spread, column + spread])
-        if (at >= 0 && at < cells.length) cells[at] = cell === "a" ? "L" : "G";
-    });
-    return cells.join("");
-  });
+  return rows.map((row, index) => (index >= head ? row : row.replace(/a/g, "L").replace(/A/g, "G")));
 }
 
 // Gray eyes, no white or pupil: each eye is the 2×2 block around a pupil `k`, the white beside
@@ -361,7 +320,7 @@ function grayEyes(rows: readonly string[]): string[] {
 }
 
 const parse = (rows: readonly string[]): Bitmap =>
-  parsePixelMap({ rows: grayEyes(twinAntennae(rows)), palette: ALIEN_PALETTE });
+  parsePixelMap({ rows: grayEyes(greenAntenna(rows)), palette: ALIEN_PALETTE });
 
 export const MUZZLE_X = 17;
 export const MUZZLE_Y = 10;
@@ -399,7 +358,5 @@ export const ALIEN = {
   cheerCrouch: parse(crouched(CHEER_ROWS)),
   cheerUp: parse(lookingUp(CHEER_ROWS)),
   cheerWaveUp: parse(lookingUp(CHEER_WAVE_ROWS)),
-  highFive: parse(HIGH_FIVE_ROWS),
-  windup: parse(crouched(WINDUP_ROWS)),
   bag: parse(BAG_ROWS),
 };

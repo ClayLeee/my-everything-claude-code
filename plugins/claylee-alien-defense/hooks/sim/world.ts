@@ -3,11 +3,12 @@ import type { Bitmap } from "../shared/pixel/bitmap";
 import { BOSS_TITLES } from "../art/boss";
 import { MONSTER_NAMES } from "../art/monsters";
 import { EFFECT_LIFE_MS, FIREWORK_REACH } from "../draw/effects";
-import { boardLeft, drawScene, isPresenting, muzzleOf, partyLayout } from "../draw/scene";
+import { VISIT_UFO_WIDTH } from "../art/flyers";
+import { boardLeft, drawScene, muzzleOf, visitLayout, visitOf } from "../draw/scene";
 import { blendSky, skyFor } from "../draw/sky";
 import type { SkyStyle } from "../draw/sky";
 import { DOC_COUNT, phaseRank } from "../openspec";
-import { flexPose, liftPose, partyPose, sleepPose } from "./routines";
+import { ARRIVE_MS, flexPose, liftPose, sleepPose } from "./routines";
 import {
   AIM_MS,
   BAG_MS,
@@ -197,6 +198,7 @@ export function createWorld(options: { seed?: number } = {}) {
     hurtMs: 0,
     bagMs: 0,
     statsMs: 0,
+    arriveMs: 0,
     askMs: 0,
   };
   // Questions put to the person still open (AskUserQuestion, ExitPlanMode).
@@ -390,33 +392,33 @@ export function createWorld(options: { seed?: number } = {}) {
     idleBeat = beat;
   }
 
-  // Dust as the robot lands; on each high-five a spark where the hands meet and the scene holds
-  // for a beat, like a landed shot; at the finale two fireworks shot off the UFO's rim.
-  function partyEffects(): void {
-    if (!isPresenting(alien)) return;
-    const pose = partyPose(STATS_MS - alien.statsMs);
-    const layout = partyLayout(floor);
+  // The UFO's visits: dust where the alien touches down (the scene holding a beat when it is
+  // shot back out), and at the stats' boss line two fireworks off the UFO's rim.
+  function visitEffects(): void {
+    const visit = visitOf(alien);
+    if (!visit) return;
+    const { pose } = visit;
+    const layout = visitLayout(floor);
     const landing = pose.isLanding ? "landing" : "";
-    const slap = pose.isSlap ? `slap:${pose.entry}` : "";
     const finale = pose.isFinale ? "finale" : "";
-    if (landing && !partyBeat.includes(landing))
-      effects.push({ kind: "dust", x: layout.robotX + 3, y: floor - 1, ageMs: 0 });
-    if (slap && !partyBeat.includes(slap)) {
-      effects.push({ kind: "sparkle", ...layout.slap, ageMs: 0 });
-      freezeMs = HIT_STOP_MS;
+    if (landing && !partyBeat.includes(landing)) {
+      effects.push({ kind: "dust", x: layout.centerX, y: floor - 1, ageMs: 0 });
+      if (alien.statsMs > 0) freezeMs = HIT_STOP_MS;
     }
-    // Only where there is sky over the alien to burst in (the short pane has none), and clear
-    // of the board by a firework's reach. The second goes up a moment after the first.
+    // Only where there is sky over the alien to burst in (the short pane has none), inside the
+    // pane and clear of the board by a firework's reach: both in the gap between the UFO and
+    // the board, one high and one low, clear of the alien's beam. The second goes up a moment later.
     if (finale && !partyBeat.includes(finale) && layout.hoverY >= 0) {
-      const from = { x: layout.ufoX, y: layout.hoverY + 2 };
+      const from = { x: layout.centerX, y: layout.hoverY + 1 };
+      const x = layout.ufoX + VISIT_UFO_WIDTH + 3;
       [
-        { x: layout.ufoX - 6, y: layout.hoverY - 1, direction: 1, ageMs: 0 },
-        { x: layout.ufoX - 11, y: layout.hoverY + 1, direction: -1, ageMs: -180 },
+        { x, y: layout.hoverY, direction: 1, ageMs: 0 },
+        { x: x + 1, y: layout.hoverY + 8, direction: -1, ageMs: -180 },
       ]
-        .filter((shot) => shot.x + FIREWORK_REACH + 1 < boardLeft(columns))
+        .filter((shot) => shot.x - FIREWORK_REACH >= 0 && shot.x + FIREWORK_REACH + 1 < boardLeft(columns))
         .forEach((shot) => effects.push({ kind: "firework", from, ...shot }));
     }
-    partyBeat = `${landing} ${slap} ${finale}`;
+    partyBeat = `${landing} ${finale}`;
   }
 
   function advanceAlien(dtMs: number): void {
@@ -426,8 +428,11 @@ export function createWorld(options: { seed?: number } = {}) {
     alien.hurtMs = Math.max(0, alien.hurtMs - dtMs);
     alien.bagMs = Math.max(0, alien.bagMs - dtMs);
     alien.statsMs = Math.max(0, alien.statsMs - dtMs);
-    partyEffects();
+    alien.arriveMs = Math.max(0, alien.arriveMs - dtMs);
+    visitEffects();
     alien.askMs = asking > 0 ? alien.askMs + dtMs : 0;
+    // Riding the beam down at session start: creatures that turn up wait for it to land.
+    if (alien.arriveMs > 0) return;
     const target = retarget();
     if (alien.mode === "idle") {
       // A question for the person gets the alien up to wait on the answer.
@@ -687,6 +692,17 @@ export function createWorld(options: { seed?: number } = {}) {
       alien.statsMs = STATS_MS;
       partyBeat = "";
       effects = effects.filter((effect) => effect.kind !== "zee");
+    },
+
+    // A new session: the UFO brings the alien down its beam, awake and on its feet.
+    arriveByUfo(): void {
+      alien.arriveMs = ARRIVE_MS;
+      alien.statsMs = 0;
+      alien.bagMs = 0;
+      partyBeat = "";
+      effects = effects.filter((effect) => effect.kind !== "zee");
+      if (alien.mode === "idle" && alien.activity === "sleep") nextActivity();
+      note("飛碟送電子星人抵達");
     },
 
     slain: (): number => slain,

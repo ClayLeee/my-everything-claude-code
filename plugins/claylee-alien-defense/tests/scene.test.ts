@@ -1,7 +1,8 @@
 import { expect, test } from "claude-code/testing";
 
-import { boardLeft, partyLayout } from "../hooks/draw/scene";
-import { FRAME_MS, floorOf, MAX_COLUMNS, STAGE_ROWS, TALL_ROWS } from "../hooks/sim/constants";
+import { boardLeft, visitLayout } from "../hooks/draw/scene";
+import { FRAME_MS, floorOf, HOME_X, MAX_COLUMNS, STAGE_ROWS, TALL_ROWS } from "../hooks/sim/constants";
+import { ARRIVE_MS } from "../hooks/sim/routines";
 import type { Mode } from "../hooks/sim/types";
 import { createWorld } from "../hooks/sim/world";
 
@@ -37,36 +38,46 @@ test("each stage paints a sky of its own, and the night stage a ground of its ow
   expect(frameOf(stage("night")).ground).not.toBe(frameOf({ kind: "free" }).ground);
 });
 
-test("the stats party hangs a UFO over the alien and stands a robot beside it", async () => {
-  const quiet = createWorld();
-  const party = createWorld();
-  [quiet, party].forEach((world) => world.resize(MAX_COLUMNS, TALL_ROWS));
-  party.showStats();
-  run(quiet, 2000);
-  run(party, 2000);
+// Pixels that differ from a world left alone, inside a box.
+function changedIn(
+  quiet: ReturnType<typeof createWorld>,
+  busy: ReturnType<typeof createWorld>,
+  box: { left: number; right: number; top: number; bottom: number },
+): number {
   const before = quiet.frame().pixels.slice();
-  const { pixels, width } = party.frame();
-  const floor = floorOf(TALL_ROWS * 2);
-  const layout = partyLayout(floor);
-  const changedIn = (left: number, right: number, top: number, bottom: number): number => {
-    let changed = 0;
-    for (let y = top; y < bottom; y += 1) {
-      for (let x = left; x < right; x += 1) {
-        if (before[y * width + x] !== pixels[y * width + x]) changed += 1;
-      }
-    }
-    return changed;
-  };
-  expect(changedIn(layout.ufoX, layout.ufoX + 13, layout.hoverY, layout.hoverY + 5)).toBeGreaterThan(20);
-  expect(changedIn(layout.robotX, layout.robotX + 7, floor - 10, floor)).toBeGreaterThan(20);
+  const { pixels, width } = busy.frame();
+  let changed = 0;
+  for (let y = box.top; y < box.bottom; y += 1)
+    for (let x = box.left; x < box.right; x += 1)
+      if (before[y * width + x] !== pixels[y * width + x]) changed += 1;
+  return changed;
+}
+
+const tallPair = () => {
+  const quiet = createWorld();
+  const busy = createWorld();
+  [quiet, busy].forEach((world) => world.resize(MAX_COLUMNS, TALL_ROWS));
+  return { quiet, busy, floor: floorOf(TALL_ROWS * 2) };
+};
+
+test("the stats visit hangs the UFO over the alien and takes it aboard", async () => {
+  const { quiet, busy, floor } = tallPair();
+  busy.showStats();
+  run(quiet, 2000);
+  run(busy, 2000);
+  const layout = visitLayout(floor);
+  const ufo = { left: layout.ufoX, right: layout.ufoX + 13, top: layout.hoverY, bottom: layout.hoverY + 5 };
+  expect(changedIn(quiet, busy, ufo)).toBeGreaterThan(20);
+  // Aboard, the spot where the alien stood is empty.
+  const spot = { left: HOME_X, right: HOME_X + 15, top: floor - 12, bottom: floor };
+  expect(changedIn(quiet, busy, spot)).toBeGreaterThan(40);
 });
 
-test("the stats party kicks up dust, sparks and holds on each high-five, and ends on fireworks", async () => {
+test("the stats visit shoots the alien back down with dust and a held beat, and ends on fireworks", async () => {
   const world = createWorld();
   world.resize(MAX_COLUMNS, TALL_ROWS);
   world.showStats();
   let dust = 0;
-  let sparks = 0;
   let fireworks = 0;
   let held = 0;
   for (let elapsed = 0; elapsed < 7000; elapsed += FRAME_MS) {
@@ -78,25 +89,23 @@ test("the stats party kicks up dust, sparks and holds on each high-five, and end
     world.effects().forEach((effect) => {
       if (seen.has(effect)) return;
       if (effect.kind === "dust") dust += 1;
-      if (effect.kind === "sparkle") sparks += 1;
       if (effect.kind === "firework") fireworks += 1;
     });
   }
   expect(dust).toBe(1);
-  expect(sparks).toBe(5);
-  expect(held).toBeGreaterThanOrEqual(5);
+  expect(held).toBeGreaterThanOrEqual(1);
   expect(fireworks).toBe(2);
 });
 
-// Inside its rim the board is a dark panel; confetti or a firework there would be bright.
-test("the stats party keeps its confetti and fireworks off the board", async () => {
+// Inside its rim the board is a dark panel; a firework there would be bright.
+test("the stats visit keeps its fireworks off the board", async () => {
   const world = createWorld();
   world.resize(MAX_COLUMNS, TALL_ROWS);
   world.showStats();
   const floor = floorOf(TALL_ROWS * 2);
   const left = boardLeft(MAX_COLUMNS);
   let brightest = 0;
-  for (let elapsed = 0; elapsed < 5600; elapsed += FRAME_MS) {
+  for (let elapsed = 0; elapsed < 6400; elapsed += FRAME_MS) {
     world.tick(FRAME_MS);
     if (elapsed < 300) continue;
     const { pixels, width } = world.frame();
@@ -109,6 +118,30 @@ test("the stats party keeps its confetti and fireworks off the board", async () 
     }
   }
   expect(brightest).toBeLessThan(0x80);
+});
+
+test("a new session brings the alien down the UFO's beam, and creatures wait for it to land", async () => {
+  const { quiet, busy, floor } = tallPair();
+  busy.arriveByUfo();
+  run(quiet, 300);
+  run(busy, 300);
+  // Still aboard the UFO coming in: nobody on the ground yet.
+  const spot = { left: HOME_X, right: HOME_X + 15, top: floor - 12, bottom: floor };
+  expect(changedIn(quiet, busy, spot)).toBeGreaterThan(40);
+  busy.spawn("Read");
+  let dust = 0;
+  for (let elapsed = 0; elapsed < ARRIVE_MS; elapsed += FRAME_MS) {
+    const seen = new Set(busy.effects());
+    if (busy.alien().arriveMs > 0) expect(busy.alien().mode).toBe("idle");
+    busy.tick(FRAME_MS);
+    busy.effects().forEach((effect) => {
+      if (!seen.has(effect) && effect.kind === "dust") dust += 1;
+    });
+  }
+  expect(dust).toBe(1);
+  expect(busy.alien().arriveMs).toBe(0);
+  run(busy, 600);
+  expect(busy.alien().mode).not.toBe("idle");
 });
 
 test("a creature on the field is drawn where it stands", async () => {
