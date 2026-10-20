@@ -9,7 +9,6 @@ import {
   pick,
   typedPrompt,
   widthOf,
-  windowAround,
 } from "./prompts";
 import type { Left, Seen } from "./prompts";
 
@@ -155,6 +154,10 @@ export const register: Register = (on) => {
       columns: PANE_COLUMNS,
       focus: true,
     });
+    const at = await read($, current);
+    // Only a convenience: a pane that cannot scroll yet still opens.
+    if (at !== null)
+      await $.ui.scroll({ in: PANE, to: { key: `r-${at}` }, block: "center" }).catch(() => undefined);
     return { text: "Prompt pane opened." };
   });
 
@@ -245,14 +248,8 @@ export const register: Register = (on) => {
           )
       : 0;
     const fullLines = Math.min(textRows, Math.max(3, Math.floor(bodyRows * 0.4)));
-    const listRows = Math.max(3, bodyRows - (Input ? 4 : 0) - (picked ? fullLines + 3 : 0));
+    // Every prompt is drawn, so the tree outgrows the pane and the arrow keys scroll it.
     const rows = list.map((p, i) => ({ p, i })).filter(({ p }) => p.text.toLowerCase().includes(q));
-    const pos = Math.max(
-      0,
-      rows.findIndex(({ i }) => i === at),
-    );
-    const [from, to] = windowAround(rows.length, pos, listRows);
-    const shownRows = rows.slice(from, to);
     return (
       <Box flexDirection="column">
         {Input && (
@@ -273,8 +270,26 @@ export const register: Register = (on) => {
             />
           </Box>
         )}
+        {picked && (
+          <Box
+            key="full"
+            flexDirection="column"
+            flexShrink={0}
+            borderStyle="round"
+            borderColor="claude"
+            paddingX={1}
+            marginBottom={1}
+            height={fullLines + 2}
+            overflow="hidden"
+          >
+            <Text wrap="wrap">
+              <Text color="claude">{`#${at! + 1} `}</Text>
+              {picked.text}
+            </Text>
+          </Box>
+        )}
         {list.length === 0 && <Text dimColor>No prompts yet.</Text>}
-        {shownRows.map(({ p, i }) => (
+        {rows.map(({ p, i }) => (
           <Box key={`r-${i}`} flexDirection="row">
             <Box flexShrink={0}>
               <Text
@@ -292,24 +307,6 @@ export const register: Register = (on) => {
             />
           </Box>
         ))}
-        {picked && (
-          <Box
-            key="full"
-            flexDirection="column"
-            flexShrink={0}
-            borderStyle="round"
-            borderColor="claude"
-            paddingX={1}
-            marginTop={1}
-            height={fullLines + 2}
-            overflow="hidden"
-          >
-            <Text wrap="wrap">
-              <Text color="claude">{`#${at! + 1} `}</Text>
-              {picked.text}
-            </Text>
-          </Box>
-        )}
       </Box>
     );
   });

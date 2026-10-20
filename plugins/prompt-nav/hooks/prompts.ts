@@ -75,9 +75,3 @@ export function clipCols(text: string, room: number): string {
 export function widthOf(text: string): number {
   return [...text].reduce((n, ch) => n + cols(ch), 0);
 }
-
-export function windowAround(count: number, at: number, size: number): [number, number] {
-  if (count <= size) return [0, count];
-  const start = Math.min(Math.max(0, at - Math.floor(size / 2)), count - size);
-  return [start, start + size];
-}
