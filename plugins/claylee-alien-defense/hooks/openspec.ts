@@ -4,43 +4,30 @@ import type { Mode, Phase } from "./sim/types";
 
 type $ = EngineInterface;
 
-export const DOC_COUNT = 6;
+// The change's four OpenSpec files. Superpowers docs do not count: a spec-patch has none, and a
+// new feature writes them before the change folder exists.
+export const DOC_COUNT = 4;
 
+// Follows the workflow: dawn while the docs are written (Phases 0–2), noon while building
+// (Phase 4; boxes are only ticked after acceptance), dusk once acceptance has begun (Phase 5),
+// night when every box is done and only archiving is left (Phase 6).
 export function phaseOf(options: { docs: number; done: number; total: number }): Phase {
   if (options.docs < DOC_COUNT) return "dawn";
   if (options.total === 0 || options.done === 0) return "noon";
-  if (options.done >= options.total) return "night";
-  return options.done / options.total < 0.5 ? "noon" : "dusk";
+  return options.done >= options.total ? "night" : "dusk";
 }
 
+// A box left open but marked DEFERRED(<reason>) has been dealt with, so it counts as done.
 export function countTasks(text: string): { done: number; total: number } {
-  const boxes = text.match(/^\s*[-*] \[[ xX]\]/gm) ?? [];
-  const done = boxes.filter((box) => /\[[xX]\]/.test(box)).length;
+  const boxes = text.match(/^\s*[-*] \[[ xX]\].*$/gm) ?? [];
+  const done = boxes.filter((box) => /\[[xX]\]|DEFERRED\(/.test(box)).length;
   return { done, total: boxes.length };
 }
 
-const PHASE_ORDER: readonly Phase[] = ["dawn", "noon", "dusk", "night"];
+export const PHASE_ORDER: readonly Phase[] = ["dawn", "noon", "dusk", "night"];
 
 export function phaseRank(phase: Phase): number {
   return PHASE_ORDER.indexOf(phase);
-}
-
-const DATED = /^(\d{4}-\d{2}-\d{2})/;
-
-export function latestArchiveDate(names: readonly string[]): string | undefined {
-  const dates = names
-    .map((name) => DATED.exec(name)?.[1])
-    .filter((date): date is string => date !== undefined)
-    .sort();
-  return dates[dates.length - 1];
-}
-
-// Superpowers docs are written before the change folder exists, so a doc belongs to the
-// current change when it is dated no earlier than the last archived change.
-export function isCurrentDoc(name: string, lastArchived: string | undefined): boolean {
-  if (!name.endsWith(".md")) return false;
-  const date = DATED.exec(name)?.[1];
-  return lastArchived === undefined || date === undefined || date >= lastArchived;
 }
 
 export function pickChange(
@@ -63,16 +50,6 @@ async function listDirs($: $, path: string): Promise<string[]> {
   return (await listEntries($, path))
     .filter((entry) => entry.kind === "dir")
     .map((entry) => entry.name);
-}
-
-async function hasCurrentDoc(
-  $: $,
-  path: string,
-  lastArchived: string | undefined,
-): Promise<boolean> {
-  return (await listEntries($, path)).some(
-    (entry) => entry.kind === "file" && isCurrentDoc(entry.name, lastArchived),
-  );
 }
 
 async function exists($: $, path: string): Promise<boolean> {
@@ -115,10 +92,6 @@ export async function readMode($: $, top: string, current?: string): Promise<Mod
       break;
     }
   }
-  const lastArchived = latestArchiveDate(await listDirs($, `${root}/archive`));
-  if (await hasCurrentDoc($, `${top}/docs/superpowers/specs`, lastArchived)) docs += 1;
-  if (await hasCurrentDoc($, `${top}/docs/superpowers/plans`, lastArchived)) docs += 1;
-
   let tasks = { done: 0, total: 0 };
   try {
     tasks = countTasks(await $.fs.read(`${base}/tasks.md`));

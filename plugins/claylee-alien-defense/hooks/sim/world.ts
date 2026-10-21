@@ -7,7 +7,7 @@ import { VISIT_UFO_WIDTH } from "../art/flyers";
 import { boardLeft, drawScene, muzzleOf, visitLayout, visitOf } from "../draw/scene";
 import { blendSky, skyFor } from "../draw/sky";
 import type { SkyStyle } from "../draw/sky";
-import { DOC_COUNT, phaseRank } from "../openspec";
+import { DOC_COUNT, PHASE_ORDER, phaseRank } from "../openspec";
 import { ARRIVE_MS, flexPose, liftPose, sleepPose } from "./routines";
 import {
   AIM_MS,
@@ -709,6 +709,7 @@ export function createWorld(options: { seed?: number } = {}) {
     bossesSlain: (): number => bossesSlain,
     tally: (): Tally => tally,
     log: (): readonly string[] => lines,
+    bossQueue: (): readonly string[] => pendingBosses.map((pending) => pending.title),
     mode: (): Mode => mode,
     alien: (): Alien => alien,
     boss: (): Boss | undefined => boss,
@@ -741,12 +742,12 @@ export function createWorld(options: { seed?: number } = {}) {
         if (next.kind === "openspec") note(`新的一天：change「${next.change}」開始`);
         return;
       }
-      const advanced =
-        next.kind === "openspec" &&
-        next.change === previous.change &&
-        phaseRank(next.phase) > phaseRank(previous.phase);
+      // Every stage left behind brings its boss, even when one poll skips several (boxes
+      // ticked in one go) or the change is archived before reaching night.
       const finished = next.kind === "free" || next.change !== previous.change;
-      if (advanced || finished) summonBoss(BOSS_TITLES[previous.phase], bossHitsFor(previous));
+      const reached = finished ? PHASE_ORDER.length : phaseRank(next.phase);
+      for (const phase of PHASE_ORDER.slice(phaseRank(previous.phase), reached))
+        summonBoss(BOSS_TITLES[phase], bossHitsFor(previous));
       if (next.kind === "free") note(`change「${previous.change}」已 archive，回到夜間巡邏`);
     },
 
