@@ -30,16 +30,18 @@ Do NOT proceed without reading. If resolution fails, report the error and stop.
 
 ## Step 3: Verify Dev Server
 
-Check if `http://localhost:5173` is reachable. If not:
-- Try `cd app && pnpm dev` in background, or
+Check if the dev server URL is reachable (from `playwright.config.*` `use.baseURL`, else the dev script / framework default — see SKILL.md § Running Tests). If not:
+- Try the dev command (`{run} dev`) in the background from the directory that holds the project's `package.json`, or
 - Inform the user that the dev server needs to be running
 
 ## Step 4: Execute Tests
 
-Run from the `app/` directory:
+Run from the directory that holds the project's `package.json`, with the project's package manager runner (`{run}` / `{exec}` from the lockfile — see SKILL.md § Running Tests):
 ```bash
-E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}
+E2E_REPORT_NAME={page-name} {run} test:e2e -- {spec-path}
 ```
+
+If no dedicated E2E script exists: `E2E_REPORT_NAME={page-name} {exec} playwright test {spec-path}`.
 
 ## Step 5: Error Discrimination
 

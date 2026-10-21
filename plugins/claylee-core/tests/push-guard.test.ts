@@ -11,7 +11,23 @@ type Repo = {
   shell?: string[];
   tools?: string[];
   outcome?: { interrupted?: boolean; backgroundTaskId?: string };
+  // Files changed since the upstream; undefined means the branch has no upstream.
+  changed?: string[];
+  // Uncommitted tracked changes and untracked files, seen only when comparing the working tree.
+  uncommitted?: string[];
+  untracked?: string[];
 };
+
+// Enough of git's glob pathspec for the patterns these tests use.
+const globRegExp = (glob: string) =>
+  new RegExp(
+    `^${glob
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/\*\*\//g, "\u0000")
+      .replace(/\*\*/g, ".*")
+      .replace(/\*/g, "[^/]*")
+      .replace(/\u0000/g, "(?:.*/)?")}$`,
+  );
 
 function engine(on: On, repo: Repo) {
   mock.store(on);
@@ -43,6 +59,23 @@ function engine(on: On, repo: Repo) {
     if (args === "git stash create") return ok(repo.workTree === repo.headTree ? "" : "stashsha\n");
     if (args === "git rev-parse stashsha^{tree}") return ok(`${repo.workTree}\n`);
     if (args === "git rev-parse HEAD^{tree}") return ok(`${repo.headTree}\n`);
+    const excluded = event.argv
+      .filter((arg) => arg.startsWith(":(exclude,glob)"))
+      .map((arg) => globRegExp(arg.slice(":(exclude,glob)".length)));
+    const listed = (files: string[]) =>
+      ok(
+        files
+          .filter((file) => !excluded.some((pattern) => pattern.test(file)))
+          .map((file) => `${file}\n`)
+          .join(""),
+      );
+    if (args.startsWith("git diff --name-only @{upstream} ")) {
+      if (repo.changed === undefined) throw new Error("no upstream configured");
+      const committed = args.startsWith("git diff --name-only @{upstream} HEAD -- . ");
+      return listed(committed ? repo.changed : [...repo.changed, ...(repo.uncommitted ?? [])]);
+    }
+    if (args.startsWith("git ls-files --others --exclude-standard -- . "))
+      return listed(repo.untracked ?? []);
     if (event.argv[0] === "cmd") {
       const check = event.argv[event.argv.length - 1] ?? "";
       repo.shell?.push(check);
@@ -155,6 +188,21 @@ test("checks that passed on uncommitted work still count once it is committed", 
   expect(ran.deny).toBeUndefined();
 });
 
+test("checks on a working tree with another session's edits count for a commit of only this session's files", async ($, on) => {
+  const repo: Repo = { headTree: "t1", workTree: "t2", config };
+  const { screen } = engine(on, repo);
+  await $.tool.call({ tool: "Bash", command: "pnpm lint && pnpm test" });
+  // This session commits its own files; the other session's edits stay uncommitted.
+  repo.headTree = "t1b";
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toBeUndefined();
+  expect(screen.toasts.at(-1)).toContain("其他未 commit 修改");
+  // Any edit after that, by either session, voids the pass.
+  repo.workTree = "t4";
+  const again = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(again.deny).toContain("pnpm lint");
+});
+
 test("an edit after the checks makes the push wait for a fresh run", async ($, on) => {
   const repo: Repo = { headTree: "t1", workTree: "t1", config };
   engine(on, repo);
@@ -182,6 +230,44 @@ test("a check moved to the background or interrupted does not count, and a toast
   const ran = await $.tool.call({ tool: "Bash", command: "git push" });
   expect(ran.deny).toContain("pnpm test");
   expect(ran.deny).toContain("移到背景");
+});
+
+const docsConfig = JSON.stringify({
+  checks: CHECKS,
+  skipWhenOnly: ["openspec/**", "docs/**", "**/*.md"],
+});
+
+test("a push whose commits touch only skipWhenOnly paths goes through without checks", async ($, on) => {
+  const { screen } = engine(on, {
+    headTree: "t1",
+    workTree: "t1",
+    config: docsConfig,
+    changed: ["openspec/changes/a/proposal.md", "docs/superpowers/plans/p.md", "README.md"],
+  });
+  const ran = await $.tool.call({ tool: "Bash", command: "git push origin develop" });
+  expect(ran.deny).toBeUndefined();
+  expect(screen.toasts[0]).toContain("skipWhenOnly");
+});
+
+test("one file outside skipWhenOnly, or no upstream, still needs the checks", async ($, on) => {
+  const repo: Repo = {
+    headTree: "t1",
+    workTree: "t1",
+    config: docsConfig,
+    changed: ["openspec/specs/a/spec.md", "src/app.ts"],
+  };
+  engine(on, repo);
+  const code = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(code.deny).toContain("pnpm lint");
+  repo.changed = undefined;
+  const fresh = await $.tool.call({ tool: "Bash", command: "git push -u origin feature" });
+  expect(fresh.deny).toContain("pnpm lint");
+});
+
+test("without skipWhenOnly a docs-only push still needs the checks", async ($, on) => {
+  engine(on, { headTree: "t1", workTree: "t1", config, changed: ["docs/a.md"] });
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toContain("pnpm lint");
 });
 
 test("git push named inside a string or message is not a push", async ($, on) => {
@@ -319,6 +405,41 @@ test("the push-checks tool stops at the first failure and returns its output", a
   expect(text).toContain("1 test failed");
   const ran = await $.tool.call({ tool: "Bash", command: "git push" });
   expect(ran.deny).toContain("pnpm fail-lint");
+});
+
+test("the push-checks tool, called before the commit, skips work that touches only skipWhenOnly paths", async ($, on) => {
+  const repo: Repo = {
+    headTree: "t1",
+    workTree: "t2",
+    config: docsConfig,
+    changed: [],
+    uncommitted: ["openspec/changes/a/tasks.md"],
+    untracked: ["docs/superpowers/plans/new.md"],
+    shell: [],
+  };
+  engine(on, repo);
+  expect(await callTool($)).toContain("不需要跑檢查");
+  expect(repo.shell).toEqual([]);
+});
+
+test("the push-checks tool runs the checks for uncommitted or untracked code", async ($, on) => {
+  const repo: Repo = {
+    headTree: "t1",
+    workTree: "t2",
+    config: docsConfig,
+    changed: [],
+    uncommitted: ["docs/a.md"],
+    untracked: ["src/new.ts"],
+    shell: [],
+  };
+  engine(on, repo);
+  expect(await callTool($)).toContain("2 項全部通過");
+  expect(repo.shell).toEqual(["pnpm lint", "pnpm test"]);
+  repo.untracked = [];
+  repo.uncommitted = ["src/app.ts"];
+  repo.shell = [];
+  await callTool($);
+  expect(repo.shell).toEqual(["pnpm lint", "pnpm test"]);
 });
 
 test("the push-checks tool runs nothing in a repo without push-checks.json", async ($, on) => {

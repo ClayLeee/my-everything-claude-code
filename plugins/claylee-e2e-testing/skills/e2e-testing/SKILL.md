@@ -157,7 +157,7 @@ When UI code changes, incrementally update tests — rebuilding from scratch los
 | `project-list-edit-dialog` | Edit dialog on project list |
 | `project-list-edit-dialog-tab-members` | Members tab inside edit dialog |
 | `login-username-input` | Username input on login page |
-| `login-sso-gitlab-btn` | GitLab SSO button on login page |
+| `login-sso-btn` | SSO button on login page |
 
 ### Placement Rules
 
@@ -242,20 +242,31 @@ Most commands run in a forked subagent (`context: fork`) with their own referenc
 
 ## Running Tests
 
-**Never use `npx playwright test`** — always go through the project's package manager. Check `package.json` for the E2E script name first (commonly `test:e2e`, `e2e`, or `playwright`). If no dedicated script exists, use `pnpm exec playwright test` as fallback. Set `E2E_REPORT_NAME` to organize reports per page:
+**Use the project's package manager runner**, detected from the lockfile in the `package.json` directory:
+
+| Lockfile | Script runner `{run}` | Binary runner `{exec}` |
+|----------|----------------------|------------------------|
+| `pnpm-lock.yaml` | `pnpm` | `pnpm exec` |
+| `yarn.lock` | `yarn` | `yarn` |
+| `package-lock.json` | `npm run` | `npx` |
+| `bun.lockb` / `bun.lock` | `bun run` | `bunx` |
+
+Check `package.json` for the E2E script name first (commonly `test:e2e`, `e2e`, or `playwright`) and run it with `{run}`. If no dedicated script exists, use `{exec} playwright test` as fallback. Set `E2E_REPORT_NAME` to organize reports per page:
 
 ```bash
 # Run specific spec with named report
-E2E_REPORT_NAME=project-list pnpm test:e2e -- tests/e2e/projects/project-list.spec.ts
+E2E_REPORT_NAME=project-list {run} test:e2e -- tests/e2e/projects/project-list.spec.ts
 # Run headed (visible browser)
-E2E_REPORT_NAME=project-list pnpm test:e2e -- --headed
+E2E_REPORT_NAME=project-list {run} test:e2e -- --headed
 # Interactive UI mode (no report)
-pnpm test:e2e:ui
+{run} test:e2e:ui
 # View HTML report
-pnpm test:e2e:report
+{run} test:e2e:report
 ```
 
 > Adapt the commands to your project's `package.json` scripts. The key convention is setting `E2E_REPORT_NAME` so reports go to `playwright/reports/{page-name}/` instead of a generic `latest/` folder.
+
+**Dev server URL and command** — read the URL from the existing Playwright config's `use.baseURL` if there is one; otherwise from the port in the `dev` script or the dev server config (e.g. `vite.config.*` `server.port`); otherwise the framework default (Vite / SvelteKit `5173`, Next.js / Nuxt / CRA `3000`, Angular `4200`). The dev command is `{run} dev` (or whichever script starts the dev server).
 
 ## Dual Test Reports
 

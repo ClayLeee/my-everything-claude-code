@@ -29,6 +29,33 @@ async function checksOf($: $, top: string): Promise<string[] | null> {
   }
 }
 
+async function skipsOf($: $, top: string): Promise<string[]> {
+  try {
+    const parsed = JSON.parse(await $.fs.read(`${top}/${CONFIG}`)) as { skipWhenOnly?: unknown };
+    return Array.isArray(parsed.skipWhenOnly) ? parsed.skipWhenOnly.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+// When every file that differs from the upstream matches skipWhenOnly, no check can come out
+// differently, so none has to run. No upstream (a new branch) means checks. The push is judged by
+// its commits; the tool runs before the commit, so it also counts uncommitted and untracked files.
+async function onlySkippable($: $, top: string, uncommitted: boolean): Promise<boolean> {
+  const skips = await skipsOf($, top);
+  if (skips.length === 0) return false;
+  const paths = ["--", ".", ...skips.map((pattern) => `:(exclude,glob)${pattern}`)];
+  const changed = await git($, top, [
+    "diff",
+    "--name-only",
+    "@{upstream}",
+    ...(uncommitted ? [] : ["HEAD"]),
+    ...paths,
+  ]);
+  if (changed !== "" || !uncommitted) return changed === "";
+  return (await git($, top, ["ls-files", "--others", "--exclude-standard", ...paths])) === "";
+}
+
 async function workTree($: $, top: string): Promise<string | null> {
   const stash = await git($, top, ["stash", "create"]);
   return git($, top, ["rev-parse", `${stash || "HEAD"}^{tree}`]);
@@ -70,10 +97,22 @@ async function dirOf($: $, command: string, upTo: number): Promise<string> {
   return lastCd(command.slice(0, upTo)) ?? (await $.session.cwd());
 }
 
-async function missingFor($: $, top: string, checks: string[]): Promise<string[]> {
+// A pass counts on the pushed commit's tree, or on the working tree it was committed from. While
+// other sessions keep uncommitted edits, a commit of only this session's files never matches the
+// tree the checks ran on; the working tree, unchanged since the checks, stands in for it.
+async function passesOf($: $, top: string, checks: string[]) {
   const head = await git($, top, ["rev-parse", "HEAD^{tree}"]);
+  const now = await workTree($, top);
   const passed = await passedOf($, top);
-  return checks.filter((check) => head === null || passed[check] !== head);
+  const missing = checks.filter(
+    (check) => head === null || (passed[check] !== head && passed[check] !== now),
+  );
+  const onWorkTree = missing.length === 0 && checks.some((check) => passed[check] !== head);
+  return { missing, onWorkTree };
+}
+
+async function missingFor($: $, top: string, checks: string[]): Promise<string[]> {
+  return (await passesOf($, top, checks)).missing;
 }
 
 async function guard<R extends ToolCallResult<string>>(
@@ -89,8 +128,15 @@ async function guard<R extends ToolCallResult<string>>(
     const top = await git($, dir, ["rev-parse", "--show-toplevel"]);
     const checks = top ? await checksOf($, top) : null;
     if (top && checks) {
-      const missing = await missingFor($, top, checks);
-      if (missing.length > 0) {
+      const { missing, onWorkTree } = await passesOf($, top, checks);
+      if (onWorkTree) {
+        $.ui.toast(
+          "push-guard：檢查是在含有其他未 commit 修改的工作區上通過的，這次 push 的 commit 沒有包含那些修改。",
+        );
+      }
+      if (missing.length > 0 && (await onlySkippable($, top, false))) {
+        $.ui.toast("push-guard：這次 push 只改了 skipWhenOnly 列出的路徑，不用跑檢查，直接放行。");
+      } else if (missing.length > 0) {
         return {
           deny: [
             `push-guard：${CONFIG} 規定這些檢查要在這次 push 的內容上通過：`,
@@ -205,6 +251,8 @@ async function runForModel($: $, cwd: string | undefined): Promise<string> {
   const checks = top ? await checksOf($, top) : null;
   if (!top || !checks) return `這個專案沒有 ${CONFIG}，push 不受保護，不需要跑檢查。`;
   if (running) return "push-checks 已經在執行中，等它跑完再呼叫一次查看結果。";
+  if (await onlySkippable($, top, true))
+    return "跟 upstream 比，這次只改了 skipWhenOnly 列出的路徑，不需要跑檢查，可以直接 commit 和 push。";
   running = top;
   try {
     const lastRun = await runChecks($, top, checks);

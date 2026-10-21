@@ -21,7 +21,7 @@ API response is the **primary** error source — it provides HTTP status, error 
 |---|---|---|---|
 | **Primary** | API Response | Classification, retry decisions, field identification | `page.waitForResponse()` → `status` + `response.json()` |
 | Auxiliary | UI feedback (toast, snackbar, banner, alert, etc.) | Verify UI renders the error to the user | `feedbackError.waitFor()` → `innerText` |
-| Auxiliary | Inline validation | Client-side validation (no API call) | `.text-destructive` presence check |
+| Auxiliary | Inline validation | Client-side validation (no API call) | `{inline-error-selector}` presence check (selector from the source or discovery, e.g. `.text-destructive` in shadcn/Tailwind projects) |
 | Auxiliary | Page-level state | Structural problems (empty table, redirect) | URL / DOM checks |
 
 **Why API-first?** Toast text is a second-hand rendering — it may abbreviate, localize, or omit details from the original API response. `response.json()` gives you the raw `status`, `message`, `field`, and `code` that the UI derived its display from.
@@ -76,7 +76,8 @@ FORM SUBMITTED
 
 NON-FORM ERRORS (no API call involved):
     ├── Redirect to login ──▶ FAIL (session expired)
-    ├── Empty table on initial load ──▶ FAIL (data issue)
+    ├── Empty table where data was expected (seeded, or created earlier in the test) ──▶ FAIL (data issue)
+    │     (an empty table on first load with no expected data is NOT a failure — create data via UI first, see coverage-checklist.md)
     └── Element not found / timeout / disappeared ──▶ [6]
 
 [6] MCP DEBUG (if MCP available AND command has code-modification scope)
@@ -103,7 +104,7 @@ NON-FORM ERRORS (no API call involved):
 | Generic error (no actionable detail) | 400+ | FAIL | Report failure |
 | Inline validation (no API call) | N/A | RECOVERABLE | Fix field value, resubmit |
 | Playwright timeout | N/A | FAIL | Report failure |
-| Empty table (initial load) | 200 | FAIL | Report failure (data issue) |
+| Empty table where data was expected (seeded or created earlier in the test) | 200 | FAIL | Report failure (data issue). No data expected → create via UI first, not a FAIL |
 | Dialog did not open | N/A | FAIL | Report failure |
 | Element not found (`data-testid`) | N/A | LOCATOR_MISMATCH | MCP snapshot → fix data-testid or POM locator → retry |
 | Element not interactable / timeout | N/A | TIMING | MCP snapshot → add explicit waitFor → retry |
@@ -328,8 +329,8 @@ if (feedbackText) {
 Client-side validation fires **before** any API call. If inline errors appear, no API response will be intercepted:
 
 ```typescript
-// Inline validation errors — project-specific selector
-const inlineError = page.locator(".text-destructive");
+// Inline validation errors — project-specific selector (from the source or discovery)
+const inlineError = page.locator("{inline-error-selector}");
 if (await inlineError.count() > 0) {
   const errorText = await inlineError.first().innerText();
   // Fix field value and resubmit — no API classification needed
@@ -339,9 +340,9 @@ if (await inlineError.count() > 0) {
 ### Auxiliary: Page-Level Error States
 
 ```typescript
-// Empty table (data loading issue)
+// Empty table (data loading issue) — only when data was expected (seeded, or created earlier in the test)
 const tableRows = page.locator("table tbody tr");
-await expect(tableRows).not.toHaveCount(0); // FAIL if empty
+await expect(tableRows).not.toHaveCount(0); // FAIL if empty despite expected data
 
 // Redirect to login (session expired)
 if (page.url().includes("/login")) {

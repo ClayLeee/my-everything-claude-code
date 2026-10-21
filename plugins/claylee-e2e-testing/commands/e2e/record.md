@@ -41,14 +41,16 @@ Do NOT proceed without reading. If resolution fails, report the error and stop.
 
 **Step 3a: Verify Playwright dependency**
 
+Run these from the directory that holds the project's `package.json`, using the project's package manager (`{exec}` from the lockfile — see SKILL.md § Running Tests).
+
 Confirm `@playwright/test` is in `package.json` devDependencies:
 ```bash
-cd app && node -e "process.exit(require('./package.json').devDependencies?.['@playwright/test'] ? 0 : 1)"
+node -e "process.exit(require('./package.json').devDependencies?.['@playwright/test'] ? 0 : 1)"
 ```
 
-If not installed:
+If not installed (`{add-dev}` = `pnpm add -D` / `yarn add -D` / `npm install -D` / `bun add -d`):
 ```bash
-cd app && pnpm add -D @playwright/test && pnpm exec playwright install chromium
+{add-dev} @playwright/test && {exec} playwright install chromium
 ```
 
 **Step 3b: Ensure .gitignore excludes recordings**
@@ -62,7 +64,7 @@ playwright/.recordings/
 **Step 3c: Launch codegen**
 
 ```bash
-cd app && mkdir -p playwright/.recordings && pnpm exec playwright codegen --output=playwright/.recordings/raw-recording.ts "$TARGET_URL"
+mkdir -p playwright/.recordings && {exec} playwright codegen --output=playwright/.recordings/raw-recording.ts "$TARGET_URL"
 ```
 
 Tell the user:
@@ -76,7 +78,7 @@ Wait for the codegen process to complete (triggered when user closes the browser
 
 ### Step 4: Read & Parse Codegen Output
 
-1. Read `playwright/.recordings/raw-recording.ts` (relative to `app/` or project root)
+1. Read `playwright/.recordings/raw-recording.ts` (relative to the directory that holds the project's `package.json`)
 2. Parse the raw code and extract:
    - All `page.goto()` calls → identify which pages were visited
    - All actions (click, fill, select, check, etc.) → extract locator + value
@@ -129,7 +131,7 @@ If user says "無", "跳過", "skip", or similar → proceed to Step 6.
 
 From the first `page.goto()` URL:
 - Extract path → derive `page-name` (kebab-case) and `domain` (first path segment)
-- Example: `/overview/project-list` → domain = `overview`, page-name = `project-list`
+- Example: `/admin/items` → domain = `admin`, page-name = `items`
 
 **Step 6b: Write recording artifact**
 
@@ -213,7 +215,7 @@ The subagent should load these references from `$SKILL_DIR/references/`:
 ### Step 9: data-testid Injection (Local mode only)
 
 For locators marked **NEEDS_INJECTION**:
-1. Find the corresponding Vue component file in `src/`
+1. Find the page's source component (the file that renders the element — `.vue`, `.tsx`/`.jsx`, `.svelte`, or Angular template)
 2. Inject `data-testid` following naming convention: `{page}-{component}-{element}`
 3. **Only add `data-testid` attributes — change nothing else in the component**
 
@@ -247,8 +249,10 @@ Check existing spec for semantically similar tests:
 
 ### Step 12: Execute Tests + Error Discrimination
 
+Run from the directory that holds the project's `package.json` (`{run}` / `{exec}` from the lockfile — see SKILL.md § Running Tests; no dedicated script → `{exec} playwright test {spec-path}`):
+
 ```bash
-cd app && E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}
+E2E_REPORT_NAME={page-name} {run} test:e2e -- {spec-path}
 ```
 
 **After execution, apply Error Discrimination:**

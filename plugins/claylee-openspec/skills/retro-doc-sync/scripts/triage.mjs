@@ -4,9 +4,9 @@ import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 const SKIP_TYPES = new Set(["docs", "test", "chore", "style", "ci", "build"]);
-const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|vue|py|go|rs|java|kt|swift|rb|cs)$/;
-const TEST = /(\.|_)(test|spec)\.[a-z]+$|(^|\/)(__tests__|tests?)\//;
-const USER_FACING = /(^|\/)(locales?|i18n|routes?|router|pages?|views|api)\//i;
+const CODE = /\.(ts|tsx|js|jsx|mjs|cjs|vue|svelte|astro|py|go|rs|java|kt|swift|rb|cs|php|c|cpp|h|dart|ex|exs)$/;
+const TEST = /(\.|_)(test|spec)\.[a-z]+$|(^|\/)test_[^/]+\.py$|(^|\/)(__tests__|tests?)\//;
+const USER_FACING = /(^|\/)(locales?|i18n|routes?|router|pages?|views|api|controllers?|handlers?|cmd)\//i;
 
 const [range, cwd = process.cwd()] = process.argv.slice(2);
 if (!range) {
@@ -20,6 +20,7 @@ const shas = git("rev-list", "--reverse", "--no-merges", range).split("\n").filt
 
 const stem = (name) =>
   name
+    .replace(/^test_/, "")
     .replace(/(\.|_)(test|spec)$/, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
