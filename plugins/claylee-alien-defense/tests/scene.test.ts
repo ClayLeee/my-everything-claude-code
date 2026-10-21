@@ -10,7 +10,7 @@ const stage = (phase: "dawn" | "noon" | "dusk" | "night"): Mode => ({
   kind: "openspec",
   change: "idle-logout",
   phase,
-  docs: phase === "dawn" ? 4 : 6,
+  docs: phase === "dawn" ? 3 : 4,
   done: 0,
   total: 5,
   others: 0,

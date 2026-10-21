@@ -1,12 +1,7 @@
 import { expect, test } from "claude-code/testing";
 
-import {
-  countTasks,
-  isCurrentDoc,
-  latestArchiveDate,
-  phaseOf,
-  pickChange,
-} from "../hooks/openspec";
+import { BOSS_TITLES } from "../hooks/art/boss";
+import { countTasks, phaseOf, pickChange } from "../hooks/openspec";
 import { QUESTION_COLOR } from "../hooks/draw/scene";
 import {
   ALIEN_HEIGHT,
@@ -37,22 +32,34 @@ const openspec = (
   kind: "openspec",
   change,
   phase,
-  docs: phase === "dawn" ? 4 : 6,
+  docs: phase === "dawn" ? 3 : 4,
   done: 0,
   total,
   others: 0,
 });
 
-test("superpowers docs count only when dated since the last archived change", async () => {
-  const archive = ["2026-09-01-old-change", "2026-10-02-last-change", "notes"];
-  expect(latestArchiveDate(archive)).toBe("2026-10-02");
-  expect(latestArchiveDate([])).toBeUndefined();
-  expect(isCurrentDoc("2026-09-30-old-design.md", "2026-10-02")).toBe(false);
-  expect(isCurrentDoc("2026-10-02-new-design.md", "2026-10-02")).toBe(true);
-  expect(isCurrentDoc("2026-10-15-new-design.md", "2026-10-02")).toBe(true);
-  expect(isCurrentDoc("undated.md", "2026-10-02")).toBe(true);
-  expect(isCurrentDoc("2026-09-30-old-design.md", undefined)).toBe(true);
-  expect(isCurrentDoc("2026-10-15-image.png", undefined)).toBe(false);
+test("every stage left behind brings its boss, one after another", async () => {
+  const world = createWorld();
+  world.setMode(openspec("dawn"));
+  // The boxes were ticked in one go: dawn, noon and dusk are all left behind at once.
+  world.setMode(openspec("night"));
+  expect(world.boss()?.title).toBe(BOSS_TITLES.dawn);
+  expect(world.bossQueue()).toEqual([BOSS_TITLES.noon, BOSS_TITLES.dusk]);
+  world.setMode({ kind: "free" });
+  expect(world.bossQueue()).toEqual([BOSS_TITLES.noon, BOSS_TITLES.dusk, BOSS_TITLES.night]);
+});
+
+test("archiving before night still brings the remaining bosses, and going back brings none", async () => {
+  const early = createWorld();
+  early.setMode(openspec("noon"));
+  early.setMode({ kind: "free" });
+  expect(early.boss()?.title).toBe(BOSS_TITLES.noon);
+  expect(early.bossQueue()).toEqual([BOSS_TITLES.dusk, BOSS_TITLES.night]);
+  const back = createWorld();
+  back.setMode(openspec("dusk"));
+  back.setMode(openspec("noon"));
+  expect(back.boss()).toBeUndefined();
+  expect(back.bossQueue()).toEqual([]);
 });
 
 test("with several active changes the one touched last is picked", async () => {
@@ -266,13 +273,15 @@ test("a failed call makes the monster blink red", async () => {
   expect(world.monsters()[0]?.rageMs).toBeGreaterThan(0);
 });
 
-test("the stage follows the documents and then the task boxes", async () => {
-  expect(phaseOf({ docs: 4, done: 0, total: 5 })).toBe("dawn");
-  expect(phaseOf({ docs: 6, done: 0, total: 5 })).toBe("noon");
-  expect(phaseOf({ docs: 6, done: 2, total: 5 })).toBe("noon");
-  expect(phaseOf({ docs: 6, done: 3, total: 5 })).toBe("dusk");
-  expect(phaseOf({ docs: 6, done: 5, total: 5 })).toBe("night");
+test("the stage follows the workflow: docs, building, acceptance, ready to archive", async () => {
+  expect(phaseOf({ docs: 3, done: 0, total: 5 })).toBe("dawn");
+  expect(phaseOf({ docs: 4, done: 0, total: 5 })).toBe("noon");
+  expect(phaseOf({ docs: 4, done: 0, total: 0 })).toBe("noon");
+  expect(phaseOf({ docs: 4, done: 1, total: 5 })).toBe("dusk");
+  expect(phaseOf({ docs: 4, done: 4, total: 5 })).toBe("dusk");
+  expect(phaseOf({ docs: 4, done: 5, total: 5 })).toBe("night");
   expect(countTasks("- [x] a\n- [ ] b\n  - [X] c\nnot - [x] d")).toEqual({ done: 2, total: 3 });
+  expect(countTasks("- [x] a\n- [ ] b DEFERRED(L2: needs staging)")).toEqual({ done: 2, total: 2 });
 });
 
 test("a tool call brings a monster that the laser kills once the call ends", async () => {
