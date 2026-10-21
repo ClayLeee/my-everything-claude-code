@@ -81,9 +81,15 @@ This creates a config with: no `webServer`, `fullyParallel: false`, `workers: 1`
 
 ### Setup Commands
 
+Use the directory's package manager, detected from its lockfile (see SKILL.md § Running Tests); a fresh directory with no lockfile uses `npm`:
+
 ```bash
+# pnpm-lock.yaml present
 pnpm install
 pnpm exec playwright install chromium
+# no lockfile / package-lock.json
+npm install
+npx playwright install chromium
 ```
 
 ## Remote Locator Strategy
@@ -258,9 +264,9 @@ Map MCP snapshot elements to behavior types using both ARIA role and context. Co
 | ARIA Pattern | Context | Behavior Type |
 |---|---|---|
 | `button` | Top-level or toolbar, not inside a form | `open-dialog` |
-| `button "確認" / "儲存" / "送出"` | Inside a form or dialog | `form-submit` |
-| `button "刪除" / "移除"` | Any location | `delete-action` |
-| `button "編輯"` | Inside table row or list item | `open-edit-dialog` |
+| `button` with a submit-like label (e.g. Save / Submit / 確認) | Inside a form or dialog | `form-submit` |
+| `button` with a delete-like label (e.g. Delete / Remove / 刪除) | Any location | `delete-action` |
+| `button` with an edit-like label (e.g. Edit / 編輯) | Inside table row or list item | `open-edit-dialog` |
 | `tab` | Inside `tablist` | `tab-switch` |
 | `checkbox` / `switch` | Standalone toggle | `toggle` |
 | `combobox` | Any location | `select-option` |
@@ -270,9 +276,11 @@ Map MCP snapshot elements to behavior types using both ARIA role and context. Co
 
 Once you identify a behavior type, think about the element's business purpose — what the user is trying to accomplish, what can go wrong, and how success is confirmed. Use these questions to derive test scenarios rather than mapping to prescribed steps.
 
-**Disambiguation rule:** When two buttons share the same label (e.g. two `button "編輯"` in different rows), use a parent container to scope the locator:
+Labels are matched against the text observed in the snapshot, in whatever language the page uses — the examples above are not a fixed list.
+
+**Disambiguation rule:** When two buttons share the same label (e.g. two edit buttons in different rows), use a parent container to scope the locator:
 ```typescript
-page.getByRole('row', { name: 'Item Name' }).getByRole('button', { name: '編輯' })
+page.getByRole('row', { name: 'Item Name' }).getByRole('button', { name: '{observed edit label}' })
 ```
 
 ## Recursive Exploration Protocol
@@ -309,7 +317,7 @@ Infer column type from MCP snapshot cell content, then apply the matching assert
 | Date | Matches `YYYY-MM-DD` or `YYYY/MM/DD` | `.toHaveText(/\d{4}[-\/]\d{2}[-\/]\d{2}/)` |
 | Progress fraction | `x/y` pattern | `.toHaveText(/\d+\/\d+/)` |
 | Percentage | `x%` pattern | `.toHaveText(/\d+%/)` |
-| Action button column | Cell contains `button` or `link` | `firstRow.getByRole('button', { name: '編輯' })` — always include `name` to avoid ambiguity when a row has multiple buttons |
+| Action button column | Cell contains `button` or `link` | `firstRow.getByRole('button', { name: '{observed label}' })` — always include `name` to avoid ambiguity when a row has multiple buttons |
 | Empty / N/A | Confirmed no data or non-required field | `.toBeVisible()` or skip assertion with comment |
 
 Apply one assertion per data column. Do not assert on action columns beyond button visibility.

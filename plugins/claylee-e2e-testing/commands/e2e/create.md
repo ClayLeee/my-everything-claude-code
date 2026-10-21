@@ -52,10 +52,10 @@ Run the scaffold script from the **`package.json` directory** (not the repo root
 **Always scaffold** — shared infrastructure required by all tests:
 
 ```bash
-echo '{"targetDir":".","templates":["BasePage","playwright.config.local","error-utils"],"variables":{"BASE_URL":"http://localhost:5173","WEB_SERVER_COMMAND":"pnpm dev"}}' | node $SKILL_DIR/scripts/scaffold.js
+echo '{"targetDir":".","templates":["BasePage","playwright.config.local","error-utils"],"variables":{"BASE_URL":"{baseUrl}","WEB_SERVER_COMMAND":"{webServerCommand}"}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
-Adjust `BASE_URL` and `WEB_SERVER_COMMAND` based on the project's actual dev server.
+Fill `{baseUrl}` and `{webServerCommand}` from the project's actual dev server — see SKILL.md § Running Tests (dev server URL and command, package manager runner `{run}` / `{exec}` from the lockfile).
 
 If auth is **not** required, skip the rest of this step and proceed to Step 4.
 
@@ -86,7 +86,7 @@ Do NOT proceed to Steps 4–10.
 **1. Parse roles** from `.env.test.local`:
 - Each `TEST_{ABBREV}_USERNAME` block defines one role
 - Use the `# Comment` above the block as the role key, camelCased (e.g., `# System Admin` → `systemAdmin`)
-- If no comment, lowercase the abbreviation (e.g., `TEST_AD_USERNAME` → `ad`)
+- If no comment, lowercase the abbreviation (e.g., `TEST_ADMIN_USERNAME` → `admin`)
 - `FIRST_ROLE` = the first role parsed
 
 **2. Dynamically generate `tests/fixtures/auth.ts`** (do NOT scaffold from template) — see `references/auth-patterns.md` § Generating auth.ts for the full convention.
@@ -118,7 +118,7 @@ echo '{"targetDir":".","templates":["playwright.config.local.auth"],"variables":
 **6. Run auth setup** to create `.auth/*.json` for all roles:
 
 ```bash
-pnpm exec playwright test tests/e2e/auth/auth.setup.ts
+{exec} playwright test tests/e2e/auth/auth.setup.ts
 ```
 
 - **Success** → `.auth/{role}.json` created for all roles — proceed to Step 4
@@ -131,7 +131,7 @@ pnpm exec playwright test tests/e2e/auth/auth.setup.ts
 ## Step 4: Inject `data-testid`
 
 Per the coverage plan's injection summary:
-- Add `data-testid` attributes to Vue components
+- Add `data-testid` attributes to the page's source components (syntax per framework: SKILL.md § Framework Syntax)
 - **Only add attributes — change nothing else in the component files**
 
 ## Step 5: Build POM Class
@@ -172,7 +172,7 @@ The file skeleton when creating from scratch:
 
 ## Step 6: Build Spec File
 
-Create `tests/e2e/{domain}/{page-name}.spec.ts` (domain inferred from `src/views/` subdirectory, e.g. `src/views/projects/` → `tests/e2e/projects/`):
+Create `tests/e2e/{domain}/{page-name}.spec.ts` (domain inferred from the page's route or its page directory, e.g. `/projects` or `src/views/projects/` / `app/projects/page.tsx` → `tests/e2e/projects/`):
 - Follow the coverage plan's test scenario list and interaction depth checklist
 - Tests start from authenticated state (no login in `beforeEach`)
 - For destructive operations (create/edit/delete), follow UI-Only Test Data Policy
@@ -202,14 +202,14 @@ IF dev server NOT running OR MCP NOT available:
 
 ## Step 8: Execute Tests
 
-Run tests from the `package.json` directory. **Never use `npx playwright test`** — always go through the project's package manager.
+Run tests from the `package.json` directory with the project's package manager runner (`{run}` / `{exec}` from the lockfile — see SKILL.md § Running Tests).
 
 First, check `package.json` for the E2E script name (commonly `test:e2e`, `e2e`, or `playwright`):
-- If a dedicated script exists: `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}`
-- If no dedicated script: `E2E_REPORT_NAME={page-name} pnpm exec playwright test {spec-path}`
+- If a dedicated script exists: `E2E_REPORT_NAME={page-name} {run} test:e2e -- {spec-path}`
+- If no dedicated script: `E2E_REPORT_NAME={page-name} {exec} playwright test {spec-path}`
 
 ```bash
-E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}
+E2E_REPORT_NAME={page-name} {run} test:e2e -- {spec-path}
 ```
 
 **After execution, apply Error Discrimination:**

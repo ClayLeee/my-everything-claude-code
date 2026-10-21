@@ -8,8 +8,8 @@
  *   pageName       — kebab-case page name (e.g., "project-list")
  *   pageNameZh     — 繁體中文 page name (e.g., "專案列表")
  *   testDate       — date string (e.g., "2026-03-19")
- *   testUrl        — URL tested (e.g., "http://localhost:5173/projects")
- *   testAccount    — account used (e.g., "sysadmin (系統管理員 權限)")
+ *   testUrl        — URL tested (e.g., "http://localhost:3000/projects")
+ *   testAccount    — account used (e.g., "admin (管理員權限)"); rendered as 未指定 when omitted or empty
  *   describeGroups — array of test describe groups with test results
  *   outputDir      — directory to write the report (e.g., "playwright/reports/project-list")
  *
@@ -31,7 +31,7 @@ function generateReport(input) {
     pageNameZh,
     testDate,
     testUrl,
-    testAccount = 'sysadmin',
+    testAccount,
     describeGroups = [],
     outputDir,
   } = input;
@@ -67,7 +67,7 @@ function generateReport(input) {
   lines.push(`**測試日期**: ${testDate}`);
   lines.push(`**測試 URL**: ${testUrl}`);
   lines.push(`**測試工具**: Playwright`);
-  lines.push(`**測試帳號**: ${testAccount}`);
+  lines.push(`**測試帳號**: ${testAccount || '未指定'}`);
   lines.push('');
   lines.push('---');
   lines.push('');

@@ -17,16 +17,16 @@ Patterns for Playwright Codegen recording → AI-powered POM/Spec transformation
 
 ### Dependency Check
 
-Before launching codegen, verify Playwright is a local dependency:
+Before launching codegen, verify Playwright is a local dependency. Run from the directory that holds the project's `package.json`, using the project's package manager (`{exec}` from the lockfile — see SKILL.md § Running Tests):
 
 ```bash
 # Check if @playwright/test is in devDependencies
-cd app && node -e "process.exit(require('./package.json').devDependencies?.['@playwright/test'] ? 0 : 1)"
+node -e "process.exit(require('./package.json').devDependencies?.['@playwright/test'] ? 0 : 1)"
 ```
 
-If not installed:
+If not installed (`{add-dev}` = `pnpm add -D` / `yarn add -D` / `npm install -D` / `bun add -d`):
 ```bash
-cd app && pnpm add -D @playwright/test && pnpm exec playwright install chromium
+{add-dev} @playwright/test && {exec} playwright install chromium
 ```
 
 ### Launch Command
@@ -36,7 +36,7 @@ cd app && pnpm add -D @playwright/test && pnpm exec playwright install chromium
 mkdir -p playwright/.recordings
 
 # Launch codegen with output file
-cd app && pnpm exec playwright codegen --output=playwright/.recordings/raw-recording.ts "$TARGET_URL"
+{exec} playwright codegen --output=playwright/.recordings/raw-recording.ts "$TARGET_URL"
 ```
 
 **Parameters:**
@@ -52,7 +52,7 @@ Codegen produces a self-contained TypeScript file:
 import { test, expect } from '@playwright/test';
 
 test('test', async ({ page }) => {
-  await page.goto('http://localhost:5173/overview/project-list');
+  await page.goto('http://localhost:3000/items');
   await page.getByRole('button', { name: '新增' }).click();
   await page.getByPlaceholder('請輸入名稱').fill('Test Project');
   await page.getByRole('combobox', { name: '角色' }).selectOption('admin');
@@ -101,7 +101,7 @@ Parse the codegen output to extract a structured action list:
 Track `page.goto()` calls to determine which page(s) the recording spans:
 
 ```
-page.goto('/overview/project-list')  → page = project-list
+page.goto('/admin/items')           → page = items
 page.goto('/settings/members')       → page = members (cross-page!)
 ```
 
@@ -140,7 +140,7 @@ Priority: `data-testid` > `getByRole` > `getByText`
 
 **Step 3:** Classification result for each locator:
 - **HAS_TESTID** — `data-testid` found → use it in POM
-- **NEEDS_INJECTION** — element has no `data-testid` → inject into Vue component, then use in POM
+- **NEEDS_INJECTION** — element has no `data-testid` → inject into the page's source component, then use in POM
 - **KEEP_SEMANTIC** — element is a pure text/role reference (e.g., toast message) → keep `getByText`/`getByRole`
 
 ### Remote Mode (external URL, no source code)
@@ -156,9 +156,9 @@ Determine where to insert the generated test code.
 ### Step 1: Extract URL Path
 
 From `page.goto()` calls, extract the URL path and derive:
-- **domain** — first path segment (e.g., `/overview/project-list` → `overview`)
-- **page-name** — last meaningful path segment (e.g., `project-list`)
-- **PageName** — PascalCase version (e.g., `ProjectList`)
+- **domain** — first path segment (e.g., `/admin/items` → `admin`)
+- **page-name** — last meaningful path segment (e.g., `items`)
+- **PageName** — PascalCase version (e.g., `Items`)
 
 ### Step 2: Find Existing Files
 
@@ -268,7 +268,7 @@ test('should perform recorded action description', async ({ page }) => {
   // Wait for API + assert
   await somePage.waitForApi('/api/endpoint');
   const feedback = await somePage.getSuccessFeedback();
-  expect(feedback).toContain('成功');
+  expect(feedback).toContain('{observed success text}'); // text seen on the page during recording / discovery
 });
 ```
 

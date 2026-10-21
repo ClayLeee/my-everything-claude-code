@@ -238,7 +238,7 @@ test.describe('Rich Text Editor', () => {
     await page.keyboard.type('Persisted content')
 
     const { ok } = await listPage.interceptApi(
-      '/v3/items/',
+      '/api/items/', // the page's real API path — from the source or browser_network_requests
       () => listPage.editDialog.submitBtn.click()
     )
     expect(ok).toBe(true)
@@ -279,7 +279,7 @@ test.describe('File Upload', () => {
       buffer: Buffer.from('fake-pdf-content'),
     })
 
-    await expect(dropZone).toContainText(/document\.pdf|上傳成功/i)
+    await expect(dropZone).toContainText(/document\.pdf/i) // or the upload success text observed on the page
   })
 
   test('should reject invalid file type', async () => {
@@ -291,7 +291,8 @@ test.describe('File Upload', () => {
       buffer: Buffer.from('fake-content'),
     })
 
-    await expect(page.locator('.text-destructive')).toBeVisible()
+    // {inline-error-selector}: the project's inline error element, from the source or discovery
+    await expect(page.locator('{inline-error-selector}')).toBeVisible()
   })
 })
 ```

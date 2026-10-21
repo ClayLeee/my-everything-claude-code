@@ -35,8 +35,8 @@ Do NOT proceed without reading. If resolution fails, report the error and stop.
 Perform full local analysis of the target page:
 
 1. **Read component tree** — Follow all import statements from the page component, recursively trace child components
-2. **Analyze templates** — Identify all interactive elements, `v-if`/`v-for` conditionals, slots
-3. **Trace event handlers** — Map `@click`, `@submit`, etc. to their handler functions → API calls
+2. **Analyze templates** — Identify all interactive elements, conditionals and loops (Vue: `v-if`/`v-for`; React/JSX: `cond && …` / `.map()`), slots / children
+3. **Trace event handlers** — Map click/submit handlers (Vue: `@click`, `@submit`; React/JSX: `onClick`, `onSubmit`; see `references/semantic-analysis.md` for other frameworks) to their handler functions → API calls
 4. **Build Semantic Element Table (SET)** — List every testable element with:
    - Element type (button, input, table, dialog, tab, select, etc.)
    - Current selector (existing `data-testid` or suggested injection point)

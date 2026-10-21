@@ -43,9 +43,9 @@ Determine the change scope using one or both input sources:
 - Locate the corresponding source files, POM, and spec
 
 **B. Git diff** — Automatic detection from code changes:
-- Run `git diff --name-only` (current vs base branch) and filter for:
-  - `app/src/views/` — page components
-  - `app/src/components/` — shared components
+- Run `git diff --name-only` (current vs base branch) and filter, under the directory that holds the project's `package.json`, for:
+  - the page/route directory — page components (e.g. `src/views/`, `src/pages/`, `app/`, `src/routes/`)
+  - the shared component directory — shared components (e.g. `src/components/`)
 
 **Decision logic:**
 - User provided description only → use (A)
@@ -74,21 +74,21 @@ Add `data-testid` to new elements only. **Only add attributes — change nothing
 ## Step 5: Update POM + Spec
 
 - POM path: `tests/e2e/pages/{PageName}Page.ts`
-- Spec path: `tests/e2e/{domain}/{page-name}.spec.ts` (domain inferred from `src/views/` subdirectory)
+- Spec path: `tests/e2e/{domain}/{page-name}.spec.ts` (domain inferred from the page's route or its page directory)
 - Update POM class with new/removed locators and action methods
 - Update spec file with new/removed/modified test cases
 - Do NOT touch unrelated tests
 
 ## Step 6: Execute Tests
 
-Run from the `package.json` directory. **Never use `npx playwright test`** — always go through the project's package manager.
+Run from the `package.json` directory with the project's package manager runner (`{run}` / `{exec}` from the lockfile — see SKILL.md § Running Tests).
 
 Check `package.json` for the E2E script name, then run:
-- If a dedicated script exists: `E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}`
-- If no dedicated script: `E2E_REPORT_NAME={page-name} pnpm exec playwright test {spec-path}`
+- If a dedicated script exists: `E2E_REPORT_NAME={page-name} {run} test:e2e -- {spec-path}`
+- If no dedicated script: `E2E_REPORT_NAME={page-name} {exec} playwright test {spec-path}`
 
 ```bash
-E2E_REPORT_NAME={page-name} pnpm test:e2e -- {spec-path}
+E2E_REPORT_NAME={page-name} {run} test:e2e -- {spec-path}
 ```
 
 **After execution, apply Error Discrimination:**

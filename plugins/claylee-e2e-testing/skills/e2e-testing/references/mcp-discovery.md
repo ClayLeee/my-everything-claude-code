@@ -155,7 +155,7 @@ For each form in the Coverage Plan:
 ### Step 1: Dry-Run
 
 ```
-browser_navigate → /overview/project-list
+browser_navigate → /projects
 browser_click → [Add Project button]
 browser_fill_form → [{name: "Project Name", type: "textbox", value: "[E2E] Test"}]
 browser_click → [Submit button]

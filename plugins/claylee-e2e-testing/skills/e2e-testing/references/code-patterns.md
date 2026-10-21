@@ -21,7 +21,7 @@ echo '{"targetDir":".","templates":["BasePage"],"variables":{}}' | node $SKILL_D
 ```
 
 **Key API surface:**
-- `constructor(page, feedback?)` — accepts a `FeedbackConfig` (presets: `sonner`, `mui`, `antd`, `reactHotToast`, `dataTestId`, or custom)
+- `constructor(page, feedback?)` — accepts a `FeedbackConfig` of `{ success?, error? }` selectors (`FeedbackSelector`: `selector` + optional `textSelector`); there are no built-in presets — pass the project's own selectors (see below)
 - `interceptApi(urlPattern, action)` — intercept API response → `{ ok, status, body }` for error classification
 - `waitForApi(urlPattern)` — fire-and-forget wait for API response
 - `waitForNavigation(urlPattern)` — wait for SPA route change
@@ -201,9 +201,11 @@ test('conditional skip', async ({ page }) => {
 
 ### Identify Flakiness
 
+Use the project's package manager runner (`{exec}` from the lockfile — see SKILL.md § Running Tests):
+
 ```bash
-npx playwright test tests/search.spec.ts --repeat-each=10
-npx playwright test tests/search.spec.ts --retries=3
+{exec} playwright test tests/search.spec.ts --repeat-each=10
+{exec} playwright test tests/search.spec.ts --retries=3
 ```
 
 ### Common Causes & Fixes
@@ -263,7 +265,7 @@ outputDir: 'playwright/test-results',  // All artifacts go here
 ## Codegen Workflow
 
 ```bash
-npx playwright codegen http://localhost:5173
+{exec} playwright codegen {dev-server-url}
 ```
 
 After recording:
@@ -283,7 +285,7 @@ After recording:
 Use `scaffold.js` to create the config with project-specific values:
 
 ```bash
-echo '{"targetDir":".","templates":["playwright.config.local"],"variables":{"BASE_URL":"http://localhost:5173","WEB_SERVER_COMMAND":"pnpm dev"}}' | node $SKILL_DIR/scripts/scaffold.js
+echo '{"targetDir":".","templates":["playwright.config.local"],"variables":{"BASE_URL":"{baseUrl}","WEB_SERVER_COMMAND":"{webServerCommand}"}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
 For remote testing, use `playwright.config.remote` template instead. See `templates/` for the full source.

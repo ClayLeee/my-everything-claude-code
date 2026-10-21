@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const reportName = process.env.E2E_REPORT_NAME || 'latest'
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -7,7 +9,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: [
-    ['html', { outputFolder: 'playwright/reports' }],
+    ['html', { outputFolder: `playwright/reports/${reportName}`, open: 'never' }],
   ],
   outputDir: 'playwright/test-results',
   use: {

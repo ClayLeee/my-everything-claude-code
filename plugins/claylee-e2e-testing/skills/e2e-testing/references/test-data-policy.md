@@ -60,6 +60,8 @@ test.describe.serial('Create → Verify → Delete', () => {
 
 ## Create with UI Cleanup — Full Example
 
+> `/api/projects` stands for the page's real API path (from the source or `browser_network_requests`); `{observed success text}` is the feedback text actually seen on the page.
+
 ```typescript
 test.describe('Create Project', () => {
   test.describe.serial('Create → Cleanup', () => {
@@ -70,11 +72,11 @@ test.describe('Create Project', () => {
       await listPage.goto()
       await listPage.addButton.click()
       await listPage.createDialog.nameInput.fill(TEST_NAME)
-      const apiPromise = listPage.waitForApi('/v3/projects')
+      const apiPromise = listPage.waitForApi('/api/projects')
       await listPage.createDialog.submitBtn.click()
       await apiPromise
       const feedback = await listPage.getSuccessFeedback()
-      expect(feedback).toContain('成功')
+      expect(feedback).toContain('{observed success text}')
     })
 
     test('should clean up via UI delete', async ({ page }) => {
@@ -85,10 +87,11 @@ test.describe('Create Project', () => {
         .locator('[data-testid="project-list-row-delete-btn"]')
       await deleteBtn.click()
       const name = await listPage.tableRows.first().locator('td').first().textContent()
+      // Only if the project's delete confirmation asks for a typed name
       await listPage.deleteDialog.confirmInput.fill(name?.trim() ?? '')
       await listPage.deleteDialog.submitBtn.click()
       const feedback = await listPage.getSuccessFeedback()
-      expect(feedback).toContain('成功')
+      expect(feedback).toContain('{observed success text}')
     })
   })
 })
@@ -107,10 +110,10 @@ test.describe('Delete Project', () => {
       await listPage.goto()
       await listPage.addButton.click()
       await listPage.createDialog.nameInput.fill(DELETE_TARGET)
-      const apiPromise = listPage.waitForApi('/v3/projects')
+      const apiPromise = listPage.waitForApi('/api/projects')
       await listPage.createDialog.submitBtn.click()
       await apiPromise
-      expect(await listPage.getSuccessFeedback()).toContain('成功')
+      expect(await listPage.getSuccessFeedback()).toContain('{observed success text}')
     })
 
     test('should delete after confirmation', async ({ page }) => {
@@ -121,11 +124,12 @@ test.describe('Delete Project', () => {
         .locator('[data-testid="project-list-row-delete-btn"]')
       await deleteBtn.click()
       await expect(listPage.deleteDialog.container).toBeVisible()
+      // Only if the project's delete confirmation asks for a typed name
       await listPage.deleteDialog.confirmInput.fill(DELETE_TARGET)
-      const apiPromise = listPage.waitForApi('/v3/projects/')
+      const apiPromise = listPage.waitForApi('/api/projects/')
       await listPage.deleteDialog.submitBtn.click()
       await apiPromise
-      expect(await listPage.getSuccessFeedback()).toContain('成功')
+      expect(await listPage.getSuccessFeedback()).toContain('{observed success text}')
     })
   })
 })

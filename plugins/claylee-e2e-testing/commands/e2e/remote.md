@@ -54,7 +54,7 @@ Check if `playwright.config.ts` exists in the current working directory:
      ```bash
      echo '{"targetDir":".","templates":["playwright.config.remote","RemoteBasePage"],"variables":{"BASE_URL":"TARGET_URL"}}' | node $SKILL_DIR/scripts/scaffold.js
      ```
-  3. Run `pnpm install` and `pnpm exec playwright install chromium`
+  3. Install with the directory's package manager (from its lockfile — see SKILL.md § Running Tests; no lockfile yet → `npm`): e.g. `pnpm install` + `pnpm exec playwright install chromium`, or `npm install` + `npx playwright install chromium`
 
 See `references/remote-testing.md` § Scaffold for details.
 
@@ -139,7 +139,7 @@ Generate from `playwright/{page-name}/remote-coverage-plan.md` (NOT directly fro
 ## Step 7: Execute Tests
 
 ```bash
-E2E_REPORT_NAME={page-name} pnpm exec playwright test {spec-path}
+E2E_REPORT_NAME={page-name} {exec} playwright test {spec-path}
 ```
 
 **After execution, apply Error Discrimination:**

@@ -4,6 +4,8 @@ Core code patterns for common UI interactions. Each section corresponds to a beh
 
 For specialized patterns (sortable columns, tabs, accordion, popover, date picker, rich text editor, file upload, drag and drop), see **`ui-patterns-extended.md`**.
 
+> **Placeholders in these examples:** `/api/items` stands for the page's real API path — take it from the source code or from `browser_network_requests` during discovery. `{observed success text}` stands for the feedback text actually seen on the page (MCP dry-run or source) — never assume a fixed word. `{inline-error-selector}` stands for the project's inline validation error element (from the source or discovery).
+
 ## Table of Contents
 
 - [Table Display & Row Assertions](#table-display--row-assertions) (row count, column content, action buttons)
@@ -15,7 +17,7 @@ For specialized patterns (sortable columns, tabs, accordion, popover, date picke
 - [Pagination](#pagination) (page info display, next page navigation)
 - [Search / Filter](#search--filter) (keyword filtering, empty state)
 - [Toggle / Switch](#toggle--switch) (toggle state, API wait, restore)
-- [Delete with Confirmation Dialog](#delete-with-confirmation-dialog) (serial create target + delete with confirm input)
+- [Delete with Confirmation Dialog](#delete-with-confirmation-dialog) (serial create target + delete, typed-name confirm only if the project asks for it)
 - [Nested Spec Structure (Tabbed Dialog)](#nested-spec-structure-tabbed-dialog) (mirroring component hierarchy with test.describe)
 
 ---
@@ -79,30 +81,30 @@ test.describe.serial('Create Item → Cleanup', () => {
     await listPage.createDialog.roleSelect.click()
     await page.locator('[data-testid="role-select-content"]').locator('text=Engineer').click()
 
-    const apiPromise = listPage.waitForApi('/v3/items')
+    const apiPromise = listPage.waitForApi('/api/items')
     await listPage.createDialog.submitBtn.click()
     await apiPromise
 
     const feedback = await listPage.getSuccessFeedback()
-    expect(feedback).toContain('成功')
+    expect(feedback).toContain('{observed success text}')
   })
 
   test('should clean up created item via UI', async () => {
     await listPage.goto()
     await listPage.searchInput.fill('[E2E]')
-    await listPage.page.waitForResponse(resp => resp.url().includes('/v3/items'))
+    await listPage.page.waitForResponse(resp => resp.url().includes('/api/items'))
 
     const deleteBtn = listPage.tableRows.first()
       .locator('[data-testid="item-delete-btn"]')
     await deleteBtn.click()
 
-    // Confirm delete dialog
+    // Confirm delete dialog — fill the typed-name input only if the project's delete confirmation asks for one
     await listPage.deleteDialog.confirmInput.fill(TEST_NAME)
-    const apiPromise = listPage.waitForApi('/v3/items/')
+    const apiPromise = listPage.waitForApi('/api/items/')
     await listPage.deleteDialog.submitBtn.click()
     await apiPromise
 
-    expect(await listPage.getSuccessFeedback()).toContain('成功')
+    expect(await listPage.getSuccessFeedback()).toContain('{observed success text}')
   })
 })
 ```
@@ -120,7 +122,7 @@ test('should create item with API verification', async () => {
 
   // interceptApi: capture HTTP status + response body
   const { ok, status, body } = await listPage.interceptApi(
-    '/v3/items',
+    '/api/items',
     () => listPage.createDialog.submitBtn.click()
   )
 
@@ -138,7 +140,7 @@ test('should handle duplicate name error via API response', async () => {
   await listPage.createDialog.nameInput.fill('existing-item-name')
 
   const { ok, status, body } = await listPage.interceptApi(
-    '/v3/items',
+    '/api/items',
     () => listPage.createDialog.submitBtn.click()
   )
 
@@ -165,7 +167,8 @@ test('should show error when submitting empty required field', async () => {
   await listPage.createDialog.submitBtn.click()
 
   // Assert inline error OR disabled submit
-  const errorMsg = listPage.createDialog.container.locator('.text-destructive')
+  // {inline-error-selector}: the project's inline error element, from the source or discovery
+  const errorMsg = listPage.createDialog.container.locator('{inline-error-selector}')
   await expect(errorMsg).toBeVisible()
 })
 
@@ -203,7 +206,7 @@ test.describe('Edit Item', () => {
 
     // Submit and verify
     const { ok } = await listPage.interceptApi(
-      '/v3/items/',
+      '/api/items/',
       () => listPage.editDialog.submitBtn.click()
     )
     expect(ok).toBe(true)
@@ -224,7 +227,7 @@ test.describe('Edit Item', () => {
     await listPage.editDialog.nameInput.fill(originalName)
 
     const { ok } = await listPage.interceptApi(
-      '/v3/items/',
+      '/api/items/',
       () => listPage.editDialog.submitBtn.click()
     )
     expect(ok).toBe(true)
@@ -259,7 +262,7 @@ test.describe('Pagination', () => {
       while (!(await nextBtn.isEnabled()) && createdCount < 25) {
         await listPage.addButton.click()
         await listPage.createDialog.nameInput.fill(`${PAGINATION_PREFIX} ${createdCount + 1}`)
-        const apiPromise = listPage.waitForApi('/v3/items')
+        const apiPromise = listPage.waitForApi('/api/items')
         await listPage.createDialog.submitBtn.click()
         await apiPromise
         createdCount++
@@ -275,12 +278,12 @@ test.describe('Pagination', () => {
     await listPage.goto()
     // Search and delete all [E2E] Pagination records
     await listPage.searchInput.fill(PAGINATION_PREFIX)
-    await page.waitForResponse(resp => resp.url().includes('/v3/items'))
+    await page.waitForResponse(resp => resp.url().includes('/api/items'))
     while (await listPage.tableRows.count() > 0) {
       const deleteBtn = listPage.tableRows.first().locator('[data-testid="item-delete-btn"]')
       await deleteBtn.click()
       await listPage.deleteDialog.submitBtn.click()
-      await page.waitForResponse(resp => resp.url().includes('/v3/items'))
+      await page.waitForResponse(resp => resp.url().includes('/api/items'))
     }
     await page.close()
   })
@@ -293,7 +296,7 @@ test.describe('Pagination', () => {
   test('should navigate to next page', async () => {
     const firstRowText = await listPage.tableRows.first().locator('td').first().textContent()
     const nextBtn = page.locator('[data-testid="pagination-next"]')
-    const apiPromise = listPage.waitForApi('/v3/items')
+    const apiPromise = listPage.waitForApi('/api/items')
     await nextBtn.click()
     await apiPromise
     const newFirstRowText = await listPage.tableRows.first().locator('td').first().textContent()
@@ -308,7 +311,7 @@ test.describe('Pagination', () => {
 test.describe('Search Filter', () => {
   test('should filter by keyword', async () => {
     await listPage.searchInput.fill('test')
-    await page.waitForResponse(resp => resp.url().includes('/v3/items'))
+    await page.waitForResponse(resp => resp.url().includes('/api/items'))
     const count = await listPage.tableRows.count()
     expect(count).toBeGreaterThan(0)
     // Verify each visible row contains the keyword
@@ -319,7 +322,7 @@ test.describe('Search Filter', () => {
 
   test('should show empty state for no results', async () => {
     await listPage.searchInput.fill('xyznonexistent123')
-    await page.waitForResponse(resp => resp.url().includes('/v3/items'))
+    await page.waitForResponse(resp => resp.url().includes('/api/items'))
     await expect(page.locator('[data-testid="empty-state"]')).toBeVisible()
   })
 })
@@ -330,9 +333,10 @@ test.describe('Search Filter', () => {
 ```typescript
 test('should toggle status and restore', async () => {
   const toggle = listPage.tableRows.first().locator('[data-testid="status-toggle"]')
+  // `data-state` is Radix / shadcn-specific — use the attribute your switch exposes (e.g. `aria-checked`, `aria-pressed`)
   const originalState = await toggle.getAttribute('data-state')
 
-  const apiPromise = listPage.waitForApi('/v3/items/')
+  const apiPromise = listPage.waitForApi('/api/items/')
   await toggle.click()
   await apiPromise
 
@@ -340,7 +344,7 @@ test('should toggle status and restore', async () => {
   expect(newState).not.toBe(originalState)
 
   // Restore original state
-  const restorePromise = listPage.waitForApi('/v3/items/')
+  const restorePromise = listPage.waitForApi('/api/items/')
   await toggle.click()
   await restorePromise
   expect(await toggle.getAttribute('data-state')).toBe(originalState)
@@ -357,27 +361,28 @@ test.describe.serial('Create Target → Delete', () => {
     test.setTimeout(60000)
     await listPage.addButton.click()
     await listPage.createDialog.nameInput.fill(DELETE_TARGET)
-    const apiPromise = listPage.waitForApi('/v3/items')
+    const apiPromise = listPage.waitForApi('/api/items')
     await listPage.createDialog.submitBtn.click()
     await apiPromise
-    expect(await listPage.getSuccessFeedback()).toContain('成功')
+    expect(await listPage.getSuccessFeedback()).toContain('{observed success text}')
   })
 
   test('should delete with confirmation', async () => {
     await listPage.goto()
     await listPage.searchInput.fill(DELETE_TARGET)
-    await page.waitForResponse(resp => resp.url().includes('/v3/items'))
+    await page.waitForResponse(resp => resp.url().includes('/api/items'))
 
     const deleteBtn = listPage.tableRows.first()
       .locator('[data-testid="item-delete-btn"]')
     await deleteBtn.click()
     await expect(listPage.deleteDialog.container).toBeVisible()
 
+    // Only if the project's delete confirmation asks for a typed name
     await listPage.deleteDialog.confirmInput.fill(DELETE_TARGET)
-    const apiPromise = listPage.waitForApi('/v3/items/')
+    const apiPromise = listPage.waitForApi('/api/items/')
     await listPage.deleteDialog.submitBtn.click()
     await apiPromise
-    expect(await listPage.getSuccessFeedback()).toContain('成功')
+    expect(await listPage.getSuccessFeedback()).toContain('{observed success text}')
   })
 })
 ```
