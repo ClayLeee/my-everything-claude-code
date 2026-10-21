@@ -25,11 +25,11 @@ Surface the breach. Do not silently overrun.
 ## Rule 5 — Surface conflicts, don't average them
 If two patterns contradict, pick one (more recent / more tested).
 Explain why. Flag the other for cleanup.
-Don't blend conflicting patterns. (Aligns with the frontend "byte-identical only / intentional drift" policy in `frontend/CLAUDE.md`.)
+Don't blend conflicting patterns.
 
 ## Rule 6 — Read before you write
 Before adding code in a file, read the file's exports, immediate callers, and obvious shared utilities.
-Use the project's accurate search mechanism — `Grep`/`Glob` by default, GitNexus when installed (`graphify-out/` or `mcp__gitnexus__*` present) for symbol-level impact.
+Use the project's accurate search mechanism — `Grep`/`Glob` by default, GitNexus when installed (`.gitnexus/` or `mcp__gitnexus__*` present) for symbol-level impact.
 "Looks orthogonal" is the most dangerous phrase in this codebase.
 
 ## Rule 7 — Checkpoint after every significant step
