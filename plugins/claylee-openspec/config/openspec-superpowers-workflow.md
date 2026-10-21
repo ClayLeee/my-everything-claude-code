@@ -1,22 +1,22 @@
-# OpenSpec + Superpowers + Agent Teams Workflow
+# OpenSpec + Superpowers Workflow
 
-## [OVERRIDE] Rule 0: No History-Modifying Git Operations Throughout Development
+## [OVERRIDE] Rule 0: No Commit Until the User Approves the Push
 
-**During Phases 1–6, you MUST NOT perform any of the following:**
-- `git commit` / `git add` / `git stash`
-- `git push` / `git pull` / `git merge` / `git rebase`
-- Creating PRs or merge requests
+**Read-only git (`status` / `diff` / `log` / `show`) is allowed at any phase.**
 
-**Allowed at any phase (read-only):**
-- `git status` / `git diff` / `git log` (read-only)
+**History-modifying git** (`add` / `commit` / `push` / `merge` / `rebase` / `pull` / `stash` / PRs) is forbidden in every phase, for code and docs alike: no commit of the change docs after Phase 2, no commit of a finished step, no "checkpoint" commit. It happens only after the user, in this session, has looked at the Phase 6 report and explicitly approved pushing this work. A project's CLAUDE.md, a skill, or an earlier approval for other work does not count. Once approved, commit and push in one go:
+- Stage only what this session changed: `git add <paths>`, never `git add -A` / `git add .`. In a file another session also edits, stage only this session's hunks. Never revert, discard or stash away changes this session did not make.
+- Order: push-checks → commit → push. If the project has `.claude/push-checks.json`, call the push-checks tool first; it compares the working tree with the upstream and says no checks are needed when only the project's `skipWhenOnly` paths differ. Fix any failure before committing. Then commit, naming the OpenSpec work in the body (`OpenSpec: <change-name>`), and `git push`.
 
-**Overrides any skill that suggests history-modifying git ops.** In Phase 6, the ONLY git action is read-only: `git diff HEAD` + `git status` to generate commit message suggestions for the user.
+Do NOT call `superpowers:finishing-a-development-branch`. **Overrides any skill that suggests history-modifying git ops.**
 
 ---
 
 ## Document Roles
 
 OpenSpec owns **domain knowledge** (permanent, archived). Superpowers owns **code knowledge** (session artifacts, ephemeral). The split:
+
+**Main specs (`openspec/specs/`) are never edited by hand.** They change only through `opsx:archive` of a change. Every spec edit goes into an unarchived `openspec/changes/<name>/`: an existing one that is related to the code change (see Phase 0 step 1), or a new one.
 
 | Content | Owner | Lives in |
 |---------|-------|----------|
@@ -32,21 +32,19 @@ OpenSpec owns **domain knowledge** (permanent, archived). Superpowers owns **cod
 
 ```
 Phase 0: Domain Triage         → read openspec/specs/, classify code-only/new-feature/spec-patch/spec-rewrite/retro-doc
-                                  code-only: skip to Phase 4 (TDD) → Phase 5 (Level 1 only) → Phase 6 (skip archive)
+                                  code-only: Phase 4 (TDD) → Phase 5 (Level 1 only) → Phase 6 (align, no archive)
                                   new-feature: full flow Phase 1 → 6
-                                  spec-patch: spec patch + Phase 4 → Phase 5 (Level 1 + patched behavior) → Phase 6 (skip archive)
+                                  spec-patch: patch the related unarchived change, or open a new full change + Phase 4 → Phase 5 (Level 1 + patched behavior) → Phase 6
                                   spec-rewrite: full flow with spec rewrite (also: requirement-modification by product)
                                   retro-doc: code-first → D-0/D-1/D-2/D-4 → standard Phase 5/6 (see retro-doc section)
-                                  STOP: confirm routing with user
+                                  STOP only where Phase 0 step 3 says so
 Phase 1: Discovery             → superpowers:brainstorming
                                   vague: full exploration | clear: confirmation mode
                                   Produces: docs/superpowers/specs/ + docs/superpowers/plans/
 Phase 2: Specification         → opsx:propose
---- Pre-Implementation Gate: Select Development Mode ---
-Phase 3: Team Assembly         → TeamCreate + spawn teammates  [Option A only]
-Phase 4: Implementation        → Agent Teams OR parallel-agents
+Phase 4: Implementation        → TDD, parallel agents where plan tasks are independent
 Phase 5: Verification          → superpowers:verification-before-completion
-Phase 6: Finish & Archive      → opsx:archive + git diff suggestions (NO commits)
+Phase 6: Align & Finish        → drift check (all paths) + opsx:archive (only if a change exists) + report
 ```
 
 ---
@@ -59,18 +57,28 @@ Phase 6: Finish & Archive      → opsx:archive + git diff suggestions (NO commi
    - `ls openspec/specs/` — list all capabilities
    - For each capability whose name relates to the request: read `openspec/specs/<capability>/spec.md` in full
    - If `openspec/specs/` does not exist yet: classify as new-feature by default
+   - List the unarchived changes (`openspec/changes/*`, excluding `archive/`) and decide which, if any, is **related** to this code change: its delta specs cover the Requirements this code change affects, or this code change is part of that change's own work (its proposal / tasks). Sharing a capability is not enough on its own. A change that is unrelated (another feature, another session's work) is never edited. If more than one could be related, or it is unclear, ask.
+   - A related change whose files are untracked or modified in `git status` and that this session did not create is probably another session's work in progress (nothing is committed before the push, Rule 0). Ask before editing it: two sessions writing the same change overwrite each other. A related change already committed is earlier work and may be edited.
 
 2. **Classify the request:**
 
 | Path | Criteria | Routing |
 |------|----------|---------|
-| **code-only** | Behavior unchanged from spec. Internal only: bug fix that doesn't alter user-visible behavior, refactor, dep upgrade, perf, typo. | Skip Phase 1 + 2 + 3 → Phase 4 (TDD) → Phase 5 (Level 1 only) → Phase 6 (skip archive) |
-| **new-feature** | New feature OR existing feature behavior change. Existing spec doesn't cover, or needs extension. | Full Phase 1 → 2 → 3 (Gate) → 4 → 5 → 6 |
-| **spec-patch** | Bug reveals existing spec is wrong/outdated. Fix scoped within one capability's spec. | Patch `openspec/specs/<cap>/spec.md` (with sub-STOP) → Phase 4 → Phase 5 (Level 1 + patched behavior) → Phase 6 (skip archive) |
+| **code-only** | Behavior unchanged from spec. Internal only: bug fix that doesn't alter user-visible behavior, refactor, dep upgrade, perf, typo, test-only. See *No-doc exemption*. | Phase 4 (TDD) → Phase 5 (Level 1 only) → Phase 6 (align, no archive) |
+| **new-feature** | New feature OR existing feature behavior change. Existing spec doesn't cover, or needs extension. | Full Phase 1 → 2 → 4 → 5 → 6 |
+| **spec-patch** | The spec **describes** the intended behavior wrongly, out of date, or incompletely, and the intended behavior itself is not changing (the spec misstated it, or left out an edge case that was always intended). Scoped to one capability. | **Related unarchived change exists** → edit that change's files directly, no new change. **None** → open a new change with the full OpenSpec set: `proposal.md` (§ Why: what the spec got wrong), `design.md`, delta spec, `tasks.md`. No Superpowers docs (no Phase 1). Either way with sub-STOP → Phase 4 → Phase 5 (Level 1 + patched behavior) → Phase 6 |
 | **spec-rewrite** | Spec needs rewrite — either (a) spec **conflicts** with required behavior (bug-driven), OR (b) requirement itself is being **modified by product decision** (intentional behavior change). Rewrite scope non-trivial. | Full flow, but Phase 1 must cite the existing spec being replaced |
 | **retro-doc** | **Code already exists** (legacy, hot-fix, merged from elsewhere, prototype-now-document-later) but no `openspec/changes/<name>/` was created. Goal: reverse-engineer docs from code. | retro-doc flow: D-0 → D-1 → D-2 → D-4 → standard Phase 5 → 6 (see retro-doc section below) |
 
-3. **STOP — present routing decision to the user:**
+**spec-patch vs behavior change:** if users will see the system behave differently from before (new rule, new field, changed limit, changed flow), it is new-feature or spec-rewrite, even when the spec edit would be small. spec-patch never carries a behavior change.
+
+3. **Announce the routing; STOP only where it matters:**
+
+| Situation | What to do |
+|-----------|------------|
+| code-only, no spec conflict | One line (`Phase 0: code-only — <reason>`), then proceed. No STOP. |
+| spec-patch | One line with the routing, then the sub-STOP in step 4 (one stop, not two). |
+| new-feature / spec-rewrite / retro-doc, or **any spec conflict** | STOP with the triage result below. When the task also has design questions, ask them in the same `AskUserQuestion` (routing as the first question) instead of stopping twice. |
 
    ```
    Phase 0 Triage Result:
@@ -84,40 +92,30 @@ Phase 6: Finish & Archive      → opsx:archive + git diff suggestions (NO commi
        Spec says:     "<verbatim quote of the spec text>"
        Code behavior: "<description of what code currently does>"
        Difference:    <one-sentence explanation of divergence>
-       Suggested:     [spec-patch | spec-rewrite | request disclaimer]
+       Suggested:     [spec-patch | spec-rewrite]
 
-     [Conflict #2, #3, ...]
-
-     Proposed routing: Path [code-only | new-feature | spec-patch | spec-rewrite | retro-doc]
+     Proposed routing: Path [new-feature | spec-patch | spec-rewrite | retro-doc]
      Reasoning:        [2-3 sentences, reference conflict #s if applicable]
-
-   Confirm? (yes / override to [code-only/new-feature/spec-patch/spec-rewrite/retro-doc] / clarify)
    ```
+
+**Reading the reply:** any plain go-ahead (繼續 / ok / 好 / yes / answering the attached design question) confirms the proposed routing. The routing changes only when the user names another path or rejects this one. Never ask the user to type an exact phrase.
 
 **retro-doc selection rule:** retro-doc is **opt-in only** — LLM does not auto-classify into retro-doc. Choose retro-doc only when the user explicitly states the code already exists and they want documentation generated retroactively. code-only/new-feature/spec-patch/spec-rewrite remain the auto-classification options for forward-direction work.
 
 4. **For spec-patch only — sub-STOP before applying spec patch:**
-   - Present diff (before/after) of proposed `openspec/specs/<cap>/spec.md` change
-   - Wait for user `apply` / `revise` / `cancel`
-   - Do NOT modify spec file until user says `apply`
+   - Say which change it goes into (the related unarchived change and why it is related, or a new change)
+   - Present diff (before/after) of the proposed edit
+   - Wait for the user to accept (any go-ahead), revise, or cancel
+   - Do NOT modify any OpenSpec file before that
+   - After editing: `openspec validate <change> --strict` must pass
 
 **Conservative default:** When path is ambiguous (code-only↔new-feature or spec-patch↔spec-rewrite), prefer the more spec-heavy path (new-feature over code-only, spec-rewrite over spec-patch). Better to write extra spec than to silently drift. **retro-doc is orthogonal** (it concerns timing — code-first vs spec-first — not scope) and not subject to conservative defaults.
 
+**No-doc exemption (overrides the conservative default):** copy/text edits, styling and layout, no-behavior refactors, dependency bumps and test-only changes are code-only — no change, no spec edit — unless the spec quotes the text or layout being changed verbatim, in which case it is spec-patch.
+
 **Multi-capability rule:** If multiple capabilities are affected, take the most spec-heavy classification across all (e.g., code-only + spec-patch → spec-patch).
 
-**Conflict-but-user-wants-code-only escape hatch:**
-
-If code-only is the proposed routing AND Phase 0 detected a spec conflict, the LLM MUST refuse to proceed as code-only silently.
-
-To override, the user must explicitly state ONE of:
-- `Switch to spec-patch` — acknowledge spec needs updating, do it now
-- `Switch to spec-rewrite` — full spec rewrite warranted
-- `Spec maintenance is my responsibility for this task` — explicit disclaimer
-
-Behavior:
-- Without one of these phrases, Phase 0 stays blocked.
-- If user invokes the disclaimer, proceed as code-only AND record the deferred conflict. At Phase 6 commit message suggestions, prepend:
-  `⚠️ Deferred spec conflict: § <section> of <capability>/spec.md (user accepted responsibility on YYYY-MM-DD).`
+**A spec conflict is never code-only:** code that conflicts with the spec means the docs and tests get aligned in the same task. Route it to spec-patch or spec-rewrite; there is no option to leave the conflict for later.
 
 ---
 
@@ -165,6 +163,8 @@ Treat the Phase 1 `design.md` as **source of truth**. Do not re-derive design de
 - A user-visible outcome that QA can verify in Phase 5 (e.g., "User can click Export CSV button on user list page")
 - NOT a developer-facing action (e.g., "Step 1: Write failing test for ExportButton" — wrong granularity)
 
+**Rule 4: No `## RENAMED Requirements` in delta specs.** Archive drops them silently. Express a rename as `## REMOVED Requirements` (old name) + `## ADDED Requirements` (new name).
+
 **Produces:**
 - `openspec/changes/<name>/proposal.md` — aligned with brainstorming spec
 - `openspec/changes/<name>/design.md` — aligned with brainstorming spec
@@ -179,40 +179,7 @@ Treat the Phase 1 `design.md` as **source of truth**. Do not re-derive design de
 - `openspec/changes/<name>/specs/<capability>/spec.md` (Phase 2 — at least one capability)
 - `openspec/changes/<name>/tasks.md` (Phase 2)
 
-**Block scope:** Guardrail applies **globally** — if multiple `openspec/changes/<name>/` exist and any is incomplete, ALL production code edits are blocked. Close out stale changes via `opsx:archive` before starting new work.
-
----
-
-### Pre-Implementation Gate
-
-After Phase 2 completes, **default to Option B (Parallel Agents) and proceed to Phase 4.** Briefly present the mode to the user:
-
-- **A. Agent Teams** (`TeamCreate`) — role specialization (Full-Stack + QA + Code Reviewer); user must explicitly request this → Phase 3
-- **B. Parallel Agents** (`superpowers:dispatching-parallel-agents`) — **default**; Tasks in `plans/...md` must be mostly independent (no shared state, no sequential dependencies). Note: independence is judged at the `plans/` Task level, NOT the `tasks.md` milestone level (one milestone may require multiple plan Tasks).
-- **C. Revise** — user can request to re-run Phase 1 and Phase 2
-
-Proceed with B immediately unless the user explicitly requests A or C.
-
----
-
-### Phase 3 — Team Assembly *(Option A only)*
-
-Use `TeamCreate`, then spawn teammates per the matrix below. **Code Reviewer is required whenever a Full-Stack Engineer is present.** The Code Reviewer reviews via `SendMessage` after each REFACTOR step.
-
-| Task Type | Roles |
-|-----------|-------|
-| UI feature | Full-Stack + UI/UX + QA + Code Reviewer |
-| Backend-only | Full-Stack + QA + Code Reviewer |
-| Bug fix (new-feature/spec-rewrite only) | Full-Stack + QA + Code Reviewer |
-| Large cross-layer | PM + UI/UX + Full-Stack + QA + Code Reviewer + Tech Lead |
-
-**Teammate skill rules:**
-- ✅ Safe (methodology only): `systematic-debugging`, `receiving-code-review`, `test-driven-development`, `verification-before-completion`
-- ❌ Forbidden (spawns nested agents): `requesting-code-review`, `dispatching-parallel-agents`
-
-**QA vs Code Reviewer (complementary, not redundant):**
-- QA — *behavior*: browser tests, Playwright, regressions
-- Code Reviewer — *code quality*: spec compliance, patterns, architecture
+**Block scope:** the guardrail applies to **this task's change only** — the one this session created, or the related change it is working in (Phase 0 step 1). Other unarchived changes are normal when several sessions work in the same checkout: they never block this task, and this session never edits, completes or archives them. If one looks abandoned, mention it in the Phase 6 report and leave it. A new spec-patch change is complete with its four OpenSpec files (`proposal.md`, `design.md`, delta spec, `tasks.md`); it needs no Superpowers docs.
 
 ---
 
@@ -220,18 +187,17 @@ Use `TeamCreate`, then spawn teammates per the matrix below. **Code Reviewer is 
 
 **Iron Law: No production code without a failing test first. No exceptions.**
 
-**Path applicability:** Iron Law and TDD loop apply to paths code-only / new-feature / spec-patch / spec-rewrite. code-only and spec-patch skip the `plans/...md` and `tasks.md` rows below (those files don't exist for those paths) — track progress via failing test → passing test transitions only. **retro-doc inverts the Iron Law** (code already exists; tests serve to characterize, not drive) and uses Phase D-4 (Test backfill) instead of standard Phase 4 — see retro-doc section below.
+**Path applicability:** Iron Law and TDD loop apply to paths code-only / new-feature / spec-patch / spec-rewrite. code-only and spec-patch have no `plans/...md` — track progress via failing test → passing test transitions; a spec-patch marks its change's `tasks.md` in Phase 5. **retro-doc inverts the Iron Law** (code already exists; tests serve to characterize, not drive) and uses Phase D-4 (Test backfill) instead of standard Phase 4 — see retro-doc section below.
 
-| Step | Option A (Agent Teams) | Option B (Parallel Agents) |
-|------|------------------------|----------------------------|
-| Dispatch | Claude Code Agent Teams (NOT subagents) | `superpowers:dispatching-parallel-agents` — one subagent per independent cluster |
-| RED | Failing test. If fails for *unexpected* reason → invoke `superpowers:systematic-debugging` first (root cause before any fix) | Same |
-| GREEN | Minimal code to pass. Nothing extra. | Same |
-| REFACTOR | Clean up, tests stay green, no new behavior | Same |
-| Code Review | Engineer → `SendMessage` task summary + diff to Code Reviewer (Reviewer does NOT invoke `requesting-code-review`); engineer invokes `superpowers:receiving-code-review` on feedback; verify before implementing suggestions | Inline review by subagent (no formal Code Reviewer role) |
-| Mark complete | Mark `plans/YYYY-MM-DD-<name>.md` step `- [x]` immediately after each TDD step verifies. Do **NOT** mark `tasks.md` here — milestones are marked in Phase 5 after acceptance verification. | Same; subagent marks only plan steps. |
+**Dispatch:** when the `plans/...md` Tasks are mostly independent (no shared state, no sequential dependencies), use `superpowers:dispatching-parallel-agents`, one subagent per independent cluster, and synthesize all subagent reports before Phase 5. Otherwise implement inline. Independence is judged at the `plans/` Task level, NOT the `tasks.md` milestone level (one milestone may require multiple plan Tasks).
 
-For Option B: synthesize all subagent reports before Phase 5.
+| Step | What happens |
+|------|--------------|
+| RED | Failing test. If fails for *unexpected* reason → invoke `superpowers:systematic-debugging` first (root cause before any fix) |
+| GREEN | Minimal code to pass. Nothing extra. |
+| REFACTOR | Clean up, tests stay green, no new behavior |
+| Review | Inline review of the diff before moving on |
+| Marks | Marking `plans/...md` steps `- [x]` is optional — the plan is a working aid, not a gate. Do **NOT** mark `tasks.md` here — milestones are marked in Phase 5 after acceptance verification. |
 
 ---
 
@@ -245,7 +211,7 @@ Before claiming any task or phase complete, invoke `superpowers:verification-bef
 |------|----------------|----------------------|
 | **code-only** | Required | **Skipped** — no domain change to verify against; `git diff` review + manual smoke is sufficient |
 | **new-feature / spec-rewrite** | Required | Required — run scenario per `tasks.md` milestone, mark `- [x]`; trace every spec Requirement to a verified milestone |
-| **spec-patch** | Required | Required — run scenario for the patched behavior in `openspec/specs/<cap>/spec.md`; no `tasks.md` to mark |
+| **spec-patch** | Required | Required — run scenario for the patched behavior in the change's delta spec; mark the change's `tasks.md` |
 | **retro-doc** | Already satisfied by D-4 (all Requirements have passing tests) | Follow new-feature rules (retro-as-new-feature) or spec-rewrite rules (retro-as-spec-rewrite) per Phase D-0 sub-classification |
 
 **Level 1: Code-level (continuous, during Phase 4) — applies to all paths**
@@ -257,7 +223,6 @@ Before claiming any task or phase complete, invoke `superpowers:verification-bef
 | Tests | Run the suite, read full output, confirm 0 failures | all |
 | Build | Confirm exit 0 | all |
 | Lint / type-check | Confirm clean (if project enforces them) | all |
-| `plans/...md` step marks | All steps marked `- [x]` | new-feature / spec-rewrite only |
 
 **Level 2: Acceptance-level (gate before Phase 6) — applies to new-feature / spec-patch / spec-rewrite**
 
@@ -265,54 +230,65 @@ For each acceptance unit (new-feature/spec-rewrite: every `tasks.md` milestone; 
 
 | Feature kind | Scenario action |
 |--------------|-----------------|
-| **UI** | Open browser, perform the user action, observe outcome with your own eyes (or via E2E tooling). For this plugin, prefer `e2e:run` if specs exist, or `e2e:create` to scaffold them. |
+| **UI** | Test with Playwright: drive the real page in the Playwright browser (MCP), or run the project's E2E specs (`e2e:run` if they exist, `e2e:create` to scaffold them). Check the outcome with assertions on the page snapshot (text, element state) and on the intercepted requests/responses. Screenshots only when the point is visual — at most one per scenario, never one per step. |
 | **Backend / API** | Hit the actual endpoint with realistic inputs (curl / httpie / postman / integration test against running service) |
 | **Library / utility** | Invoke the function from a fresh REPL or scratch script with the exact inputs a user would use |
+
+**When a scenario needs a signed-in user:** open the sign-in page in the Playwright browser and stop. Tell the user what account the scenario needs: if the spec or the scenario depends on a particular role or permission, name it and say why; otherwise any account that can reach the page will do. Continue once they say they are signed in. Never ask for, store or type a password.
+
+**When a scenario still cannot be run** (backend not deployed, third-party service, the user cannot sign in now): do not skip it silently and do not mark it `- [x]`. Mark the milestone `- [ ] … DEFERRED(L2: <reason>)`, run the closest automated substitute you can (test against a mocked response, DOM check on a local build), and list it in the Phase 6 report under **L2 未驗** with the reason and the exact steps for the user to verify it by hand.
 
 **Mark + trace (path-specific):**
 
 | Path | Mark | Trace |
 |------|------|-------|
-| *new-feature / C2* | `tasks.md` milestone `- [x]` only after the scenario passes | Re-read `openspec/changes/<name>/specs/<capability>/spec.md` § Requirements line by line — every requirement must trace to a verified milestone. Any orphan requirement = Phase 5 not done. |
-| *spec-patch* | (no `tasks.md` to mark) | Re-read the patched section of `openspec/specs/<cap>/spec.md` § Requirements — every patched line must trace to a verified scenario. |
+| *new-feature / spec-rewrite* | `tasks.md` milestone `- [x]` only after the scenario passes | Re-read `openspec/changes/<name>/specs/<capability>/spec.md` § Requirements line by line — every requirement must trace to a verified milestone. Any orphan requirement = Phase 5 not done. |
+| *spec-patch* | The change's `tasks.md` milestone for the patched behavior `- [x]` only after the scenario passes | Re-read the patched section of `openspec/changes/<name>/specs/<cap>/spec.md` § Requirements — every patched line must trace to a verified scenario. |
 
 **Hard rule:** Avoid hand-waving language ("should work", "looks correct", "tests passed so it works") for Level 2 — unit tests prove code does what the test says, not what the user needs. Phase 5 is the only place to catch that gap before Phase 6 archives the spec.
 
 ---
 
-### Phase 6 — Finish & Archive
+### Phase 6 — Align & Finish
+
+Runs for every path. When the user asks to "align docs and tests and archive" (對齊文件/測試並 archive), this phase is what they mean: align always, archive only when a change exists. **Never create a change just so there is something to archive.**
 
 **Path applicability:**
 
-| Step | When it runs | code-only | new-feature | spec-patch | spec-rewrite | retro-doc |
-|------|--------------|--------|--------|---------|---------|--------|
-| 1. Shutdown teammates | only if Phase 3 ran (Option A) | conditional | conditional | conditional | conditional | **skip** (D never invokes Phase 3) |
-| 2. `TeamDelete` | only if Phase 3 ran (Option A) | conditional | conditional | conditional | conditional | **skip** |
-| 3. `opsx:archive` | only if `openspec/changes/<name>/` exists | **skip** | run | **skip** | run | **run** |
-| 4. Read-only diff + commit suggestions | always | run | run | run | run | run |
+| Step | code-only | new-feature | spec-patch | spec-rewrite | retro-doc |
+|------|--------|--------|---------|---------|--------|
+| 1. Drift check | run | run | run | run | run |
+| 2. `opsx:archive` + checklist | **skip** | run | run | run | run |
+| 3. Report | run | run | run | run | run |
 
-**Steps:**
+A patched existing change is archived only when its own work is finished; if it still has open work, leave it unarchived and say so in the report.
 
-1+2. *(If Phase 3 ran)* `SendMessage({ type: "shutdown_request" })` to each teammate, wait for shutdown, then `TeamDelete`.
+**1. Drift check.** Read the final diff against the Requirements of every capability it touches.
+- Docs and tests match the code → continue.
+- code-only, but the diff turns out to change what the specs say → stop and say so. Within one capability and the spec only misdescribed it → switch to spec-patch (sub-STOP with the diff). Otherwise propose a change for it (retro-doc style: the code exists, the docs follow), or update the related unarchived change.
+- A Requirement no longer has a test, or a test asserts behavior the spec does not describe → fix the test or the spec before finishing.
 
-3. *(new-feature / spec-rewrite)* Invoke `opsx:archive` — sync delta specs from `openspec/changes/<name>/specs/` → `openspec/specs/<capability>/spec.md`.
+**2. Archive (only if this task's `openspec/changes/<name>/` exists; never another session's).** Before `opsx:archive`:
+- Every `tasks.md` item is `- [x]` or annotated `DEFERRED(<reason>)`; no bare unchecked items.
+- No `## RENAMED Requirements` blocks in the delta specs (see Phase 2 Rule 4).
 
-4. **[REQUIRED — all paths] Present changes for user review — read-only git, no commits:**
-   - Run `git diff HEAD` (or `git diff` if nothing staged) — read the full output
-   - Run `git status` to see all changed/untracked files
-   - Based on the diff, generate one or more **commit message suggestions** with:
-     - A concise subject line (≤72 chars, conventional commits format)
-     - A body section explaining what changed and why
-     - **Deferred-conflict prefix (from Phase 0 escape hatch):** if the user invoked `Spec maintenance is my responsibility for this task`, prepend the body of every suggestion with: `⚠️ Deferred spec conflict: § <section> of <capability>/spec.md (user accepted responsibility on YYYY-MM-DD).`
-   - Present all suggestions to the user
-   - **Stop here. Wait for the user to decide whether to commit, push, or open a PR.**
-   - Do NOT call `superpowers:finishing-a-development-branch`
+After it:
+- Open each affected `openspec/specs/<cap>/spec.md` and confirm the delta landed. If the sync step did not run (its skill may be missing), apply the archived change's delta by hand — the one hand edit of `openspec/specs/` allowed, since it completes the archive and copies only what the delta says.
+- The capability's `## Purpose` is a real sentence, not `TBD`.
+- `openspec validate --specs --strict` passes.
+- If the CLI fails or is blocked, report that; do not claim the archive is done.
+
+**3. Report.**
+- Run `git status` and `git diff HEAD`, read the full output.
+- Summarize what changed; list **L2 未驗** items from Phase 5, if any.
+- Give commit message suggestions: subject ≤72 chars in conventional commits format, a body saying what changed and why, and the `OpenSpec:` line from Rule 0.
+- **Stop here.** Commit and push only after the user approves the push (Rule 0).
 
 ---
 
 ## retro-doc — Retroactive Documentation (code-first)
 
-Triggered when code is already written/merged without going through Phases 1–2, but documentation is desired retroactively. Common scenarios: legacy code, hot-fix that bypassed flow, work merged from someone else, prototype-now-document-later.
+Triggered when code is already written/merged without going through Phases 1–2, but documentation is desired retroactively. Common scenarios: legacy code, hot-fix that bypassed flow, work merged from someone else, prototype-now-document-later, and e.g. a `feat`/`fix` commit that landed without its docs follow-up (such as a `docs(openspec)` commit). For an MR, a branch or a commit range, use the `retro-doc-sync` skill.
 
 **Critical difference from other paths:** the Iron Law (failing test before code) is **inverted** — code exists, so tests serve to *characterize* and *lock down* existing behavior, not to drive implementation. The discipline floor remains: every Requirement must trace to a passing test.
 
@@ -359,8 +335,10 @@ Read code behavior + tests to infer domain-layer:
 - What acceptance conditions are hidden in tests / branching logic / edge cases?
 - What product motivation can be reconstructed (or inferred)?
 
+If an unarchived change related to this code (Phase 0 step 1) already exists, update its files instead of opening a new one. Otherwise:
+
 📄 produces (4 files under `openspec/changes/<name>/`):
-- `proposal.md` — § Why = `"Retroactive documentation; no new product decision. Original implementation: <commit-hash> on <date>."` + § What Changes inferred from code
+- `proposal.md` — § Why **must open with** `"Retroactive documentation; no new product decision. Original implementation: <commit-hash> on <date>."` + § What Changes inferred from code
 - `design.md` — § Context + § Decision inferred from architecture observations
 - `specs/<cap>/spec.md` — Requirements inferred from observed behavior + tests
 - `tasks.md` — milestones inferred from user-visible outcomes
@@ -387,15 +365,15 @@ Proceed as new-feature (for retro-as-new-feature) or spec-rewrite (for retro-as-
 - Level 1 is largely satisfied by D-4 already
 - Level 2 (acceptance scenario per milestone or per patched behavior) still applies — actually exercise the user-facing flow, not just rely on tests
 
-### Phase 6 (standard) — Finish & Archive
+### Phase 6 (standard) — Align & Finish
 
-- Steps 1+2 (Shutdown / TeamDelete) → skip (retro-doc never invokes Phase 3 teams)
-- Step 3 → `opsx:archive` runs (retro-doc produces `openspec/changes/<name>/` via D-2)
-- Step 4 → read-only `git diff` + commit suggestions
+- Step 1 → drift check
+- Step 2 → `opsx:archive` with its checklist (retro-doc produces `openspec/changes/<name>/` via D-2)
+- Step 3 → report
 
 ### Guardrail interaction
 
-The 6-artifact guardrail (no production code edits while any `openspec/changes/<name>/` is incomplete) is a rule you follow, not a hook that enforces it. For retro-doc this naturally fits:
+The 6-artifact guardrail (no production code edits while this task's `openspec/changes/<name>/` is incomplete) is a rule you follow, not a hook that enforces it. For retro-doc this naturally fits:
 - D-1 + D-2 are doc-only (the guardrail permits them)
 - D-4 only edits test files (the guardrail permits them)
 - Production code edits during D-4 should never happen if **Buggy-code halt** is followed; a real bug requires switching to code-only first (delete the in-progress `openspec/changes/<name>/` before starting code-only)
