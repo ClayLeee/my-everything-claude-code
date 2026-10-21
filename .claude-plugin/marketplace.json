@@ -9,25 +9,25 @@
       "name": "claylee-core",
       "source": "./plugins/claylee-core",
       "description": "Behavioral contract rule + a Stop hook that flags console.log in git-changed files + a push-guard mod for projects with .claude/push-checks.json",
-      "version": "0.2.5"
+      "version": "0.3.0"
     },
     {
       "name": "claylee-e2e-testing",
       "source": "./plugins/claylee-e2e-testing",
       "description": "Playwright E2E testing skill with Page Object Model patterns, configuration templates, and 7 /e2e:* commands (analyze, plan, create, maintain, run, remote, record).",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "name": "claylee-code-quality-agents",
       "source": "./plugins/claylee-code-quality-agents",
       "description": "Four sub-agents for on-demand code work: code-review, build-error-resolver, security-reviewer, refactor-cleaner.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "name": "claylee-openspec",
       "source": "./plugins/claylee-openspec",
       "description": "OpenSpec + Superpowers workflow injection. Conditionally injects workflow docs when project has openspec/ directory or .claude/openspec-enabled marker. Includes the retro-doc-sync skill.",
-      "version": "0.3.0"
+      "version": "0.4.0"
     },
     {
       "name": "claylee-alien-defense",
