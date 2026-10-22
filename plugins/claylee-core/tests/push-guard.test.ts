@@ -59,6 +59,17 @@ function engine(on: On, repo: Repo) {
     if (args === "git stash create") return ok(repo.workTree === repo.headTree ? "" : "stashsha\n");
     if (args === "git rev-parse stashsha^{tree}") return ok(`${repo.workTree}\n`);
     if (args === "git rev-parse HEAD^{tree}") return ok(`${repo.headTree}\n`);
+    // Like git's, the stash above holds tracked changes only; untracked files join in a scratch
+    // index, never the real one.
+    if (args === "git ls-files --others --exclude-standard -z")
+      return ok((repo.untracked ?? []).map((file) => `${file}\0`).join(""));
+    if (args === "git rev-parse --absolute-git-dir") return ok(`${REPO}/.git\n`);
+    if (/^git (read-tree|add|write-tree)\b/.test(args)) {
+      if (event.init?.env?.GIT_INDEX_FILE !== `${REPO}/.git/push-guard.index`)
+        throw new Error(`${args} on the real index`);
+      if (event.argv[1] !== "write-tree") return ok("");
+      return ok(`${[repo.workTree, ...(repo.untracked ?? [])].join("+")}\n`);
+    }
     const excluded = event.argv
       .filter((arg) => arg.startsWith(":(exclude,glob)"))
       .map((arg) => globRegExp(arg.slice(":(exclude,glob)".length)));
@@ -184,6 +195,18 @@ test("checks that passed on uncommitted work still count once it is committed", 
   await $.tool.call({ tool: "Bash", command: "pnpm lint" });
   await $.tool.call({ tool: "Bash", command: "pnpm test" });
   repo.headTree = "t2";
+  const ran = await $.tool.call({ tool: "Bash", command: "git push" });
+  expect(ran.deny).toBeUndefined();
+});
+
+test("checks run before a new file is added still count once a commit adds it", async ($, on) => {
+  const repo: Repo = { headTree: "t1", workTree: "t2", untracked: ["src/new.ts"], config, shell: [] };
+  engine(on, repo);
+  expect(await callTool($)).toContain("2 項全部通過");
+  // git add -A && git commit: the new file is in HEAD and nothing is left untracked.
+  repo.headTree = "t2+src/new.ts";
+  repo.workTree = repo.headTree;
+  repo.untracked = [];
   const ran = await $.tool.call({ tool: "Bash", command: "git push" });
   expect(ran.deny).toBeUndefined();
 });

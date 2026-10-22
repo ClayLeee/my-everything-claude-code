@@ -11,9 +11,14 @@ const TOOL = "push-checks";
 const TOOL_ID = "mcp__claylee-core__push-checks";
 const TAIL_LINES = 15;
 
-async function git($: $, cwd: string, args: string[]): Promise<string | null> {
+async function git(
+  $: $,
+  cwd: string,
+  args: string[],
+  init: { env?: Record<string, string>; stdin?: string } = {},
+): Promise<string | null> {
   try {
-    const ran = await $.process.run(["git", ...args], { cwd });
+    const ran = await $.process.run(["git", ...args], { cwd, ...init });
     return ran.exitCode === 0 ? ran.stdout.trim() : null;
   } catch {
     return null;
@@ -56,9 +61,21 @@ async function onlySkippable($: $, top: string, uncommitted: boolean): Promise<b
   return (await git($, top, ["ls-files", "--others", "--exclude-standard", ...paths])) === "";
 }
 
+// The tree a commit of everything would have. `git stash create` leaves untracked files out, so a
+// check run before `git add` of a new file would never match the commit that adds it; they are
+// added on top in a scratch index, which leaves the real one alone and hashes only those files.
 async function workTree($: $, top: string): Promise<string | null> {
   const stash = await git($, top, ["stash", "create"]);
-  return git($, top, ["rev-parse", `${stash || "HEAD"}^{tree}`]);
+  const tracked = await git($, top, ["rev-parse", `${stash || "HEAD"}^{tree}`]);
+  const untracked = await git($, top, ["ls-files", "--others", "--exclude-standard", "-z"]);
+  if (!tracked || !untracked) return tracked;
+  const gitDir = await git($, top, ["rev-parse", "--absolute-git-dir"]);
+  if (!gitDir) return null;
+  const env = { GIT_INDEX_FILE: `${gitDir}/push-guard.index` };
+  if ((await git($, top, ["read-tree", tracked], { env })) === null) return null;
+  const add = ["add", "--pathspec-from-file=-", "--pathspec-file-nul"];
+  if ((await git($, top, add, { env, stdin: untracked })) === null) return null;
+  return git($, top, ["write-tree"], { env });
 }
 
 const storeKey = (top: string) => `passed:${top}`;
