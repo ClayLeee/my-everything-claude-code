@@ -1,6 +1,6 @@
 {
   "name": "claylee-core",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Behavioral contract rule + a Stop hook that flags console.log in git-changed files + a push-guard mod for projects with .claude/push-checks.json",
   "author": {
     "name": "ClayLeee",
