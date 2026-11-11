@@ -17,8 +17,6 @@ Look for `playwright/{page-name}/coverage-plan.md` (relative to `package.json` d
 - If multiple exist, ask the user which page to create tests for
 - If none exist, tell the user to run `/e2e:analyze` then `/e2e:plan` first
 
-> **Note:** Legacy flat-file paths (`playwright/{page-name}-coverage-plan.md`) are also accepted for backward compatibility.
-
 ## Step 2: Read References
 
 Read from `$SKILL_DIR/references/`:

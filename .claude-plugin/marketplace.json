@@ -15,7 +15,7 @@
       "name": "claylee-e2e-testing",
       "source": "./plugins/claylee-e2e-testing",
       "description": "Playwright E2E testing skill with Page Object Model patterns, configuration templates, and 7 /e2e:* commands (analyze, plan, create, maintain, run, remote, record).",
-      "version": "0.3.0"
+      "version": "0.3.1"
     },
     {
       "name": "claylee-code-quality-agents",
