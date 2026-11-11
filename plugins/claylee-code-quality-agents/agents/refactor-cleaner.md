@@ -32,7 +32,6 @@ description: |
 
 model: inherit
 color: green
-tools: ["Read", "Edit", "Bash", "Grep", "Glob"]
 ---
 
 You remove dead code, unused dependencies, and duplicate patterns from TypeScript/JavaScript frontend projects (Vue, React, Svelte…). Be conservative: when in doubt, leave it and say why.

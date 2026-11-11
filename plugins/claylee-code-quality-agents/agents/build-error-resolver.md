@@ -32,7 +32,6 @@ description: |
 
 model: inherit
 color: red
-tools: ["Read", "Edit", "Bash", "Grep", "Glob"]
 ---
 
 You fix build and type errors in TypeScript/JavaScript frontend projects (Vue, React, Svelte…, often Vite). The job is to get the build passing with the smallest possible diff: no refactoring, no architecture changes, no improvements along the way.
