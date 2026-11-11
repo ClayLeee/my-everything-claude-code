@@ -1,6 +1,6 @@
 {
   "name": "claylee-openspec",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "OpenSpec + Superpowers workflow injection. At SessionStart, injects the workflow summary plus the path of the full doc when the project has an openspec/ directory or .claude/openspec-enabled marker.",
   "author": {
     "name": "ClayLeee",
