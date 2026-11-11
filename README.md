@@ -40,9 +40,9 @@ This repo is a **Claude Code marketplace** with 7 plugins. Install only the ones
 plugins/
 ├── claylee-core/
 │   ├── .claude-plugin/plugin.json
-│   ├── hooks/hooks.json          # Stop hook + push-guard.ts module
+│   ├── hooks/hooks.json          # SessionStart + Stop hooks, push-guard.ts module
 │   ├── rules/behavioral-contract.md
-│   ├── scripts/hooks/            # console.log check
+│   ├── scripts/hooks/            # behavioral-contract injector, console.log check
 │   └── tests/                    # push-guard tests (claude plugin test)
 ├── claylee-e2e-testing/
 │   ├── .claude-plugin/plugin.json
@@ -115,7 +115,7 @@ plugins/
 
 ### Rules
 
-Global rule installed to `~/.claude/rules/` for automatic enforcement (provided by **claylee-core**):
+Injected into every session by a SessionStart hook (provided by **claylee-core**; a plugin's `rules/` directory is not loaded by Claude Code on its own):
 
 - **behavioral-contract** — 5 behavioral norms (Simplicity First, Surgical Changes, Surface Conflicts, Read before Write, Fail Loud) adapted from Karpathy's CLAUDE.md template
 

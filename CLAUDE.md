@@ -42,7 +42,8 @@ Hook conventions (same across plugins):
 
 All hook scripts are Node.js (pure stdlib, no npm dependencies) under `plugins/<plugin>/scripts/hooks/`:
 
-**claylee-core** (1 script):
+**claylee-core** (2 scripts):
+- **inject-behavioral-contract.js** — injects `rules/behavioral-contract.md` as `additionalContext` at SessionStart. Claude Code loads no `rules/` component from a plugin, so this hook is the only way the contract reaches the model; the file stays in `rules/` as the single source
 - **check-console-log.js** — scans all git-changed files for `console.log` (Stop)
 
 ### Mods (function-hook modules)
@@ -98,7 +99,7 @@ Conventional Commits format. AI-assisted commits end with the `Co-Authored-By` l
 
 ### Rules (in `claylee-core`)
 
-Global rule installed to `~/.claude/rules/` for automatic enforcement:
+Injected into every session by the plugin's SessionStart hook (a plugin's `rules/` directory is not loaded by Claude Code on its own):
 - **behavioral-contract** — 5 behavioral norms (Simplicity First, Surgical Changes, Surface Conflicts, Read before Write, Fail Loud) adapted from Karpathy's CLAUDE.md template
 
 ### Agents (in `claylee-code-quality-agents`)
