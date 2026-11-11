@@ -6,7 +6,7 @@ argument-hint: "<!MR-number | #PR-number | branch | git-range>"
 
 # retro-doc-sync
 
-Runs the workflow's **retro-doc** path (Phases D-0 → D-1 → D-2 → D-4 → 5 → 6 in the injected OpenSpec + Superpowers workflow) over code that already exists. Production code is never edited: only `openspec/`, `docs/superpowers/` and test files.
+Runs the workflow's **retro-doc** path (Phases D-0 → D-1 → D-2 → D-4 → 5 → 6 of the OpenSpec + Superpowers workflow; the SessionStart summary gives the path of the full workflow doc — read its retro-doc section before starting) over code that already exists. Production code is never edited: only `openspec/`, `docs/superpowers/` and test files.
 
 ## 1. Resolve the range
 
