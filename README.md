@@ -11,13 +11,13 @@ This repo is a **Claude Code marketplace** with 7 plugins. Install only the ones
 /plugin marketplace add ClayLeee/my-everything-claude-code
 
 # Install plugins individually (pick any subset)
-/plugin install claylee-core@ClayLeee-my-everything-claude-code
-/plugin install claylee-e2e-testing@ClayLeee-my-everything-claude-code
-/plugin install claylee-code-quality-agents@ClayLeee-my-everything-claude-code
-/plugin install claylee-openspec@ClayLeee-my-everything-claude-code
-/plugin install claylee-alien-defense@ClayLeee-my-everything-claude-code
-/plugin install cicd-watch@ClayLeee-my-everything-claude-code
-/plugin install prompt-nav@ClayLeee-my-everything-claude-code
+/plugin install claylee-core@my-everything-claude-code
+/plugin install claylee-e2e-testing@my-everything-claude-code
+/plugin install claylee-code-quality-agents@my-everything-claude-code
+/plugin install claylee-openspec@my-everything-claude-code
+/plugin install claylee-alien-defense@my-everything-claude-code
+/plugin install cicd-watch@my-everything-claude-code
+/plugin install prompt-nav@my-everything-claude-code
 ```
 
 ## Plugins
