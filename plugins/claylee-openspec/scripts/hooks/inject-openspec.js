@@ -1,14 +1,8 @@
 #!/usr/bin/env node
 /**
- * Dual-mode injector for OpenSpec + Superpowers workflow.
- *
- * Modes (CLI arg):
- *   full      — SessionStart hook: inject the full workflow doc once per session.
- *   reminder  — UserPromptSubmit hook (default): inject compressed reminder ONCE per
- *               session (session-marker dedup). Subsequent prompts pass through silently.
- *
- * Reminder dedup uses ~/.claude/cache/openspec-reminder/<session_id>.flag.
- * Markers older than 24h are cleaned up on next reminder invocation.
+ * SessionStart hook: inject the OpenSpec + Superpowers workflow doc. Startup,
+ * resume, clear and compact all fire SessionStart, so the doc is present once
+ * in every context window; no per-prompt reminder is needed.
  *
  * Only injects when the current project uses OpenSpec:
  *   - project root has an `openspec/` directory, OR
@@ -18,20 +12,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { execSync } = require('child_process');
 
-const MODE = process.argv[2] === 'full' ? 'full' : 'reminder';
-
-const CONFIG_DIR = path.join(__dirname, '..', '..', 'config');
-const FULL_FILE = path.join(CONFIG_DIR, 'openspec-superpowers-workflow.md');
-const REMINDER_FILE = path.join(CONFIG_DIR, 'openspec-superpowers-workflow.reminder.md');
-
-const WORKFLOW_FILE = MODE === 'full' ? FULL_FILE : REMINDER_FILE;
-const HOOK_EVENT = MODE === 'full' ? 'SessionStart' : 'UserPromptSubmit';
-
-const MARKER_DIR = path.join(os.homedir(), '.claude', 'cache', 'openspec-reminder');
-const MARKER_TTL_MS = 24 * 60 * 60 * 1000;
+const WORKFLOW_FILE = path.join(__dirname, '..', '..', 'config', 'openspec-superpowers-workflow.md');
 
 function getProjectRoot() {
   try {
@@ -48,41 +31,9 @@ function isOpenSpecEnabled(projectRoot) {
   );
 }
 
-function cleanupExpiredMarkers() {
-  try {
-    if (!fs.existsSync(MARKER_DIR)) return;
-    const now = Date.now();
-    for (const name of fs.readdirSync(MARKER_DIR)) {
-      const full = path.join(MARKER_DIR, name);
-      try {
-        const stat = fs.statSync(full);
-        if (now - stat.mtimeMs > MARKER_TTL_MS) fs.unlinkSync(full);
-      } catch (_e) { /* ignore */ }
-    }
-  } catch (_e) { /* ignore */ }
-}
-
-function reminderAlreadyInjected(sessionId) {
-  if (!sessionId) return false;
-  return fs.existsSync(path.join(MARKER_DIR, `${sessionId}.flag`));
-}
-
-function markReminderInjected(sessionId) {
-  if (!sessionId) return;
-  try {
-    fs.mkdirSync(MARKER_DIR, { recursive: true });
-    fs.writeFileSync(path.join(MARKER_DIR, `${sessionId}.flag`), String(Date.now()));
-  } catch (_e) { /* ignore */ }
-}
-
 let data = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', chunk => { data += chunk; });
-
-function clearReminderMarker(sessionId) {
-  if (!sessionId) return;
-  try { fs.unlinkSync(path.join(MARKER_DIR, `${sessionId}.flag`)); } catch (_e) { /* ignore */ }
-}
 
 process.stdin.on('end', () => {
   try {
@@ -98,22 +49,6 @@ process.stdin.on('end', () => {
       return;
     }
 
-    const input = (() => { try { return JSON.parse(data || '{}'); } catch (_e) { return {}; } })();
-    const sessionId = input.session_id || '';
-
-    if (MODE === 'full') {
-      // SessionStart fires for startup/resume/clear/compact. Reset reminder
-      // dedup so the next UserPromptSubmit re-injects the compressed reminder.
-      clearReminderMarker(sessionId);
-    } else {
-      cleanupExpiredMarkers();
-      if (reminderAlreadyInjected(sessionId)) {
-        console.log(data);
-        return;
-      }
-      markReminderInjected(sessionId);
-    }
-
     const content = fs.readFileSync(WORKFLOW_FILE, 'utf8').trim();
 
     if (!content) {
@@ -123,7 +58,7 @@ process.stdin.on('end', () => {
 
     console.log(JSON.stringify({
       hookSpecificOutput: {
-        hookEventName: HOOK_EVENT,
+        hookEventName: 'SessionStart',
         additionalContext: content
       }
     }));
