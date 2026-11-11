@@ -18,8 +18,6 @@ Look for `playwright/{page-name}/analysis.md` files (relative to `package.json` 
 - If multiple exist, ask the user which page to plan for
 - If none exist, tell the user to run `/e2e:analyze` first
 
-> **Note:** Legacy flat-file paths (`playwright/{page-name}-analysis.md`) are also accepted for backward compatibility.
-
 ## Step 2: Read References
 
 Read `$SKILL_DIR/references/coverage-checklist.md` (interaction depth checklist and coverage requirements). Read `$SKILL_DIR/references/ui-patterns.md` only if you need to see which interaction patterns the test code supports before naming scenarios.
