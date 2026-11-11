@@ -57,9 +57,8 @@ A plugin's `hooks/hooks.json` can name a TypeScript module under `modules` next 
 
 **prompt-nav** — `hooks/register.tsx` + `hooks/prompts.ts`: a `/prompts` pane to search and jump to the prompts sent, and an `AbovePrompt` band naming the prompt the transcript is at. The list is built from `$.session.messages()`; `typedPrompt()` drops rows the person did not type (commands, reminders, interruptions). A prompt sent while Claude was working is no user row of its own: it rides in the next tool-result message as a "new message while you were working" notice (door `attachment` in `session.append`), and `midTurnPrompts()` takes it from there, and only there, from such messages. The band names the topmost prompt whose `UserMessage` row reports itself on screen (`onScreen`, via `pick`); a row only reports when drawn and at the viewport's edges on a scroll, so one pushed off by a burst of output or unmounted can stay "on screen" for good. Sending a prompt, typed or mid-turn, therefore clears what is on screen and puts the band on the newest prompt, and the rows still in view report again. The pane draws every prompt, the one it is at in full in a box above the list, so the tree outgrows the pane and the arrow keys scroll it; `/prompts` scrolls the current prompt to the middle as it opens (`$.ui.scroll`, a convenience the pane opens without where it fails). Row ids for jumping come from `UserMessage` renders, `session.append`, and `hooks/transcript.py` (reads the transcript JSONL, `queued_command` attachments included) on session start and `/prompts reload`.
 
-**claylee-openspec** (2 scripts):
-- **inject-openspec.js** — dual-mode workflow injector (SessionStart = full, UserPromptSubmit = compressed reminder)
-- **clear-reminder-marker.js** — clears per-session reminder dedup marker on PreCompact
+**claylee-openspec** (1 script):
+- **inject-openspec.js** — injects the full workflow doc at SessionStart (startup, resume, clear and compact all fire it) when the project has `openspec/` or `.claude/openspec-enabled`; no per-prompt reminder
 
 ### E2E Testing Scripts (in `claylee-e2e-testing`)
 
@@ -83,10 +82,7 @@ Per official Claude Code docs, valid fields: `name`, `description`, `argument-hi
 A hook's `matcher` filters on tool name only (`Write`, `Edit|Write`, `*`); conditions on `tool_input` belong in the script or in the handler's `if` field (one permission rule, e.g. `Bash(git push*)`). A PreToolUse hook blocks only by exiting 2 or by printing a `permissionDecision: "deny"` JSON; exit 1 is a non-blocking error and the tool call goes ahead.
 
 ### Commit Convention
-Conventional Commits format. All AI-assisted commits include:
-```
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
-```
+Conventional Commits format. AI-assisted commits end with the `Co-Authored-By` line Claude Code supplies for the session's model.
 
 ### Git Branching
 - `main` — production
@@ -103,7 +99,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ### Rules (in `claylee-core`)
 
 Global rule installed to `~/.claude/rules/` for automatic enforcement:
-- **behavioral-contract** — 8 universal behavioral norms (Simplicity First, Surgical Changes, Fail Loud, etc.) adapted from Karpathy's CLAUDE.md template
+- **behavioral-contract** — 5 behavioral norms (Simplicity First, Surgical Changes, Surface Conflicts, Read before Write, Fail Loud) adapted from Karpathy's CLAUDE.md template
 
 ### Agents (in `claylee-code-quality-agents`)
 
@@ -117,7 +113,7 @@ All agents output in 繁體中文.
 ### Skills
 
 - **retro-doc-sync** (in `claylee-openspec`) — backfills OpenSpec specs, Superpowers docs and characterization tests for code already merged or pushed (an MR, a branch, a range), without touching production code. `scripts/triage.mjs <range> [repo]` does the deterministic first pass (commit types, `specFlag`, `testGaps`) so the model only judges what it flags; judge per range, not per commit, since a `feat:` is often followed by its `docs(openspec):` commit
-- **e2e-testing** (in `claylee-e2e-testing`) — Playwright E2E testing patterns with 3-level progressive disclosure: SKILL.md (core conventions, ~310 lines) → references/ (12 judgment-based guides) → templates/ (8 deterministic code files) + scripts/ (scaffold.js, generate-report.js). Commands resolve `$SKILL_DIR` via Glob and load only the references they need
+- **e2e-testing** (in `claylee-e2e-testing`) — Playwright E2E testing patterns with 3-level progressive disclosure: SKILL.md (core conventions, ~310 lines) → references/ (13 judgment-based guides) → templates/ (8 deterministic code files) + scripts/ (scaffold.js, generate-report.js). Commands get the skill directory from `${CLAUDE_PLUGIN_ROOT}` (substituted in command and skill bodies, not in references read with Read) and load each reference at the step that needs it
 
 ### Commands
 

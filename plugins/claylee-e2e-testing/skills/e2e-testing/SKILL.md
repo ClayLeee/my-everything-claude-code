@@ -276,14 +276,9 @@ For the full markdown template, see **`references/report-template.md`**.
 
 ## Additional References
 
-### Resolve `$SKILL_DIR` {#resolve-skill-dir}
+### Skill directory
 
-All commands need the skill directory path to access references, scripts, and templates. Resolve it once per session:
-
-1. `Glob("**/e2e-testing/SKILL.md")` — searches from CWD (works during plugin development)
-2. If not found: `Glob("**/e2e-testing/SKILL.md", path: "~/.claude/plugins")` — searches the plugin cache
-3. Extract the directory path from the result (remove `/SKILL.md` suffix) → `$SKILL_DIR`
-4. Access resources as `$SKILL_DIR/references/`, `$SKILL_DIR/scripts/`, `$SKILL_DIR/templates/`
+This skill's directory is `${CLAUDE_PLUGIN_ROOT}/skills/e2e-testing` (Claude Code substitutes the absolute path when it loads this skill or one of the `/e2e:*` commands). The references and commands call it `$SKILL_DIR`: `$SKILL_DIR/references/`, `$SKILL_DIR/scripts/`, `$SKILL_DIR/templates/`.
 
 ### Scripts
 
@@ -309,6 +304,7 @@ All commands need the skill directory path to access references, scripts, and te
 - **`references/coverage-checklist.md`** — Coverage Plan decomposition rules, validation rules, coverage self-check questions
 - **`references/error-discrimination.md`** — Error Discrimination Framework: error classification decision flow, recoverable vs non-recoverable determination, retry strategy, code examples (with import from error-utils)
 - **`references/mcp-discovery.md`** — MCP-Driven Test Discovery: session auth, page exploration, form dry-run, MCP→Spec translation
+- **`references/project-patterns.md`** — `playwright/e2e-patterns.md`: when to read and write the project's own locator/timing/feedback notes, skeleton, remote variant
 - **`references/report-template.md`** — Report generation via generate-report.js, key rules
 - **`references/semantic-analysis.md`** — Semantic Analysis: recursive extraction procedure, Semantic Element Table (SET), behavior taxonomy, column assertion rules, worked example
 - **`references/test-data-policy.md`** — UI-Only Test Data Policy: forbidden API patterns, lifecycle examples (create with cleanup, edit/delete with setup)
