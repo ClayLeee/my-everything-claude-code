@@ -55,7 +55,7 @@ plugins/
 │   ├── .claude-plugin/plugin.json
 │   ├── hooks/hooks.json
 │   ├── config/                   # OpenSpec workflow docs
-│   ├── scripts/hooks/            # 2 OpenSpec hooks
+│   ├── scripts/hooks/            # SessionStart workflow injector
 │   └── skills/retro-doc-sync/    # backfill specs/docs/tests for merged code
 ├── claylee-alien-defense/
 │   ├── .claude-plugin/plugin.json
@@ -117,7 +117,7 @@ plugins/
 
 Global rule installed to `~/.claude/rules/` for automatic enforcement (provided by **claylee-core**):
 
-- **behavioral-contract** — 8 universal behavioral norms (Simplicity First, Surgical Changes, Read before Write, Fail Loud, etc.) adapted from Karpathy's CLAUDE.md template
+- **behavioral-contract** — 5 behavioral norms (Simplicity First, Surgical Changes, Surface Conflicts, Read before Write, Fail Loud) adapted from Karpathy's CLAUDE.md template
 
 ### Skills
 
