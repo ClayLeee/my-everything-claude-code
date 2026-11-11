@@ -1,7 +1,6 @@
 ---
 name: "e2e:create"
 description: "Create POM + spec from coverage plan, run tests, and generate dual reports"
-model: opus
 context: fork
 ---
 
@@ -9,7 +8,7 @@ context: fork
 
 Create POM + spec files from the coverage plan, execute tests, and generate dual reports.
 
-All output must be in **繁體中文**.
+All output must be in **繁體中文**. `$SKILL_DIR` below is `${CLAUDE_PLUGIN_ROOT}/skills/e2e-testing`.
 
 ## Step 1: Locate Coverage Plan
 
@@ -20,36 +19,22 @@ Look for `playwright/{page-name}/coverage-plan.md` (relative to `package.json` d
 
 > **Note:** Legacy flat-file paths (`playwright/{page-name}-coverage-plan.md`) are also accepted for backward compatibility.
 
-## Step 2: Locate Skill Directory & Load References (MANDATORY)
+## Step 2: Read References
 
-**Resolve `$SKILL_DIR`** per SKILL.md § Resolve `$SKILL_DIR` — Glob for `**/e2e-testing/SKILL.md`, extract directory path.
-
-**Read references** from `$SKILL_DIR/references/`:
+Read from `$SKILL_DIR/references/`:
 - `code-patterns.md` — POM class patterns and spec file patterns
 - `ui-patterns.md` — core interaction code (table, form, select, pagination, search, toggle, delete, edit)
-- `ui-patterns-extended.md` — **only if coverage plan includes**: sortable columns, tabs, accordion, popover/filter, date picker, rich text editor, file upload, or drag-and-drop
-- `error-discrimination.md` — error classification for test failures
+- `ui-patterns-extended.md` — only if the coverage plan includes sortable columns, tabs, accordion, popover/filter, date picker, rich text editor, file upload, or drag-and-drop
 - `test-data-policy.md` — UI-Only test data policy
-- `auth-patterns.md` — authentication setup patterns
-- `mcp-discovery.md` — MCP tool reference and exploration patterns (for pre-validation and debug loop)
+- `project-patterns.md` — then apply `playwright/e2e-patterns.md` (in the `package.json` directory) if it exists; do not create it yet if absent
 
-Do NOT proceed without reading. If resolution fails, report the error and stop.
-
-## Step 2b: Load Project-Local Patterns (if present)
-
-Check for project-local patterns — zero additional cost when absent:
-- Check if `playwright/e2e-patterns.md` exists (in the `package.json` directory)
-- If exists: Read it and apply its patterns throughout Steps 4–8:
-  - `## Locators` — prefer these selectors over default `[data-testid]` when building POM
-  - `## Timing` — add these wait conditions to relevant POM action methods
-  - `## Feedback` — use this confirmed selector in `super(page, {...})` constructor
-- If absent: skip — do not create it yet
+Other references are read where they are needed: `auth-patterns.md` in Step 3 when the page needs authentication, `mcp-discovery.md` in Step 7 when MCP pre-validation runs, `error-discrimination.md` in Step 8 when a test fails.
 
 ## Step 3: Scaffold Shared Files
 
 Run the scaffold script from the **`package.json` directory** (not the repo root). Use `"targetDir":"."`.
 
-**Always scaffold** — shared infrastructure required by all tests:
+Always scaffold the shared infrastructure every test needs:
 
 ```bash
 echo '{"targetDir":".","templates":["BasePage","playwright.config.local","error-utils"],"variables":{"BASE_URL":"{baseUrl}","WEB_SERVER_COMMAND":"{webServerCommand}"}}' | node $SKILL_DIR/scripts/scaffold.js
@@ -61,7 +46,7 @@ If auth is **not** required, skip the rest of this step and proceed to Step 4.
 
 ---
 
-**Conditionally: Auth Setup** — only if the coverage plan indicates the page requires authentication (e.g., tests start from authenticated state, scenarios involve roles or permissions, page redirects to login when unauthenticated).
+**Auth setup** — only if the coverage plan indicates the page requires authentication (e.g., tests start from authenticated state, scenarios involve roles or permissions, page redirects to login when unauthenticated). Read `$SKILL_DIR/references/auth-patterns.md` first.
 
 **Pass 1 — Check `.env.test.local`:**
 
@@ -71,13 +56,11 @@ If `.env.test.local` does not exist or is empty (no credentials filled in):
 echo '{"targetDir":".","templates":["env.test.local"],"variables":{}}' | node $SKILL_DIR/scripts/scaffold.js
 ```
 
-Stop here. Tell the user:
+Stop here and tell the user; the remaining steps need the credentials:
 
 ```
 📝 .env.test.local 已建立，請填入各角色的測試帳號密碼，完成後再繼續執行 /e2e:create。
 ```
-
-Do NOT proceed to Steps 4–10.
 
 ---
 
@@ -89,9 +72,9 @@ Do NOT proceed to Steps 4–10.
 - If no comment, lowercase the abbreviation (e.g., `TEST_ADMIN_USERNAME` → `admin`)
 - `FIRST_ROLE` = the first role parsed
 
-**2. Dynamically generate `tests/fixtures/auth.ts`** (do NOT scaffold from template) — see `references/auth-patterns.md` § Generating auth.ts for the full convention.
+**2. Generate `tests/fixtures/auth.ts`** from the parsed roles (not from a template) — see `auth-patterns.md` § Generating auth.ts for the convention.
 
-**3. Dynamically generate `tests/e2e/auth/auth.setup.ts`** (do NOT scaffold from template) — one `setup()` block per role, each saving `.auth/{role}.json`:
+**3. Generate `tests/e2e/auth/auth.setup.ts`** from the parsed roles (not from a template) — one `setup()` block per role, each saving `.auth/{role}.json`:
 
 ```typescript
 import { test as setup } from "@playwright/test";
@@ -107,7 +90,7 @@ setup("authenticate as {role}", async ({ page }) => {
 // ... one block per parsed role
 ```
 
-**4. Generate `tests/e2e/pages/LoginPage.ts`** — read the project's login page source first, then implement `goto()` and `loginAs(account)`. See `references/auth-patterns.md` § LoginPage POM.
+**4. Generate `tests/e2e/pages/LoginPage.ts`** — read the project's login page source first, then implement `goto()` and `loginAs(account)`. See `auth-patterns.md` § LoginPage POM.
 
 **5. Scaffold `playwright.config.ts` with auth config** (overwrite: true, replaces the no-auth version):
 
@@ -122,17 +105,14 @@ echo '{"targetDir":".","templates":["playwright.config.local.auth"],"variables":
 ```
 
 - **Success** → `.auth/{role}.json` created for all roles — proceed to Step 4
-- **Failure** → Stop. Tell the user:
+- **Failure** → stop here and tell the user; the tests cannot run without a valid session:
   ```
   ❌ Auth setup 失敗，請確認 .env.test.local 中的帳號密碼是否正確，完成後再繼續執行 /e2e:create。
   ```
-  Do NOT proceed to Steps 4–10.
 
 ## Step 4: Inject `data-testid`
 
-Per the coverage plan's injection summary:
-- Add `data-testid` attributes to the page's source components (syntax per framework: SKILL.md § Framework Syntax)
-- **Only add attributes — change nothing else in the component files**
+Per the coverage plan's injection summary, add `data-testid` attributes to the page's source components (syntax per framework: SKILL.md § Framework Syntax). Only add attributes; change nothing else in the component files.
 
 ## Step 5: Build POM Class
 
@@ -142,33 +122,7 @@ Create `tests/e2e/pages/{PageName}Page.ts`:
 - Nested object structure for dialogs, tabs, sub-components
 - Include action methods for each user flow
 
-After writing the POM constructor with feedback config:
-- If `super(page, {})` (no feedback selectors) → skip
-- If `super(page, { success: ..., error: ... })` → check `playwright/e2e-patterns.md`:
-  - `## Feedback` section empty or file absent → create file skeleton if needed, write entry
-  - `## Feedback` already has an entry → skip (trust existing confirmed selector)
-
-The file skeleton when creating from scratch:
-```markdown
-# E2E Patterns — {project-name}
-<!-- Hard cap: 50 lines total. When full, replace similar entries, do NOT add. -->
-
-## Locators
-<!-- Quirks where UI library wrappers change the actual DOM element to target -->
-<!-- Format: - {component}: use {selector} not {default} -->
-
-## Timing
-<!-- Wait conditions this app needs beyond SKILL.md defaults -->
-<!-- Format: - {operation}: needs {waitCondition} because {reason} -->
-
-## Feedback
-<!-- The ONE confirmed feedback selector for this project -->
-<!-- Format: - library: {name} | success: {selector} | error: {selector} -->
-
-## API
-<!-- Base URL and auth pattern (only if non-standard) -->
-<!-- Format: - baseUrl: {pattern} | auth: {method} -->
-```
+If the constructor passes real feedback selectors (`super(page, { success: ..., error: ... })`), record them in `playwright/e2e-patterns.md` per `project-patterns.md` § Writing it.
 
 ## Step 6: Build Spec File
 
@@ -180,25 +134,21 @@ Create `tests/e2e/{domain}/{page-name}.spec.ts` (domain inferred from the page's
 
 ## Step 7: MCP Pre-validation (if dev server running)
 
-IF dev server is running AND MCP Playwright tools are available:
+If the dev server is running and MCP Playwright tools are available, read `$SKILL_DIR/references/mcp-discovery.md`, then:
 
 1. `browser_navigate` → target page URL
 2. `browser_snapshot` → get ARIA tree
-3. `browser_run_code` → verify all POM `data-testid` locators exist in DOM:
+3. `browser_run_code` → list the `data-testid` values present in the DOM:
    ```javascript
    const testIds = await page.locator('[data-testid]').evaluateAll(
      els => els.map(e => e.getAttribute('data-testid'))
    );
    return testIds;
    ```
-4. Cross-check: every `data-testid` in the POM class MUST appear in the DOM scan result
-5. For each missing `data-testid`:
-   - Check if the injection in Step 4 was applied correctly
-   - Fix the source component or POM locator
-6. For dialogs/tabs: `browser_click` to open each → `browser_snapshot` → verify inner `data-testid` attributes
+4. Every `data-testid` the POM uses should appear in that list; for each missing one, check the Step 4 injection and fix the source component or the POM locator
+5. For dialogs/tabs: `browser_click` to open each → `browser_snapshot` → verify inner `data-testid` attributes
 
-IF dev server NOT running OR MCP NOT available:
-→ Skip this step. Proceed to test execution.
+Otherwise skip this step and proceed to test execution.
 
 ## Step 8: Execute Tests
 
@@ -212,32 +162,9 @@ First, check `package.json` for the E2E script name (commonly `test:e2e`, `e2e`,
 E2E_REPORT_NAME={page-name} {run} test:e2e -- {spec-path}
 ```
 
-**After execution, apply Error Discrimination:**
+If any test fails, read `$SKILL_DIR/references/error-discrimination.md` (and `mcp-discovery.md` if not yet read), classify each failure, and follow the reference's retry strategy: fix entity state through the UI for ENVIRONMENT errors, fix test data for RECOVERABLE ones, and run the MCP Debug Loop for element errors (snapshot the page, compare the failing locator with the DOM, inject the `data-testid` or fix the POM locator or add a wait, rerun the failing tests). Report what still fails with its classification and the MCP diagnostic; do not keep retrying past the limits the reference sets.
 
-IF any test fails:
-├── Classify each failure:
-│   ├── FORM SUBMISSION error (API returned 4xx/5xx)?
-│   │   ├── ENVIRONMENT (disabled/archived/locked)? → Fix entity state via MCP UI, retry
-│   │   ├── RECOVERABLE (duplicate/invalid format)? → Fix test data per strategy table → Retry (max 2)
-│   │   └── Other → Report FAIL with classification
-│   ├── ELEMENT INTERACTION error (not found / timeout / not interactable)?
-│   │   └── **MCP Debug Loop** (see error-discrimination.md § MCP Debug Loop):
-│   │       ├── `browser_navigate` → failing page
-│   │       ├── `browser_snapshot` → get ARIA tree
-│   │       ├── Diagnose: query failed locator in DOM, find actual testid or confirm missing
-│   │       ├── Fix: inject data-testid / fix POM locator / add waitFor
-│   │       └── Retry failing test(s) (max 1 MCP-debug retry)
-│   └── PAGE LOADING error → Report FAIL
-└── Generate report with per-failure classification + MCP diagnostic info
-
-**After all tests pass** (whether initially, after MCP debug loop, or after user-guided fixes):
-→ If any POM or spec file was modified in this session AND tests now pass:
-  1. Read `playwright/e2e-patterns.md` (create with skeleton from Step 5 if absent)
-  2. Classify each fix made in this session:
-     - Selector / locator change → `## Locators` entry: `- {component}: use {actual-selector} not {attempted-selector}`
-     - Wait / timing change → `## Timing` entry: `- {operation}: needs {waitCondition} because {reason}`
-  3. Skip if same pattern already present (substring match)
-  4. If total file lines < 50 → append; if ≥ 50 → replace most similar entry in same section
+After all tests pass, if any POM or spec file changed in this session, record each fix in `playwright/e2e-patterns.md` per `project-patterns.md` § Writing it.
 
 ## Step 9: Generate Dual Reports
 

@@ -1,7 +1,6 @@
 ---
 name: "e2e:plan"
 description: "Generate coverage plan from page analysis for E2E testing"
-model: sonnet
 context: fork
 allowed-tools: Read, Glob, Grep, Write
 ---
@@ -10,7 +9,7 @@ allowed-tools: Read, Glob, Grep, Write
 
 Generate a Coverage Plan from the analysis artifact produced by `/e2e:analyze`.
 
-All output must be in **繁體中文**.
+All output must be in **繁體中文**. `$SKILL_DIR` below is `${CLAUDE_PLUGIN_ROOT}/skills/e2e-testing`.
 
 ## Step 1: Locate Analysis Artifact
 
@@ -21,15 +20,9 @@ Look for `playwright/{page-name}/analysis.md` files (relative to `package.json` 
 
 > **Note:** Legacy flat-file paths (`playwright/{page-name}-analysis.md`) are also accepted for backward compatibility.
 
-## Step 2: Locate Skill Directory & Load References (MANDATORY)
+## Step 2: Read References
 
-**Resolve `$SKILL_DIR`** per SKILL.md § Resolve `$SKILL_DIR` — Glob for `**/e2e-testing/SKILL.md`, extract directory path.
-
-**Read references** from `$SKILL_DIR/references/`:
-- `coverage-checklist.md` — interaction depth checklist and coverage requirements
-- `ui-patterns.md` — core UI interaction patterns (table, form, select, pagination, search, toggle, delete, edit)
-
-Do NOT proceed without reading. If resolution fails, report the error and stop.
+Read `$SKILL_DIR/references/coverage-checklist.md` (interaction depth checklist and coverage requirements). Read `$SKILL_DIR/references/ui-patterns.md` only if you need to see which interaction patterns the test code supports before naming scenarios.
 
 ## Step 3: Read Analysis Artifact
 

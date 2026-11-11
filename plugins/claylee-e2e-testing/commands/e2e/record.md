@@ -2,14 +2,13 @@
 name: "e2e:record"
 description: "Record browser actions with Playwright codegen, then convert to POM + spec test code"
 argument-hint: "[target_url]"
-model: opus
 ---
 
 # E2E Record — Playwright Codegen + AI Transform
 
 Record browser actions via Playwright codegen, then convert to project-standard POM + spec test code.
 
-All output must be in **繁體中文**.
+All output must be in **繁體中文**. `$SKILL_DIR` below is `${CLAUDE_PLUGIN_ROOT}/skills/e2e-testing`.
 
 **Two-phase design:**
 - **Phase 1 (inline):** Launch codegen → read results → ask user for supplementary interactions → produce recording artifact
@@ -28,14 +27,9 @@ All output must be in **繁體中文**.
 - **Local mode:** URL is `localhost` or local dev server AND project has `tests/e2e/` directory → locator strategy = `data-testid` priority, POM extends `BasePage`
 - **Remote mode:** External URL, no local source code → locator strategy = preserve codegen semantic locators, POM extends `RemoteBasePage`
 
-### Step 2: Locate Skill Directory & Load References (MANDATORY)
+### Step 2: Read References
 
-**Resolve `$SKILL_DIR`** per SKILL.md § Resolve `$SKILL_DIR` — Glob for `**/e2e-testing/SKILL.md`, extract directory path.
-
-**Read references** from `$SKILL_DIR/references/` (Phase 1 only needs recording-patterns):
-- `recording-patterns.md` — codegen workflow, locator transform rules, code gen templates
-
-Do NOT proceed without reading. If resolution fails, report the error and stop.
+Read `$SKILL_DIR/references/recording-patterns.md` (codegen workflow, locator transform rules, code gen templates). Phase 1 needs nothing else.
 
 ### Step 3: Launch Playwright Codegen
 
@@ -147,7 +141,7 @@ Write `playwright/{page-name}/recording-log.md` with:
 
 Use the **Agent tool** to spawn a fork subagent with the following prompt. Include:
 - Path to `recording-log.md`
-- Path to `$SKILL_DIR` (for reference loading)
+- The skill directory path (`$SKILL_DIR`, for reference loading)
 - Mode (local/remote)
 - The Phase 2 instructions below
 
@@ -155,21 +149,15 @@ Use the **Agent tool** to spawn a fork subagent with the following prompt. Inclu
 
 ## Phase 2: Code Generation (fork subagent via Agent tool)
 
-The subagent should load these references from `$SKILL_DIR/references/`:
+Read from `$SKILL_DIR/references/`:
 - `recording-patterns.md` — codegen workflow, locator transform rules, code gen templates
 - `code-patterns.md` — BasePage, POM patterns, spec patterns
 - `ui-patterns.md` — core interaction code examples
-- `ui-patterns-extended.md` — only if recording involves: sortable columns, tabs, accordion, date picker, rich text, file upload, or drag-and-drop
+- `ui-patterns-extended.md` — only if the recording involves sortable columns, tabs, accordion, date picker, rich text, file upload, or drag-and-drop
 - `test-data-policy.md` — UI-only data policy, CRUD lifecycle
-- `error-discrimination.md` — error classification framework
-- `mcp-discovery.md` — MCP tool reference (for debug loop)
+- `project-patterns.md` — then apply `playwright/e2e-patterns.md` if it exists; do not create it yet if absent
 
-**Load project-local patterns (if present):**
-- Check if `playwright/e2e-patterns.md` exists
-- If exists: Read and apply throughout Steps 8–12:
-  - `## Locators` — prefer these selectors when transforming locators in Step 8
-  - `## Timing` — add these wait conditions to relevant POM action methods
-- If absent: skip
+`error-discrimination.md` and `mcp-discovery.md` are read in Step 12 only if tests fail (Step 8 also uses MCP in local mode; read `mcp-discovery.md` there if the tool reference is needed).
 
 ### Step 7: Auto-Assignment — Resolve Target Files
 
@@ -217,7 +205,7 @@ The subagent should load these references from `$SKILL_DIR/references/`:
 For locators marked **NEEDS_INJECTION**:
 1. Find the page's source component (the file that renders the element — `.vue`, `.tsx`/`.jsx`, `.svelte`, or Angular template)
 2. Inject `data-testid` following naming convention: `{page}-{component}-{element}`
-3. **Only add `data-testid` attributes — change nothing else in the component**
+3. Only add `data-testid` attributes; change nothing else in the component
 
 Remote mode: skip this step entirely.
 
@@ -235,7 +223,7 @@ Transform codegen output into project-standard POM + spec:
 - Add `waitForResponse` for API calls where appropriate
 - Add toast assertions where form submissions detected
 - **CRUD detection:** If action sequence matches create flow → wrap in `test.describe.serial` with cleanup test
-- **Recording data exception:** Preserve user's original recorded values — do NOT apply `[E2E]` prefix or automated cleanup for manually recorded data
+- **Recording data exception:** Preserve user's original recorded values; the `[E2E]` prefix and automated cleanup do not apply to manually recorded data
 - Insert into target `test.describe` block (from Step 7)
 
 ### Step 11: Conflict Detection
@@ -255,54 +243,9 @@ Run from the directory that holds the project's `package.json` (`{run}` / `{exec
 E2E_REPORT_NAME={page-name} {run} test:e2e -- {spec-path}
 ```
 
-**After execution, apply Error Discrimination:**
+If any test fails, read `$SKILL_DIR/references/error-discrimination.md` and `$SKILL_DIR/references/mcp-discovery.md`, classify each failure, and follow the reference's retry strategy: fix entity state through the UI for ENVIRONMENT errors, fix test data for RECOVERABLE ones, and run the MCP Debug Loop for element errors (snapshot the page, compare the failing locator with the DOM, inject the `data-testid` or fix the POM locator or add a wait, rerun the failing tests; in remote mode fix the ARIA locator instead). Report what still fails with its classification and the MCP diagnostic; do not keep retrying past the limits the reference sets.
 
-IF any test fails:
-├── Classify each failure:
-│   ├── FORM SUBMISSION error (API returned 4xx/5xx)?
-│   │   ├── ENVIRONMENT (disabled/archived/locked)? → Fix entity state via MCP UI, retry
-│   │   ├── RECOVERABLE (duplicate/invalid format)? → Fix test data per strategy table → Retry (max 2)
-│   │   └── Other → Report FAIL with classification
-│   ├── ELEMENT INTERACTION error (not found / timeout / not interactable)?
-│   │   └── **MCP Debug Loop** (see error-discrimination.md § MCP Debug Loop):
-│   │       ├── `browser_navigate` → failing page
-│   │       ├── `browser_snapshot` → get ARIA tree
-│   │       ├── Diagnose: query failed locator in DOM, find actual testid or confirm missing
-│   │       ├── Fix: inject data-testid / fix POM locator / add waitFor
-│   │       └── Retry failing test(s) (max 1 MCP-debug retry)
-│   └── PAGE LOADING error → Report FAIL
-└── Generate report with per-failure classification + MCP diagnostic info
-
-**After all tests pass** (whether initially, after MCP debug loop, or after user-guided fixes):
-→ If any POM or spec file was modified in this session AND tests now pass:
-  1. Read `playwright/e2e-patterns.md` (create with skeleton below if absent)
-  2. Classify each fix made in this session:
-     - Selector / locator change → `## Locators` entry: `- {component}: use {actual-selector} not {attempted-selector}`
-     - Wait / timing change → `## Timing` entry: `- {operation}: needs {waitCondition} because {reason}`
-  3. Skip if same pattern already present (substring match)
-  4. If total file lines < 50 → append; if ≥ 50 → replace most similar entry in same section
-
-Skeleton when creating from scratch:
-```markdown
-# E2E Patterns — {project-name}
-<!-- Hard cap: 50 lines total. When full, replace similar entries, do NOT add. -->
-
-## Locators
-<!-- Quirks where UI library wrappers change the actual DOM element to target -->
-<!-- Format: - {component}: use {selector} not {default} -->
-
-## Timing
-<!-- Wait conditions this app needs beyond SKILL.md defaults -->
-<!-- Format: - {operation}: needs {waitCondition} because {reason} -->
-
-## Feedback
-<!-- The ONE confirmed feedback selector for this project -->
-<!-- Format: - library: {name} | success: {selector} | error: {selector} -->
-
-## API
-<!-- Base URL and auth pattern (only if non-standard) -->
-<!-- Format: - baseUrl: {pattern} | auth: {method} -->
-```
+After all tests pass, if any POM or spec file changed in this session, record each fix in `playwright/e2e-patterns.md` per `project-patterns.md` § Writing it (remote variant in remote mode).
 
 ### Step 13: Dual Reports + Completion
 
