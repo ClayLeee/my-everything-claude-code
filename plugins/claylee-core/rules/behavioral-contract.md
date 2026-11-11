@@ -19,7 +19,7 @@ Don't blend conflicting patterns.
 
 ## Rule 4 — Read before you write
 Before adding code in a file, read the file's exports, immediate callers, and obvious shared utilities.
-Use the project's accurate search mechanism — `Grep`/`Glob` by default, GitNexus when installed (`.gitnexus/` or `mcp__gitnexus__*` present) for symbol-level impact.
+Use the search tools this environment provides: lean-ctx (`ctx_search`, `ctx_glob`, `ctx_read`) when its MCP tools are present, Claude Code's own `Grep`/`Glob` otherwise, and GitNexus when installed (`.gitnexus/` or `mcp__gitnexus__*` present) for symbol-level impact.
 "Looks orthogonal" is the most dangerous phrase in this codebase.
 
 ## Rule 5 — Fail loud
